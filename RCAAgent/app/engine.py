@@ -1,5 +1,4 @@
 import re
-from typing import Any
 
 from langfuse import propagate_attributes
 
@@ -62,7 +61,6 @@ class RCAEngine:
                     prompt=prompt,
                     orchestration_output=raw,
                     remediation_required=result.remediation_required,
-                    remediation_output="",
                 )
             )
         except Exception:
@@ -97,12 +95,11 @@ class RCAEngine:
 
     @classmethod
     def _parse(cls, raw: str) -> RCAResult:
-        remediation = cls._bool_field(raw, "Remediation Required", default=True)
+        remediation = cls._bool_field(raw, "Remediation Required", default=False)
         incident = cls._field(raw, "Incident State").lower()
         allowed = {"active", "recovered", "intermittent", "preventive risk", "unconfirmed"}
         if incident not in allowed:
             incident = "unconfirmed"
-        plan_text = cls._section(raw, "Remediation Plan")
         return RCAResult(
             remediation_required=remediation,
             incident_state=incident,
@@ -111,7 +108,14 @@ class RCAEngine:
             evidence=cls._lines(cls._section(raw, "Evidence")),
             impact_scope=cls._lines(cls._section(raw, "Impact Scope")),
             uncertainty=cls._lines(cls._section(raw, "Missing Or Uncertain")),
-            remediation_plan=RemediationPlan(action=plan_text),
+            remediation_plan=RemediationPlan(
+                action=cls._section(raw, "Remediation Plan"),
+                targets=cls._lines(cls._section(raw, "Remediation Targets")),
+                expected_benefit=cls._section(raw, "Expected Benefit"),
+                verification=cls._lines(cls._section(raw, "Verification")),
+                rollback=cls._lines(cls._section(raw, "Rollback")),
+                guardrails=cls._lines(cls._section(raw, "Guardrails")),
+            ),
         )
 
     @staticmethod

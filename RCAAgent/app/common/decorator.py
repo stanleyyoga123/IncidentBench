@@ -1,7 +1,6 @@
 import functools
-import inspect
 import time
-from typing import Awaitable, Callable, TypeVar, ParamSpec, cast
+from typing import Callable, TypeVar, ParamSpec
 
 from common.logger.console import get_logger
 
@@ -37,37 +36,6 @@ def retry(
                     current_delay *= backoff
 
             raise RuntimeError("Unexpected retry failure")
-
-        return wrapper
-
-    return decorator
-
-
-def log_runtime():
-    def decorator(func: Callable[P, T]) -> Callable[P, T]:
-        if inspect.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-                start = time.perf_counter()
-                try:
-                    return await cast(Callable[P, Awaitable[T]], func)(*args, **kwargs)
-                finally:
-                    stop = time.perf_counter()
-                    LOGGER.info(
-                        f"Runtime {func.__qualname__}: {stop - start:.6f} seconds"
-                    )
-
-            return cast(Callable[P, T], async_wrapper)
-
-        @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            start = time.perf_counter()
-            try:
-                return func(*args, **kwargs)
-            finally:
-                stop = time.perf_counter()
-                LOGGER.info(f"Runtime {func.__qualname__}: {stop - start:.6f} seconds")
 
         return wrapper
 

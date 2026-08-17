@@ -125,16 +125,6 @@ TOOL_USAGE_CONTEXT = {
         "Inspect `coverage.missing_signals`, `errors`, and each resource's `missing_signals`. Empty or failed signals are missing evidence, never proof of health.",
         "The latency matrix uses ten ICMP samples per directed worker pair over both overlay and underlay paths; the tool performs no active path, DNS, TCP-connect, or bandwidth probes and makes no cluster mutations.",
     ],
-    "remediator.write_file": [
-        "Use only from the remediator agent to create files in the active remediation session folder.",
-        "Write every required artifact explicitly, such as `remediation.yml`, `inventory.ini`, manifests, or rollback notes.",
-        "Do not include path separators in filenames.",
-    ],
-    "remediator.run_ansible": [
-        "Use only from the remediator agent after required files have been written.",
-        "Run check mode first with `check=true`; run live with `check=false` only when hard guardrails pass.",
-        "Inspect status, return code, changed summary, and stdout summary; do not fabricate execution results.",
-    ],
     "agent_spawner": [
         "Use only from the orchestrator to delegate bounded evidence gathering to sub-agents.",
         "Never include `agent_spawner` in a spawned sub-agent's tools.",

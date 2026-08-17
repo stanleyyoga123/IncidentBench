@@ -167,6 +167,17 @@ class RemediationJobStore:
                 )
             conn.commit()
 
+    def list_artifacts(self, job_id: UUID) -> list[str]:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT filename FROM remediation_artifact
+                WHERE remediation_job_id=%s ORDER BY filename
+                """,
+                (job_id,),
+            )
+            return [row["filename"] for row in cur.fetchall()]
+
     def _finish(self, job_id: UUID, status: str, *, result=None, raw=None, error=None):
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(

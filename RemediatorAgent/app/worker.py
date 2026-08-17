@@ -48,6 +48,9 @@ class RemediatorWorker:
         try:
             request = RemediationJobRequest.model_validate(job.request)
             result, raw = self.engine.run(job.id, request)
+            result = result.model_copy(
+                update={"artifacts": self.store.list_artifacts(job.id)}
+            )
             self.store.succeed(job.id, result, raw)
         except Exception as exc:
             LOGGER.exception("Remediation job %s requires review", job.id)

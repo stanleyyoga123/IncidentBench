@@ -1,3 +1,4 @@
+import json
 import re
 
 from langfuse import propagate_attributes
@@ -36,11 +37,7 @@ class RemediationEngine:
             temperature=0.6,
             top_p=0.95,
         )
-        prompt = REMEDIATOR_EXECUTION_PROMPT.format(
-            session_id=job_id,
-            prompt="Approved RCA workflow",
-            orchestration_output=request.rca_result,
-        )
+        prompt = self._prompt(job_id, request)
         callback = (
             lambda name, args, result: self.audit_callback(job_id, name, args, result)
             if self.audit_callback else None
@@ -50,19 +47,38 @@ class RemediationEngine:
                 raw = agent.run(prompt)
         return self._parse(raw), raw
 
+    @staticmethod
+    def _prompt(job_id, request: RemediationJobRequest) -> str:
+        workflow_context = {
+            "workflow_id": str(request.workflow_id) if request.workflow_id else None,
+            "rca_job_id": str(request.rca_job_id),
+            "approval": request.approval.model_dump(mode="json"),
+        }
+        return REMEDIATOR_EXECUTION_PROMPT.format(
+            session_id=job_id,
+            prompt=json.dumps(workflow_context, sort_keys=True, indent=2),
+            orchestration_output=json.dumps(
+                request.rca_result,
+                sort_keys=True,
+                indent=2,
+            ),
+        )
+
     @classmethod
     def _parse(cls, raw: str) -> RemediationResult:
         return RemediationResult(
             summary=cls._section(raw, "Status") or raw[:4000],
             changes=cls._lines(cls._section(raw, "Changes")),
             verification=cls._lines(cls._section(raw, "Verification")),
-            artifacts=cls._lines(cls._section(raw, "Artifacts")),
         )
 
     @staticmethod
     def _section(raw: str, name: str) -> str:
         match = re.search(
-            rf"(?ims)^\s*(?:#+\s*)?{re.escape(name)}\s*:?(.*?)(?=^\s*#+\s*[A-Z]|\Z)", raw
+            rf"(?ims)^\s*(?:#+\s*)?{re.escape(name)}\s*:?\s*(.*?)"
+            rf"(?=^\s*(?:#+\s*)?(?:Status|Changes|Verification|"
+            rf"Blocked Or Skipped|Next Steps)\s*:?\s*$|\Z)",
+            raw,
         )
         return match.group(1).strip() if match else ""
 

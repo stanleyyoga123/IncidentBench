@@ -306,36 +306,3 @@ class Agent:
         estimated_tokens = len(json.dumps(self._messages, default=str).split()) * 4
         LOGGER.info(f"Estimated context tokens: {estimated_tokens}")
         return estimated_tokens > self._context_threshold * self._max_context
-
-
-if __name__ == "__main__":
-    agent = Agent(
-        name="testing-agent",
-        model="Qwen/Qwen3.6-35B-A3B",
-        base_url="http://localhost:8000/v1",
-        system_prompt="You are a helpful agent",
-        tools=TOOL_REGISTRY.describe_openai_format(
-            [
-                "kubectl",
-                "prometheus",
-                "loki",
-                "jaeger.list_services",
-                "jaeger.retrieve_slow_traces",
-                "jaeger.investigate_trace",
-                "jaeger.retrieve_bottleneck",
-                "network.topology",
-                "network.latency_matrix",
-                "network.bandwidth",
-                "network.path",
-                "network.dns",
-                "network.tcp_connect",
-                "agent_spawner",
-            ]
-        ),
-        max_rounds=20,
-        timeout_seconds=60,
-    )
-    user_prompt = "Give me the current condition of the microservice system inside online-boutique namespace. I want you to retrieve the last 30 minutes states per deployments (like cpu metrics, memory, network, rps, any error, etc)"
-    output = agent.run(user_prompt)
-
-    print(output)

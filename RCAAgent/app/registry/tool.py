@@ -41,9 +41,6 @@ class ToolRegistry:
             api_key=SETTINGS.client.token,
         )
 
-    async def _session(self):
-        raise RuntimeError("use _list_remote or _call_remote")
-
     async def _list_remote(self) -> dict[str, dict[str, Any]]:
         headers = {"Authorization": f"Bearer {SETTINGS.mcp.token}"}
         async with httpx2.AsyncClient(headers=headers, timeout=300) as client:

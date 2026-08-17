@@ -72,9 +72,9 @@ Final output must use compact headings and bullet points, including one `Changes
 
 Active MCP remediation session ID: {session_id}
 
-Original user prompt:
+Approved workflow context:
 {prompt}
 
-Orchestrator output:
+Approved RCA result:
 {orchestration_output}
 """

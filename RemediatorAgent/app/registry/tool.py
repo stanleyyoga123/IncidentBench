@@ -10,7 +10,6 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from config import SETTINGS
-from registry.tool_context import build_tool_usage_context
 
 
 _AUDIT: ContextVar[Callable[[str, dict, Any], None] | None] = ContextVar(
@@ -32,9 +31,6 @@ class audit_tool_calls:
 class ToolRegistry:
     def __init__(self):
         self._schemas: dict[str, dict[str, Any]] | None = None
-
-    async def _session(self):
-        raise RuntimeError("use _list_remote or _call_remote")
 
     async def _list_remote(self) -> dict[str, dict[str, Any]]:
         headers = {"Authorization": f"Bearer {SETTINGS.mcp.token}"}
@@ -79,9 +75,6 @@ class ToolRegistry:
             self._schemas = asyncio.run(self._list_remote())
         return self._schemas
 
-    def names(self) -> set[str]:
-        return set(self._metadata())
-
     def describe_openai_format(self, names: list[str]) -> list[dict[str, Any]]:
         metadata = self._metadata()
         return [
@@ -96,12 +89,6 @@ class ToolRegistry:
             for name in names
             if name in metadata
         ]
-
-    def usage_context(self, names: list[str]) -> str:
-        metadata = self._metadata()
-        return build_tool_usage_context(
-            names, {name: metadata[name]["description"] for name in names if name in metadata}
-        )
 
     def run(self, name: str, kwargs: dict[str, Any]):
         canonical = name.replace("__", ".")
