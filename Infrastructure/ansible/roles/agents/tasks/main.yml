@@ -33,14 +33,30 @@
     - {name: mcp-tools-remediation, template: mcp-remediation.env.j2}
   no_log: true
 
-- name: Deploy the split agent platform resources
+- name: Deploy the component-owned agent platform resources
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_kubeconfig_local }}"
     state: present
     definition: "{{ item }}"
   loop: >-
-    {{ lookup('ansible.builtin.file', role_path + '/../../../kubernetes/agents/agent-platform.yaml')
-       | from_yaml_all | select | list }}
+    {{
+      (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/rbac.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/network-probes.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/investigation.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/remediation.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../RCAAgent/kubernetes/manifest.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../RemediatorAgent/kubernetes/manifest.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../AgentOrchestrator/kubernetes/manifest.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../kubernetes/agents/shared.yaml')
+        | from_yaml_all | select | list)
+    }}
 
 - name: Set split service images
   kubernetes.core.k8s:
@@ -153,7 +169,7 @@
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_kubeconfig_local }}"
     state: present
-    src: "{{ role_path }}/../../../kubernetes/agents/anomaly-detector.yaml"
+    src: "{{ role_path }}/../../../../AnomalyDetector/kubernetes/manifest.yaml"
 
 - name: Set the AnomalyDetector image
   kubernetes.core.k8s:

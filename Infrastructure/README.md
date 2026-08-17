@@ -1,14 +1,15 @@
 # Infrastructure
 
-This directory is the only source of truth for cluster creation, node
-preparation, platform tools, deployment manifests, Helm values, and runtime
-configuration assembly. Application directories contain application code;
-Evaluation retains only experiment-time restart and cleanup behavior.
+This directory is the source of truth for cluster creation, node preparation,
+platform tools, shared policy, Helm values, runtime configuration assembly, and
+ordered installation. Application directories own their raw workload
+manifests; Evaluation retains experiment-time restart and cleanup behavior.
 
 ## Layout
 
 - `ansible/`: inventory, cluster/tool/node/application playbooks, and roles.
-- `kubernetes/`: authored manifests for PostgreSQL, agents, and Online Boutique.
+- `kubernetes/`: authored manifests for PostgreSQL, shared agent policy, and
+  Online Boutique. Agent workload manifests live under each component.
 - `values/`: Prometheus, Grafana, Loki, Alloy, Jaeger, and tracing configuration.
 - `compose/database.yml`: local PostgreSQL plus the DatabaseJob migration.
 - `generated/`: ignored kubeconfig and pinned SSH host keys produced by Ansible.

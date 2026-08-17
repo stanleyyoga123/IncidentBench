@@ -10,8 +10,9 @@ HTTP. It never connects to PostgreSQL.
 This repository does not own database DDL or cluster installation:
 
 - Schema and Alembic migrations belong to `../DatabaseJob/`.
-- Kubernetes manifests, Prometheus rules, runtime Secret templates, and cluster
-  installation belong to `../Infrastructure/`.
+- The service Deployment and ClusterIP Service belong to `kubernetes/manifest.yaml`.
+- Prometheus rules, runtime Secret rendering, and cluster installation belong
+  to `../Infrastructure/`.
 - Fault injection and service restart controls belong to `../Evaluation/`.
 
 Read the workspace `../AGENTS.md` and `../docs/` before making cross-component
@@ -44,9 +45,8 @@ window each cycle and does not perform startup backfill.
 - `src/controller/orchestrator.py`: bounded authenticated HTTP delivery.
 - `src/schema/`: Pydantic transport and detection models.
 - `tests/`: unit, provider, manager, profile, and API tests.
+- `kubernetes/manifest.yaml`: component-owned Deployment and ClusterIP Service.
 - `../Infrastructure/values/prometheus/recording-rules.*`: metric contract.
-- `../Infrastructure/kubernetes/agents/anomaly-detector.yaml`: Deployment and
-  ClusterIP Service.
 
 ## Adaptability Contract
 
@@ -114,8 +114,8 @@ requests them and the target is known.
 - Add bounds and tests for every newly mutable parameter.
 - Treat missing required Prometheus recording rules as fatal configuration;
   transient HTTP or payload failures may skip a cycle.
-- Do not recreate database tables, infrastructure manifests, or fault-install
-  scripts in this repository.
+- Do not recreate database tables, shared Infrastructure policy, Secret
+  rendering, or fault-install scripts in this repository.
 - Preserve unrelated dirty worktree changes.
 
 ## Verification

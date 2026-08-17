@@ -6,4 +6,7 @@ mode, guarded live execution, and direct post-action verification. Any crash or
 ambiguous failure after execution starts becomes `needs_review`; never retry a
 mutation blindly. Use only the remediation MCP profile and explicit session IDs.
 
+Own `kubernetes/manifest.yaml` for the Deployment and ClusterIP Service.
+Infrastructure owns Secret rendering and ordered installation.
+
 Run `PYTHONPATH=app pytest -q` and `python -m compileall -q app tests`.

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: mcp-tools-network-probe-overlay, namespace: utility}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: mcp-tools-network-probe, app.kubernetes.io/component: overlay}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mcp-tools-network-probe, app.kubernetes.io/component: overlay}
+      annotations: {sidecar.istio.io/inject: "false"}
+    spec:
+      nodeSelector: {role: services}
+      containers:
+        - name: probe
+          image: nicolaka/netshoot:v0.16
+          command: [iperf3, --server]
+          ports: [{name: iperf, containerPort: 5201}]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL], add: [NET_RAW]}}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: mcp-tools-network-probe-underlay, namespace: utility}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: mcp-tools-network-probe, app.kubernetes.io/component: underlay}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mcp-tools-network-probe, app.kubernetes.io/component: underlay}
+      annotations: {sidecar.istio.io/inject: "false"}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector: {role: services}
+      containers:
+        - name: probe
+          image: nicolaka/netshoot:v0.16
+          command: [iperf3, --server]
+          ports: [{name: iperf, containerPort: 5201}]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL], add: [NET_RAW]}}

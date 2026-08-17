@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rca-agent, namespace: agents}
+spec:
+  replicas: 0
+  selector: {matchLabels: {app: rca-agent}}
+  template:
+    metadata: {labels: {app: rca-agent, agent-platform: job-service}}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: {role: tools}
+      containers:
+        - name: rca-agent
+          image: stanleyyoga123/rca-agent:dev
+          imagePullPolicy: Always
+          ports: [{name: http, containerPort: 8081}]
+          volumeMounts: [{name: config, mountPath: /app/.env, subPath: .env, readOnly: true}]
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 30, periodSeconds: 20}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+      volumes: [{name: config, secret: {secretName: rca-agent-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: rca-agent, namespace: agents}
+spec: {type: ClusterIP, selector: {app: rca-agent}, ports: [{name: http, port: 8081, targetPort: http}]}

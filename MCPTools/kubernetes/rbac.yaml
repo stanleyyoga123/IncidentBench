@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: mcp-tools-investigation, namespace: agents}
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: mcp-tools-remediation, namespace: agents}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: mcp-tools-investigation}
+rules:
+  - apiGroups: [""]
+    resources: [nodes, pods, pods/log, services, endpoints, events, namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [apps, batch, autoscaling, networking.k8s.io, metrics.k8s.io]
+    resources: ["*"]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: mcp-tools-investigation}
+subjects:
+  - {kind: ServiceAccount, name: mcp-tools-investigation, namespace: agents}
+  - {kind: ServiceAccount, name: mcp-tools-remediation, namespace: agents}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: mcp-tools-investigation}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: mcp-tools-remediation-node-maintainer}
+rules:
+  - apiGroups: [""]
+    resources: [nodes, nodes/status]
+    verbs: [get, list, watch, patch, update]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]
+  - apiGroups: [""]
+    resources: [pods/eviction]
+    verbs: [create]
+  - apiGroups: [policy]
+    resources: [pods/eviction]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: mcp-tools-remediation-node-maintainer}
+subjects:
+  - {kind: ServiceAccount, name: mcp-tools-remediation, namespace: agents}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: mcp-tools-remediation-node-maintainer}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: mcp-tools-remediation, namespace: online-boutique}
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, pods/exec, services, endpoints, configmaps, events]
+    verbs: [get, list, watch, create, patch, update, delete]
+  - apiGroups: [apps]
+    resources: [deployments, deployments/scale, statefulsets, daemonsets, replicasets]
+    verbs: [get, list, watch, patch, update]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch, patch, update]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, patch, update, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: mcp-tools-remediation, namespace: online-boutique}
+subjects:
+  - {kind: ServiceAccount, name: mcp-tools-remediation, namespace: agents}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: mcp-tools-remediation}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: mcp-tools-network-probes, namespace: utility}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: mcp-tools-investigation-network-probes, namespace: utility}
+subjects:
+  - {kind: ServiceAccount, name: mcp-tools-investigation, namespace: agents}
+  - {kind: ServiceAccount, name: mcp-tools-remediation, namespace: agents}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: mcp-tools-network-probes}

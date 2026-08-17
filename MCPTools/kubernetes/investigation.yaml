@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mcp-tools-investigation, namespace: agents}
+spec:
+  replicas: 0
+  selector: {matchLabels: {app: mcp-tools-investigation}}
+  template:
+    metadata: {labels: {app: mcp-tools-investigation, agent-platform: mcp}}
+    spec:
+      serviceAccountName: mcp-tools-investigation
+      nodeSelector: {role: tools}
+      containers:
+        - name: mcp-tools-investigation
+          image: stanleyyoga123/mcp-tools:dev
+          imagePullPolicy: Always
+          ports: [{name: http, containerPort: 8090}]
+          volumeMounts: [{name: config, mountPath: /app/.env, subPath: .env, readOnly: true}]
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 20, periodSeconds: 20}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+      volumes: [{name: config, secret: {secretName: mcp-tools-investigation-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mcp-tools-investigation, namespace: agents}
+spec: {type: ClusterIP, selector: {app: mcp-tools-investigation}, ports: [{name: http, port: 8090, targetPort: http}]}

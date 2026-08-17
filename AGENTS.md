@@ -17,16 +17,22 @@ overrides this file for local implementation details.
 ## Service ownership
 
 - `AnomalyDetector/`: Prometheus collection, adaptive statistical detection,
-  deterministic event envelopes, and authenticated HTTP delivery.
+  deterministic event envelopes, authenticated HTTP delivery, and its
+  Deployment/Service manifest.
 - `AgentOrchestrator/`: anomaly ingestion, idempotency, workflow state,
-  batching, reconciliation, approval/decline/retry, and downstream submission.
-- `RCAAgent/`: durable asynchronous RCA jobs and LLM sub-agent orchestration.
-- `RemediatorAgent/`: approved asynchronous remediation and verification jobs.
+  batching, reconciliation, approval/decline/retry, downstream submission, and
+  its Deployment/Service manifest.
+- `RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
+  its Deployment/Service manifest.
+- `RemediatorAgent/`: approved asynchronous remediation and verification jobs,
+  plus its Deployment/Service manifest.
 - `MCPTools/`: Kubernetes, observability, network, profiling, and remediation
-  tools. Investigation and remediation use separate deployments and tokens.
+  tools and their Kubernetes RBAC, deployments, PVC, Services, and network
+  probe DaemonSets. Investigation and remediation use separate profiles.
 - `DatabaseJob/`: Alembic migrations and sole ownership of database DDL.
-- `Infrastructure/`: Ansible, inventory, manifests, Helm values, node setup,
-  secrets assembly, RBAC, and deployment ordering.
+- `Infrastructure/`: Ansible, inventory, shared platform policy, Helm values,
+  node setup, secrets assembly, and deployment ordering. It installs
+  component-owned manifests.
 - `Evaluation/`: workload/fault execution, service restarts, scaling/waiting,
   capture, cleanup, and comparison.
 
@@ -83,7 +89,9 @@ Downgrade restores table structure only; deleted records cannot be recovered.
 
 - Trace every consumer before changing a status, field, environment key,
   operation ID, metric, Deployment name, label, or artifact shape.
-- Keep applications DML-only and infrastructure out of service repositories.
+- Keep applications DML-only. Application repositories own their raw workload
+  manifests; deployment orchestration, runtime Secret assembly, and shared
+  platform policy stay in Infrastructure.
 - Use mocks for Kubernetes, observability, model, and HTTP boundaries in tests.
 - Never run remediation, chaos, cleanup, namespace reset, cluster installation,
   chart upgrades, or migrations against a live cluster without explicit user

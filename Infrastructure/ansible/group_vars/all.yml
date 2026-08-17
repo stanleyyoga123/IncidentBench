@@ -37,11 +37,11 @@ application_namespace: online-boutique
 
 # Images are intentionally configurable. Publish immutable digests/tags before
 # running a reproducible evaluation.
-anomaly_detector_image: stanleyyoga123/anomaly-detector:1.0.0-rc16
-agent_orchestrator_image: agent-orchestrator:latest
-rca_agent_image: rca-agent:latest
-remediator_agent_image: remediator-agent:latest
-mcp_tools_image: mcp-tools:latest
+anomaly_detector_image: stanleyyoga123/anomaly-detector:dev
+agent_orchestrator_image: stanleyyoga123/agent-orchestrator:dev
+rca_agent_image: stanleyyoga123/rca-agent:dev
+remediator_agent_image: stanleyyoga123/remediator-agent:dev
+mcp_tools_image: stanleyyoga123/mcp-tools:dev
 database_job_image: database-job:latest
 evaluation_runner_image: stanleyyoga123/agent-evaluator:1.2.0-rc3
 

@@ -16,6 +16,22 @@
 Downgrade recreates legacy table structure only. Deleted records are not
 recoverable. Return `allow_agent_workflow_reset` to false after migration.
 
+## Development image rollout
+
+After the platform has been installed, the root
+`build-push-deploy-dev.sh` script builds the five agent images for
+`linux/amd64`, pushes `stanleyyoga123/*:dev`, updates the existing Deployments,
+forces `imagePullPolicy: Always`, and waits for each rollout in dependency
+order. Docker Buildx, Docker Hub authentication, kubectl access, and an explicit
+Kubernetes context are required:
+
+```bash
+./build-push-deploy-dev.sh <kubernetes-context>
+```
+
+The script mutates the selected cluster. It does not install missing resources
+or run database migrations; use Infrastructure Ansible for initial deployment.
+
 ## Local verification
 
 Run component tests and Python compilation, parse every YAML document, run

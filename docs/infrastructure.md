@@ -4,10 +4,14 @@
 It provisions k3s/node roles, observability, Chaos Mesh/chaosd, PostgreSQL,
 migrations, agent services, network probes, and the optional evaluation runner.
 
-Agent resources are in `kubernetes/agents/agent-platform.yaml` and
-`anomaly-detector.yaml`. The platform manifest defines split service accounts,
-read/remediation RBAC, six ClusterIP workloads, NetworkPolicy, a remediation
-artifact PVC, and MCP-owned overlay/underlay probe DaemonSets.
+Application resources are owned beside their code in
+`AnomalyDetector/kubernetes/manifest.yaml`,
+`AgentOrchestrator/kubernetes/manifest.yaml`, `RCAAgent/kubernetes/manifest.yaml`,
+`RemediatorAgent/kubernetes/manifest.yaml`, and `MCPTools/kubernetes/`.
+Infrastructure applies those manifests and owns the shared
+`kubernetes/agents/shared.yaml` NetworkPolicy. MCPTools owns its split service
+accounts, read/remediation RBAC, remediation artifact PVC, and overlay/underlay
+probe DaemonSets.
 
 Deployment order is enforced by roles:
 
