@@ -7,7 +7,7 @@
 | RCAAgent | asynchronous RCA, evidence, sub-agent spawning, RCA audit | remediation execution |
 | RemediatorAgent | approved execution, verification, changes/artifacts audit | approval policy or detector tuning |
 | MCPTools | kubectl, Prometheus, Loki, Jaeger, network, baseline, Ansible artifacts/execution | workflow DML |
-| Orchestrator | Alembic schema versioning | long-running coordination |
+| DatabaseJob | Alembic schema versioning | long-running coordination |
 | Infrastructure | Ansible, nodes, charts, manifests, secrets, RBAC, probes | experiment-time restarts |
 | Evaluation | experiments, restarts, scale/wait, cleanup, artifacts | installation |
 

@@ -5,7 +5,7 @@ time series and commits anomaly records to AgentOrchestrator over HTTP. Detectio
 observed Prometheus data; no external forecasting service is required.
 
 The service does not create its database table. Apply the shared Alembic
-migrations in `../Orchestrator` before starting the detector.
+migrations in `../DatabaseJob` before starting the detector.
 
 ## Data flow
 
@@ -96,13 +96,13 @@ curl -X PATCH http://localhost:8080/api/v1/detector/profiles/default-threshold-h
 Updates affect the next detection cycle. Every emitted anomaly includes the
 profile ID, version, and effective parameters in its detail. This initial
 registry is intentionally in-memory: restarts restore built-in defaults. A
-future Orchestrator-backed registry can provide durability without changing the
+future AgentOrchestrator-backed registry can provide durability without changing the
 API contract.
 
 For a fresh database, run this first from the workspace root:
 
 ```bash
-cd Orchestrator
+cd DatabaseJob
 orchestrator.ingestion_token='<token>' ./run.sh
 ```
 

@@ -24,13 +24,11 @@ overrides this file for local implementation details.
 - `RemediatorAgent/`: approved asynchronous remediation and verification jobs.
 - `MCPTools/`: Kubernetes, observability, network, profiling, and remediation
   tools. Investigation and remediation use separate deployments and tokens.
-- `Orchestrator/`: Alembic migrations and sole ownership of database DDL.
+- `DatabaseJob/`: Alembic migrations and sole ownership of database DDL.
 - `Infrastructure/`: Ansible, inventory, manifests, Helm values, node setup,
   secrets assembly, RBAC, and deployment ordering.
 - `Evaluation/`: workload/fault execution, service restarts, scaling/waiting,
   capture, cleanup, and comparison.
-- `KubernetesCloudAgent/`: retired legacy implementation; do not deploy or add
-  new behavior. Preserve unrelated work until migration validation is complete.
 
 The root is not one Git repository. Some components are independent dirty Git
 worktrees. Never discard unrelated modified or untracked files.
@@ -71,7 +69,7 @@ Secrets as sensitive. Never log, quote, commit, or duplicate their values.
 
 ## Database rules
 
-Only `Orchestrator/` may create or alter tables. The active schema is:
+Only `DatabaseJob/` may create or alter tables. The active schema is:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`;
 - singleton `agent_execution_slot`;
@@ -98,7 +96,7 @@ Run focused tests, then component suites. At minimum:
 
 ```bash
 cd AnomalyDetector && PYTHONPATH=src pytest -q
-cd ../Orchestrator && pytest -q
+cd ../DatabaseJob && pytest -q
 cd ../Evaluation && pytest -q
 python -m compileall -q ../AgentOrchestrator ../RCAAgent ../RemediatorAgent ../MCPTools
 ```

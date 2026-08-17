@@ -42,7 +42,7 @@ agent_orchestrator_image: agent-orchestrator:latest
 rca_agent_image: rca-agent:latest
 remediator_agent_image: remediator-agent:latest
 mcp_tools_image: mcp-tools:latest
-database_orchestrator_image: database-orchestrator:latest
+database_job_image: database-job:latest
 evaluation_runner_image: stanleyyoga123/agent-evaluator:1.2.0-rc3
 
 # Supply database_password through Ansible Vault or --extra-vars. Do not commit
@@ -63,7 +63,7 @@ mcp_investigation_token: "{{ vault_mcp_investigation_token | default('') }}"
 mcp_remediation_token: "{{ vault_mcp_remediation_token | default('') }}"
 allow_agent_workflow_reset: false
 
-# CloudAgent model and tracing credentials. Secret values must come from Vault
+# Agent model and tracing credentials. Secret values must come from Vault
 # or --extra-vars.
 agent_llm_model: Qwen/Qwen3.6-35B-A3B
 agent_llm_url: "{{ vault_agent_llm_url | default('') }}"

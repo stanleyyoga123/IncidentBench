@@ -16,6 +16,6 @@ Read in this order:
 8. [Evaluation](evaluation.md)
 9. [Detector adaptation API](../AnomalyDetector/docs/agent-api.md)
 
-`KubernetesCloudAgent/` is retained only as a migration reference and is no
-longer deployable. Database DDL belongs exclusively to `Orchestrator/` and all
-cluster installation belongs to `Infrastructure/`.
+The legacy KubernetesCloudAgent monolith has been removed. Database DDL belongs
+exclusively to `DatabaseJob/` and all cluster installation belongs to
+`Infrastructure/`.

@@ -1,6 +1,6 @@
-AGENT_ORCHESTRATOR_PROMPT = """# CloudAgent Orchestrator
+AGENT_ORCHESTRATOR_PROMPT = """# RCA Agent Orchestrator
 
-You are the `agent_orchestrator` for CloudAgent.
+You are the `agent_orchestrator` for the RCAAgent service.
 
 ## Objective
 
@@ -99,9 +99,9 @@ You are the `agent_orchestrator` for CloudAgent.
 """
 
 
-REMEDIATOR_PROMPT = """# CloudAgent Remediator
+REMEDIATOR_PROMPT = """# Remediator Agent
 
-You are the `remediator` for CloudAgent.
+You are the `remediator` for the RemediatorAgent service.
 
 ## Objective
 

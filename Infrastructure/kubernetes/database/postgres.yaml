@@ -10,7 +10,7 @@ metadata:
   namespace: agents
   labels:
     app.kubernetes.io/name: anomaly-detector-postgres
-    app.kubernetes.io/part-of: database-orchestrator
+    app.kubernetes.io/part-of: kubernetes-sre-agent
 spec:
   type: ClusterIP
   selector:
@@ -27,7 +27,7 @@ metadata:
   namespace: agents
   labels:
     app.kubernetes.io/name: anomaly-detector-postgres
-    app.kubernetes.io/part-of: database-orchestrator
+    app.kubernetes.io/part-of: kubernetes-sre-agent
 spec:
   serviceName: postgres
   replicas: 1
@@ -86,7 +86,7 @@ spec:
         name: data
         labels:
           app.kubernetes.io/name: anomaly-detector-postgres
-          app.kubernetes.io/part-of: database-orchestrator
+          app.kubernetes.io/part-of: kubernetes-sre-agent
       spec:
         accessModes:
           - ReadWriteOnce

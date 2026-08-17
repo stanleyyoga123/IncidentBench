@@ -1,4 +1,4 @@
-# Orchestrator schema project
+# DatabaseJob schema project
 
 This directory is the sole owner of PostgreSQL DDL for the split agent
 platform. It contains Alembic migrations and a migration image; it is not a

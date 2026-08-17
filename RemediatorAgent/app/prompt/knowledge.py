@@ -1,4 +1,4 @@
-CLUSTER_KNOWLEDGE = """# CloudAgent Cluster Knowledge
+CLUSTER_KNOWLEDGE = """# Kubernetes SRE Cluster Knowledge
 
 Use this as lightweight baseline context. Treat it as a starting point, not proof.
 Re-check live Kubernetes state, metrics, logs, and traces during each incident.

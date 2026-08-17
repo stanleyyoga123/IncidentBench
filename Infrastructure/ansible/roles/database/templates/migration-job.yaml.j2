@@ -4,14 +4,14 @@ metadata:
   name: database-migration-20260817-0002
   namespace: agents
   labels:
-    app.kubernetes.io/name: database-orchestrator
+    app.kubernetes.io/name: database-job
     app.kubernetes.io/component: migration
 spec:
   backoffLimit: 2
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: database-orchestrator
+        app.kubernetes.io/name: database-job
         app.kubernetes.io/component: migration
     spec:
       restartPolicy: Never
@@ -19,7 +19,7 @@ spec:
         role: tools
       containers:
         - name: migration
-          image: {{ database_orchestrator_image }}
+          image: {{ database_job_image }}
           imagePullPolicy: IfNotPresent
           env:
             - name: ALLOW_AGENT_WORKFLOW_RESET

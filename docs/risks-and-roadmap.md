@@ -86,7 +86,7 @@ tables. Preserve current IDs or provide a tested migration mapping.
 
 ## Decision record needed
 
-Before implementing Orchestrator beyond its current migration package, decide
+Before extending DatabaseJob beyond its migration-only responsibility, decide
 whether it should become:
 
 - only a migration/schema package;

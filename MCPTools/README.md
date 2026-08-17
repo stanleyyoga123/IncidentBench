@@ -1,6 +1,6 @@
 # MCPTools
 
-MCPTools serves the former KubernetesCloudAgent tools over authenticated MCP
+MCPTools serves the former monolithic agent tools over authenticated MCP
 Streamable HTTP at `/mcp`. The same image runs as `investigation` and
 `remediation` profiles with distinct bearer tokens, allowlists, and Kubernetes
 service accounts. The remediation profile stores session files on its mounted

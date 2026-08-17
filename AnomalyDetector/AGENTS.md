@@ -9,7 +9,7 @@ HTTP. It never connects to PostgreSQL.
 
 This repository does not own database DDL or cluster installation:
 
-- Schema and Alembic migrations belong to `../Orchestrator/`.
+- Schema and Alembic migrations belong to `../DatabaseJob/`.
 - Kubernetes manifests, Prometheus rules, runtime Secret templates, and cluster
   installation belong to `../Infrastructure/`.
 - Fault injection and service restart controls belong to `../Evaluation/`.
@@ -68,7 +68,7 @@ metric direction or other detection semantics. Replica-count thresholds are
 intentionally immutable so feedback cannot suppress a zero-instance outage.
 
 The registry is currently in-memory. A restart restores built-in defaults.
-Durable profile storage should be introduced through Orchestrator migrations
+Durable profile storage should be introduced through DatabaseJob migrations
 without breaking `/api/v1/detector/profiles` or removing provenance from
 anomaly details.
 

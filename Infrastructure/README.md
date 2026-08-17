@@ -10,7 +10,7 @@ Evaluation retains only experiment-time restart and cleanup behavior.
 - `ansible/`: inventory, cluster/tool/node/application playbooks, and roles.
 - `kubernetes/`: authored manifests for PostgreSQL, agents, and Online Boutique.
 - `values/`: Prometheus, Grafana, Loki, Alloy, Jaeger, and tracing configuration.
-- `compose/database.yml`: local PostgreSQL plus the Orchestrator migration.
+- `compose/database.yml`: local PostgreSQL plus the DatabaseJob migration.
 - `generated/`: ignored kubeconfig and pinned SSH host keys produced by Ansible.
 - `backups/`: ignored placeholder for externally managed restores; never used
   by automation or images.
@@ -76,7 +76,7 @@ central Online Boutique manifests:
 
 ```bash
 docker build -f Evaluation/Dockerfile -t <registry>/agent-evaluator:<tag> .
-docker build -f Orchestrator/Dockerfile -t <registry>/database-orchestrator:<tag> Orchestrator
+docker build -f DatabaseJob/Dockerfile -t <registry>/database-job:<tag> DatabaseJob
 ```
 
 Set immutable image tags in `ansible/group_vars/all.yml` or in a release vars
@@ -94,13 +94,13 @@ experiment. They read deployment inputs from `INFRASTRUCTURE_ROOT` (the sibling
 From the workspace root:
 
 ```bash
-docker compose --env-file Orchestrator/.env \
+docker compose --env-file DatabaseJob/.env \
   -f Infrastructure/compose/database.yml up -d postgres
-docker compose --env-file Orchestrator/.env \
+docker compose --env-file DatabaseJob/.env \
   -f Infrastructure/compose/database.yml run --rm migration
 ```
 
-Copy `Orchestrator/.env.example` to the ignored `.env` and replace every
+Copy `DatabaseJob/.env.example` to the ignored `.env` and replace every
 placeholder before running these commands.
 
 ## Validation
