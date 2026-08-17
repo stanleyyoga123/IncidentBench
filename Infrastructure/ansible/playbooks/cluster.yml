@@ -91,6 +91,7 @@
 - name: Label cluster nodes by workload role
   hosts: localhost
   connection: local
+  become: false
   gather_facts: false
   tasks:
     - name: Label tool nodes

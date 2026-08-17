@@ -34,6 +34,11 @@ defaults:
 gateway:
   nodeSelector:
     role: tools
+  # Only one node carries role=tools. A rolling update cannot schedule the new
+  # gateway alongside the old one because the chart defaults to hard pod
+  # anti-affinity, so replace the single replica in place.
+  deploymentStrategy:
+    type: Recreate
 
 chunksCache:
   nodeSelector:

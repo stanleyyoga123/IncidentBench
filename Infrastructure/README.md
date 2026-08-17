@@ -30,11 +30,19 @@ pip install -r requirements.txt
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Update `inventory.ini` before targeting a different cluster. Copy
-`vault.example.yml` to the ignored `vault.yml`, replace its placeholders, and
-encrypt it with `ansible-vault encrypt vault.yml`. The required variables are
-also documented in `group_vars/all.yml`; no secret values belong in the
-inventory, manifests, or command line history.
+Update `inventory.ini` before targeting a different cluster. Create the ignored,
+encrypted `vault.yml` with the interactive helper:
+
+```bash
+cd Infrastructure/ansible
+./create-vault.sh
+```
+
+The helper generates independent database and service tokens, prompts locally
+for external model/tracing/evaluation values, and invokes `ansible-vault`
+without printing secret values. `vault.example.yml` and `group_vars/all.yml`
+document the required variables; no secret values belong in inventory,
+manifests, or command-line arguments.
 
 ## Provision a cluster
 

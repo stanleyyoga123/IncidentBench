@@ -2,6 +2,7 @@
 - name: Install database, agents, and evaluation runner
   hosts: localhost
   connection: local
+  become: false
   gather_facts: false
   pre_tasks:
     - name: Inspect legacy workloads before the incompatible migration

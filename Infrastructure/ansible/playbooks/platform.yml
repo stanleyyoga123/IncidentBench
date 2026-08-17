@@ -2,9 +2,10 @@
 - name: Install Kubernetes platform services
   hosts: localhost
   connection: local
+  become: false
   gather_facts: false
   vars:
-    infrastructure_root: "{{ inventory_dir }}/.."
+    infrastructure_root: "{{ ansible_config_file | dirname }}/.."
   tasks:
     - name: Create platform namespaces
       kubernetes.core.k8s:
@@ -100,6 +101,9 @@
         chart_version: "{{ alloy_chart_version | default(omit, true) }}"
         release_namespace: "{{ observability_namespace }}"
         wait: true
+        # The DaemonSet rolls one node at a time; seven-node clusters can
+        # legitimately exceed Helm's five-minute default timeout.
+        timeout: 15m0s
         values_files:
           - "{{ infrastructure_root }}/values/alloy/values.yaml"
 
@@ -127,10 +131,9 @@
             namespace: "{{ prometheus_namespace }}"
             labels:
               grafana_dashboard: "1"
-          data:
-            "{{ item }}": >-
-              {{ lookup('ansible.builtin.file', infrastructure_root +
-                 '/values/grafana/dashboards/' + item) }}
+          data: >-
+            {{ {item: lookup('ansible.builtin.file', infrastructure_root +
+               '/values/grafana/dashboards/' + item)} }}
       loop: "{{ grafana_dashboard_files }}"
       when: install_grafana | bool
 

@@ -4,7 +4,7 @@
 k3s_channel: stable
 k3s_version: ""
 k3s_server_url: "https://{{ hostvars[groups['control_plane'][0]].ansible_host }}:6443"
-k3s_kubeconfig_local: "{{ inventory_dir }}/../generated/kubeconfig.yaml"
+k3s_kubeconfig_local: "{{ ansible_config_file | dirname }}/../generated/kubeconfig.yaml"
 
 # Current explicit platform pin. Empty chart versions mean the newest chart in
 # the refreshed upstream repository; set them in a release vars file to lock a
@@ -42,7 +42,7 @@ agent_orchestrator_image: stanleyyoga123/agent-orchestrator:dev
 rca_agent_image: stanleyyoga123/rca-agent:dev
 remediator_agent_image: stanleyyoga123/remediator-agent:dev
 mcp_tools_image: stanleyyoga123/mcp-tools:dev
-database_job_image: database-job:latest
+database_job_image: stanleyyoga123/database-job:dev
 evaluation_runner_image: stanleyyoga123/agent-evaluator:1.2.0-rc3
 
 # Supply database_password through Ansible Vault or --extra-vars. Do not commit
@@ -85,7 +85,7 @@ chaosd_tls_server_name: chaosd.chaos-mesh.org
 chaos_cleaner_user: chaos-cleaner
 chaos_cleaner_public_key_file: "{{ vault_chaos_cleaner_public_key_file | default('') }}"
 chaos_cleaner_private_key_file: "{{ vault_chaos_cleaner_private_key_file | default('') }}"
-chaos_cleaner_known_hosts_output: "{{ inventory_dir }}/../generated/evaluation-runner-known_hosts"
+chaos_cleaner_known_hosts_output: "{{ ansible_config_file | dirname }}/../generated/evaluation-runner-known_hosts"
 
 # Optional evaluation result upload. All three credential fields must be set to
 # create evaluation-runner-s3.

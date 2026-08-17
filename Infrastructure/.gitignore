@@ -1,6 +1,7 @@
 .DS_Store
 ansible/.venv/
 ansible/vault.yml
+ansible/.vault-password
 backups/
 generated/*
 !generated/.gitignore

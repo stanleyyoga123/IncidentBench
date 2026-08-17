@@ -86,7 +86,9 @@ spec:
         name: data
         labels:
           app.kubernetes.io/name: anomaly-detector-postgres
-          app.kubernetes.io/part-of: kubernetes-sre-agent
+          # StatefulSet volumeClaimTemplates are immutable. Preserve the label
+          # used by existing clusters so upgrades retain the bound database PVC.
+          app.kubernetes.io/part-of: anomaly-detector
       spec:
         accessModes:
           - ReadWriteOnce
