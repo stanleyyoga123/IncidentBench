@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migration-20260817-0002
+  namespace: agents
+  labels:
+    app.kubernetes.io/name: database-orchestrator
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: database-orchestrator
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        role: tools
+      containers:
+        - name: migration
+          image: {{ database_orchestrator_image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ALLOW_AGENT_WORKFLOW_RESET
+              value: "{{ allow_agent_workflow_reset | bool | lower }}"
+            - name: POSTGRES_HOST
+              value: postgres.agents.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: anomaly-detector-postgres
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: anomaly-detector-postgres
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: anomaly-detector-postgres
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

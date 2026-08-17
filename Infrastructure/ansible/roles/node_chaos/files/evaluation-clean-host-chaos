@@ -1,0 +1,173 @@
+#!/bin/sh
+set -eu
+
+# chaosd composes new traffic-control attacks from every attack that its local
+# registry still considers successful. Recover those records before deleting
+# qdiscs, otherwise the next experiment can reconstruct an old impairment.
+find_chaosd_server_pid() {
+    ps -eo pid=,comm=,args= |
+        awk '$2 == "chaosd" && $0 ~ / server / {print $1; exit}'
+}
+
+run_chaosd() {
+    nsenter -t "$chaosd_server_pid" -m -p -- \
+        sh -c 'cd / && exec /usr/local/bin/chaosd "$@"' sh "$@"
+}
+
+recover_chaosd_registry() {
+    if ! command -v nsenter >/dev/null || ! command -v chaosd >/dev/null; then
+        echo "nsenter and chaosd are required to reconcile the chaosd registry" >&2
+        return 1
+    fi
+
+    chaosd_server_pid="$(find_chaosd_server_pid)"
+    if [ -z "$chaosd_server_pid" ]; then
+        echo "chaosd server process was not found" >&2
+        return 1
+    fi
+
+    registry_directory="$(mktemp -d)"
+    registry_scan="$registry_directory/successful-attacks"
+    registry_uids="$registry_directory/uids"
+    trap 'rm -rf "$registry_directory"' EXIT HUP INT TERM
+    : >"$registry_scan"
+
+    registry_failed=0
+    for kind in network process stress disk host jvm; do
+        if ! run_chaosd search -s success -k "$kind" >>"$registry_scan"; then
+            echo "failed to inspect successful chaosd $kind attacks" >&2
+            registry_failed=1
+        fi
+    done
+
+    awk '
+        length($1) == 36 &&
+        $1 ~ /^[0-9a-fA-F][0-9a-fA-F-]*$/ &&
+        !seen[$1]++ {print $1}
+    ' "$registry_scan" >"$registry_uids"
+
+    if [ -s "$registry_uids" ]; then
+        echo "chaosd-successful-attacks-before"
+        cat "$registry_scan"
+    else
+        echo "chaosd registry: no successful attacks"
+    fi
+
+    while IFS= read -r attack_uid; do
+        [ -n "$attack_uid" ] || continue
+        echo "recovering stale chaosd attack $attack_uid"
+        if ! run_chaosd recover "$attack_uid"; then
+            echo "failed to recover chaosd attack $attack_uid" >&2
+            registry_failed=1
+        fi
+    done <"$registry_uids"
+
+    : >"$registry_scan"
+    for kind in network process stress disk host jvm; do
+        if ! run_chaosd search -s success -k "$kind" >>"$registry_scan"; then
+            echo "failed to verify successful chaosd $kind attacks" >&2
+            registry_failed=1
+        fi
+    done
+    awk '
+        length($1) == 36 &&
+        $1 ~ /^[0-9a-fA-F][0-9a-fA-F-]*$/ &&
+        !seen[$1]++ {print $1}
+    ' "$registry_scan" >"$registry_uids"
+    if [ -s "$registry_uids" ]; then
+        echo "successful chaosd attacks remain after recovery:" >&2
+        cat "$registry_scan" >&2
+        registry_failed=1
+    else
+        echo "chaosd registry: clean (no successful attacks)"
+    fi
+
+    rm -rf "$registry_directory"
+    trap - EXIT HUP INT TERM
+    return "$registry_failed"
+}
+
+cleanup_failed=0
+recover_chaosd_registry || cleanup_failed=1
+
+qdisc_cleaner='
+failed=0
+echo "qdisc-before"
+tc qdisc show
+for device_path in /sys/class/net/*; do
+    device="${device_path##*/}"
+    qdisc="$(tc qdisc show dev "$device" 2>/dev/null || true)"
+    case "$qdisc" in
+        *"qdisc netem "*|*"qdisc tbf "*)
+            echo "removing residual chaos qdisc from $device"
+            tc qdisc del dev "$device" root || failed=1
+            ;;
+    esac
+done
+echo "qdisc-after"
+tc qdisc show
+if tc qdisc show | grep -Eq "qdisc (netem|tbf) "; then
+    echo "residual Chaos Mesh network qdisc remains" >&2
+    failed=1
+fi
+exit "$failed"
+'
+
+echo "network-namespace host"
+sh -c "$qdisc_cleaner" || cleanup_failed=1
+
+if ! command -v lsns >/dev/null || ! command -v nsenter >/dev/null; then
+    echo "lsns and nsenter are required to inspect pod network namespaces" >&2
+    cleanup_failed=1
+else
+    namespace_rows="$(mktemp)"
+    namespace_pids="$(mktemp)"
+    trap 'rm -f "$namespace_rows" "$namespace_pids"' EXIT HUP INT TERM
+    if ! lsns -t net -n -o NS,PID >"$namespace_rows"; then
+        echo "failed to enumerate pod network namespaces" >&2
+        cleanup_failed=1
+    else
+        awk '$2 ~ /^[0-9]+$/ && !seen[$1]++ {print $2}' \
+            "$namespace_rows" >"$namespace_pids"
+        host_namespace="$(readlink /proc/1/ns/net)"
+        while IFS= read -r namespace_pid; do
+            [ -n "$namespace_pid" ] || continue
+            namespace="$(readlink "/proc/$namespace_pid/ns/net" 2>/dev/null || true)"
+            [ -n "$namespace" ] || continue
+            [ "$namespace" != "$host_namespace" ] || continue
+            echo "network-namespace pid=$namespace_pid"
+            if ! nsenter -t "$namespace_pid" -n sh -c "$qdisc_cleaner"; then
+                if kill -0 "$namespace_pid" 2>/dev/null; then
+                    cleanup_failed=1
+                else
+                    echo "network namespace disappeared during cleanup; skipped"
+                fi
+            fi
+        done <"$namespace_pids"
+    fi
+fi
+
+find_stress_pids() {
+    ps -eo pid=,comm= |
+        awk '$2 == "stress" || $2 == "stress-ng" || $2 ~ /^stress-ng-/ {print $1}'
+}
+
+stress_pids="$(find_stress_pids)"
+if [ -n "$stress_pids" ]; then
+    kill -TERM $stress_pids 2>/dev/null || true
+fi
+sleep 1
+stress_pids="$(find_stress_pids)"
+if [ -n "$stress_pids" ]; then
+    kill -KILL $stress_pids 2>/dev/null || true
+fi
+
+echo "stress-processes-after"
+ps -eo pid=,comm=,args= |
+    awk '$2 == "stress" || $2 == "stress-ng" || $2 ~ /^stress-ng-/'
+
+if [ -n "$(find_stress_pids)" ]; then
+    echo "residual CPU stress process remains" >&2
+    cleanup_failed=1
+fi
+exit "$cleanup_failed"

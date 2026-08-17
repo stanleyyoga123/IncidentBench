@@ -1,0 +1,24 @@
+# Deferred component
+/Evaluation/
+
+# Credentials and machine-local configuration
+**/.env
+**/*.env
+**/*.pem
+**/*.key
+**/kubeconfig*
+
+# Runtime data and generated artifacts
+**/__pycache__/
+**/.pytest_cache/
+**/.DS_Store
+**/*.py[cod]
+**/MEMORY.md
+**/remediation/
+**/artifacts/
+**/*.sqlite*
+
+# Local agent/editor state
+/.agents/
+/.codex/
+**/.vscode/

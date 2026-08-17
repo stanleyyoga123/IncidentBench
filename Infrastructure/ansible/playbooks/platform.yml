@@ -1,0 +1,168 @@
+---
+- name: Install Kubernetes platform services
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    infrastructure_root: "{{ inventory_dir }}/.."
+  tasks:
+    - name: Create platform namespaces
+      kubernetes.core.k8s:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ item }}"
+      loop:
+        - "{{ prometheus_namespace }}"
+        - "{{ observability_namespace }}"
+        - "{{ istio_namespace }}"
+        - "{{ chaos_mesh_namespace }}"
+        - "{{ agents_namespace }}"
+        - "{{ utility_namespace }}"
+
+    - name: Configure Helm repositories
+      kubernetes.core.helm_repository:
+        name: "{{ item.name }}"
+        repo_url: "{{ item.url }}"
+        force_update: true
+      loop:
+        - {name: prometheus-community, url: "https://prometheus-community.github.io/helm-charts"}
+        - {name: grafana, url: "https://grafana.github.io/helm-charts"}
+        - {name: grafana-community, url: "https://grafana-community.github.io/helm-charts"}
+        - {name: istio, url: "https://istio-release.storage.googleapis.com/charts"}
+        - {name: chaos-mesh, url: "https://charts.chaos-mesh.org"}
+
+    - name: Install Istio base
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: istio-base
+        chart_ref: istio/base
+        chart_version: "{{ istio_chart_version | default(omit, true) }}"
+        release_namespace: "{{ istio_namespace }}"
+        wait: true
+
+    - name: Install Istio control plane with Jaeger tracing provider
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: istiod
+        chart_ref: istio/istiod
+        chart_version: "{{ istio_chart_version | default(omit, true) }}"
+        release_namespace: "{{ istio_namespace }}"
+        wait: true
+        values:
+          global:
+            defaultNodeSelector:
+              role: tools
+          meshConfig:
+            enableTracing: true
+            extensionProviders:
+              - name: jaeger
+                opentelemetry:
+                  service: jaeger-collector.istio-system.svc.cluster.local
+                  port: 4317
+            defaultProviders:
+              tracing:
+                - jaeger
+
+    - name: Install Prometheus and detector recording rules
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: prometheus
+        chart_ref: prometheus-community/prometheus
+        chart_version: "{{ prometheus_chart_version | default(omit, true) }}"
+        release_namespace: "{{ prometheus_namespace }}"
+        create_namespace: true
+        wait: true
+        values_files:
+          - "{{ infrastructure_root }}/values/prometheus/values.yaml"
+          - "{{ infrastructure_root }}/values/prometheus/recording-rules.values.yaml"
+
+    - name: Install Loki
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: loki
+        chart_ref: grafana-community/loki
+        chart_version: "{{ loki_chart_version | default(omit, true) }}"
+        release_namespace: "{{ observability_namespace }}"
+        create_namespace: true
+        wait: true
+        values_files:
+          - "{{ infrastructure_root }}/values/loki/values.yaml"
+
+    - name: Install Alloy
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: alloy
+        chart_ref: grafana/alloy
+        chart_version: "{{ alloy_chart_version | default(omit, true) }}"
+        release_namespace: "{{ observability_namespace }}"
+        wait: true
+        values_files:
+          - "{{ infrastructure_root }}/values/alloy/values.yaml"
+
+    - name: Install Grafana
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: grafana
+        chart_ref: grafana-community/grafana
+        chart_version: "{{ grafana_chart_version | default(omit, true) }}"
+        release_namespace: "{{ prometheus_namespace }}"
+        wait: true
+        values_files:
+          - "{{ infrastructure_root }}/values/grafana/values.yaml"
+      when: install_grafana | bool
+
+    - name: Provision Grafana dashboards
+      kubernetes.core.k8s:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "grafana-dashboard-{{ item | splitext | first | regex_replace('_', '-') }}"
+            namespace: "{{ prometheus_namespace }}"
+            labels:
+              grafana_dashboard: "1"
+          data:
+            "{{ item }}": >-
+              {{ lookup('ansible.builtin.file', infrastructure_root +
+                 '/values/grafana/dashboards/' + item) }}
+      loop: "{{ grafana_dashboard_files }}"
+      when: install_grafana | bool
+
+    - name: Install Jaeger
+      kubernetes.core.k8s:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        state: present
+        src: "{{ infrastructure_root }}/values/jaeger/jaeger.yaml"
+
+    - name: Configure mesh-wide tracing
+      kubernetes.core.k8s:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        state: present
+        src: "{{ infrastructure_root }}/values/jaeger/telemetry.yaml"
+
+    - name: Install Chaos Mesh
+      kubernetes.core.helm:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        name: chaos-mesh
+        chart_ref: chaos-mesh/chaos-mesh
+        chart_version: "{{ chaos_mesh_chart_version }}"
+        release_namespace: "{{ chaos_mesh_namespace }}"
+        create_namespace: true
+        wait: true
+        values:
+          chaosDaemon:
+            runtime: containerd
+            socketPath: /run/k3s/containerd/containerd.sock
+          dashboard:
+            nodeSelector: {role: tools}
+            securityMode: true
+          controllerManager:
+            nodeSelector: {role: tools}
+          dnsServer:
+            nodeSelector: {role: tools}

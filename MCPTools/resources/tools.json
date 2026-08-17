@@ -1,0 +1,70 @@
+[
+  {
+    "name": "remediator.write_file",
+    "description": "Create one remediation file inside the active remediation session folder. Use this for remediation.yml, inventory.ini, Kubernetes manifests, rollback files, and other artifacts before execution."
+  },
+  {
+    "name": "remediator.run_ansible",
+    "description": "Execute an existing Ansible playbook from the active remediation session folder using Python ansible_runner.run. Use this after creating the playbook, inventory, and manifests with remediator.write_file."
+  },
+  {
+    "name": "kubectl",
+    "description": "Run kubectl with agent-generated arguments after the kubectl binary. Pass args as a string or list, and use grep for in-process regex/substring filtering instead of shell pipes. Shell operators are blocked; dangerous deletes and scaling to zero are guarded."
+  },
+  {
+    "name": "prometheus",
+    "description": "Run agent-generated PromQL against Prometheus. The callable tool name is exactly prometheus. Use the query_type argument for instant or range metric queries; do not call prometheus.query, prometheus.query_range, or any suffixed Prometheus tool. Use filter to keep only useful JSON fields, paths, matching items, or bounded item counts. Bound range queries to 30 minutes when possible."
+  },
+  {
+    "name": "loki",
+    "description": "Run agent-generated LogQL against Loki. The callable tool name is exactly loki. Use the query_type argument for range or instant log queries; do not call loki.query, loki.query_range, or any suffixed Loki tool. Supports start/end/since/limit/direction and filter to reduce large JSON log responses."
+  },
+  {
+    "name": "jaeger.list_services",
+    "description": "List the service names currently available in Jaeger trace storage. Use this when the service name for a trace query is unknown, then pass one of the returned names to jaeger.retrieve_slow_traces."
+  },
+  {
+    "name": "jaeger.retrieve_slow_traces",
+    "description": "Retrieve slow Jaeger trace samples for a service. Use this first when investigating latency. Services are usually named like frontend.online-boutique. Returns compact trace summaries with trace IDs, duration, root operation, span count, and involved services."
+  },
+  {
+    "name": "jaeger.investigate_trace",
+    "description": "Summarize one Jaeger trace by trace_id. Use this after selecting a trace from jaeger.retrieve_slow_traces. Returns trace summary, slowest spans, and service duration breakdown."
+  },
+  {
+    "name": "jaeger.retrieve_bottleneck",
+    "description": "Identify the likely slow service/span for one Jaeger trace_id. Use this when you need a direct bottleneck candidate from an already selected trace."
+  },
+  {
+    "name": "network.topology",
+    "description": "Inspect Ready role=services worker nodes and the overlay/underlay network probe coverage on each node. Returns node internal IPs, pod CIDRs, probe pods, and missing, duplicate, or unready probe states."
+  },
+  {
+    "name": "network.latency_matrix",
+    "description": "Run a bounded on-demand node-to-node latency and packet-loss matrix through the Flannel overlay, node underlay, or both. Returns directed pair samples and min/mean/p50/p95/max RTT with jitter."
+  },
+  {
+    "name": "network.bandwidth",
+    "description": "Run one bounded, rate-limited iperf3 test between two different Ready role=services worker nodes. Supports overlay or underlay, TCP or UDP, and forward, reverse, or bidirectional traffic."
+  },
+  {
+    "name": "network.path",
+    "description": "Run a bounded mtr path report between two Ready role=services worker nodes over the overlay or underlay. Returns ordered ICMP or TCP hop latency and packet-loss evidence."
+  },
+  {
+    "name": "network.dns",
+    "description": "Query an A, AAAA, or SRV record for a Kubernetes service name under svc.cluster.local from a selected worker's overlay or underlay probe. Arbitrary external DNS names are rejected."
+  },
+  {
+    "name": "network.tcp_connect",
+    "description": "Measure bounded TCP connection attempts from a selected worker probe to a declared Kubernetes Service port. The Service is validated with read-only kubectl and arbitrary hosts or IPs are rejected."
+  },
+  {
+    "name": "cluster.profile_baseline",
+    "description": "Build one deterministic, bounded baseline of every current Deployment in a namespace and every cluster node. Joins Kubernetes readiness, replicas, placement, endpoints, HPA state, Prometheus service/node metrics, bounded Loki error samples, passive probe coverage, and an active overlay/underlay latency matrix between Ready service workers while preserving missing evidence."
+  },
+  {
+    "name": "agent_spawner",
+    "description": "Spawn and run a bounded sub-agent for delegated evidence gathering. Provide a sub-agent name, system prompt, task prompt, allowed registered tools, and max_rounds. Do not include agent_spawner in the spawned agent's tool list."
+  }
+]

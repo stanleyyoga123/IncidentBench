@@ -1,0 +1,8 @@
+pydantic
+pydantic-settings
+fastapi
+uvicorn
+httpx
+matplotlib
+kafka-python
+PyYAML

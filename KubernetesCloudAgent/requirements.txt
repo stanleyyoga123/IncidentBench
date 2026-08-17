@@ -1,0 +1,10 @@
+pydantic>=2
+pydantic-settings>=2
+python-dotenv
+openai
+psycopg[binary]
+mcp
+httpx
+langfuse
+ansible
+ansible-runner

@@ -1,0 +1,7 @@
+---
+- import_playbook: playbooks/cluster.yml
+- import_playbook: playbooks/platform.yml
+- import_playbook: playbooks/node-chaosd.yml
+- import_playbook: playbooks/node-cleaner.yml
+- import_playbook: playbooks/applications.yml
+

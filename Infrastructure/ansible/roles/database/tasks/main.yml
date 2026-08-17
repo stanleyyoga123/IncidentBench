@@ -1,0 +1,85 @@
+---
+- name: Require database credentials
+  ansible.builtin.assert:
+    that:
+      - database_name | length > 0
+      - database_user | length > 0
+      - database_password | length > 0
+    fail_msg: Supply vault_database_password through Ansible Vault or --extra-vars.
+
+- name: Create database credentials Secret
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: anomaly-detector-postgres
+        namespace: "{{ agents_namespace }}"
+      type: Opaque
+      stringData:
+        POSTGRES_DB: "{{ database_name }}"
+        POSTGRES_USER: "{{ database_user }}"
+        POSTGRES_PASSWORD: "{{ database_password }}"
+  no_log: true
+
+- name: Deploy PostgreSQL
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    src: "{{ role_path }}/../../../kubernetes/database/postgres.yaml"
+
+- name: Wait for PostgreSQL StatefulSet readiness
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: "{{ agents_namespace }}"
+    name: anomaly-detector-postgres
+  register: postgres_statefulset
+  retries: 60
+  delay: 5
+  until:
+    - postgres_statefulset.resources | length == 1
+    - postgres_statefulset.resources[0].status.readyReplicas | default(0) | int == 1
+
+- name: Remove an earlier migration Job with the same revision
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ agents_namespace }}"
+    name: database-migration-20260817-0002
+    wait: true
+
+- name: Remove the obsolete legacy migration Job
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ agents_namespace }}"
+    name: database-migration-20260817-0001
+    wait: true
+
+- name: Run the Alembic migration Job
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    definition: "{{ lookup('ansible.builtin.template', role_path + '/templates/migration-job.yaml.j2') | from_yaml }}"
+
+- name: Wait for the migration Job to complete
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ agents_namespace }}"
+    name: database-migration-20260817-0002
+  register: migration_job
+  retries: 60
+  delay: 5
+  until:
+    - migration_job.resources | length == 1
+    - migration_job.resources[0].status.succeeded | default(0) | int == 1

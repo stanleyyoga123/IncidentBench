@@ -1,0 +1,6 @@
+.DS_Store
+ansible/.venv/
+ansible/vault.yml
+backups/
+generated/*
+!generated/.gitignore

@@ -1,0 +1,12 @@
+{% for host in groups['service_nodes'] %}
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PhysicalMachine
+metadata:
+  name: {{ host }}
+  namespace: {{ chaos_mesh_namespace }}
+spec:
+  address: {{ hostvars[host].physical_machine_address }}
+{% if not loop.last %}
+---
+{% endif %}
+{% endfor %}

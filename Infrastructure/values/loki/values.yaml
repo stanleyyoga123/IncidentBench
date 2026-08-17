@@ -1,0 +1,82 @@
+loki:
+  auth_enabled: false
+
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: "2025-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  storage:
+    type: filesystem
+  pattern_ingester:
+    enabled: true
+  limits_config:
+    allow_structured_metadata: true
+    volume_enabled: true
+    retention_period: 24h
+  ruler:
+    enable_api: true
+
+defaults:
+  nodeSelector:
+    role: tools
+
+gateway:
+  nodeSelector:
+    role: tools
+
+chunksCache:
+  nodeSelector:
+    role: tools
+
+resultsCache:
+  nodeSelector:
+    role: tools
+
+minio:
+  enabled: false
+
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  nodeSelector:
+    role: tools
+# Zero out replica counts of other deployment modes
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+ingester:
+  replicas: 0
+querier:
+  replicas: 0
+queryFrontend:
+  replicas: 0
+queryScheduler:
+  replicas: 0
+distributor:
+  replicas: 0
+compactor:
+  replicas: 0
+indexGateway:
+  replicas: 0
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+bloomGateway:
+  replicas: 0

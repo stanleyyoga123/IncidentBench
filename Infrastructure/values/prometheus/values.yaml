@@ -1,0 +1,25 @@
+server:
+  nodeSelector:
+    role: tools
+  global:
+    scrape_interval: 15s
+  retention: 3d
+  resources:
+    requests:
+      cpu: 500m
+
+alertmanager:
+  nodeSelector:
+    role: tools
+
+kube-state-metrics:
+  nodeSelector:
+    role: tools
+
+prometheus-node-exporter:
+  tolerations:
+    - operator: Exists
+
+prometheus-pushgateway:
+  enabled: false
+

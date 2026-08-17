@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: evaluation-runner
+  namespace: agents
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: evaluation-runner-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: evaluation-runner
+    namespace: agents
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evaluation-runner
+  namespace: agents
+  labels:
+    app.kubernetes.io/name: evaluation-runner
+spec:
+  serviceAccountName: evaluation-runner
+  nodeSelector:
+    role: tools
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 960
+  containers:
+    - name: evaluation-runner
+      image: {{ evaluation_runner_image }}
+      imagePullPolicy: IfNotPresent
+      command: ["sleep"]
+      args: ["infinity"]
+      workingDir: /app
+      lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/bash", "/app/cleanup_chaos_state.sh", "--yes"]
+      env:
+        - name: INFRASTRUCTURE_ROOT
+          value: /infrastructure
+        - name: CHAOS_NODE_INVENTORY
+          value: /etc/evaluation/inventory.ini
+        - name: CHAOS_NODE_SSH_USER
+          value: chaos-cleaner
+        - name: CHAOS_NODE_SSH_IDENTITY_FILE
+          value: /var/run/evaluation-runner/ssh/id_ed25519
+        - name: CHAOS_NODE_SSH_KNOWN_HOSTS_FILE
+          value: /var/run/evaluation-runner/ssh/known_hosts
+      envFrom:
+        - secretRef:
+            name: evaluation-runner-s3
+            optional: true
+      volumeMounts:
+        - name: worker-node-ssh
+          mountPath: /var/run/evaluation-runner/ssh
+          readOnly: true
+        - name: node-inventory
+          mountPath: /etc/evaluation
+          readOnly: true
+  volumes:
+    - name: worker-node-ssh
+      secret:
+        secretName: evaluation-runner-ssh
+        defaultMode: 0400
+    - name: node-inventory
+      configMap:
+        name: evaluation-node-inventory

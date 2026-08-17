@@ -1,0 +1,164 @@
+- name: Prepare restricted SSH access for the evaluation runner
+  hosts: service_nodes
+  become: true
+  gather_facts: true
+  vars:
+    chaos_cleaner_user: chaos-cleaner
+  pre_tasks:
+    - name: Require the cleaner public key path
+      ansible.builtin.assert:
+        that:
+          - chaos_cleaner_public_key_file is defined
+          - chaos_cleaner_public_key_file | length > 0
+        fail_msg: >-
+          Pass -e chaos_cleaner_public_key_file=/absolute/path/to/key.pub.
+
+    - name: Read the cleaner public key on the Ansible controller
+      ansible.builtin.set_fact:
+        chaos_cleaner_public_key: >-
+          {{ lookup('ansible.builtin.file', chaos_cleaner_public_key_file) }}
+      no_log: true
+
+  tasks:
+    - name: Install SSH, sudo, traffic-control, and process tools
+      ansible.builtin.apt:
+        name:
+          - iproute2
+          - openssh-server
+          - procps
+          - sudo
+          - util-linux
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Create the restricted cleaner account
+      ansible.builtin.user:
+        name: "{{ chaos_cleaner_user }}"
+        comment: Evaluation runner host-state cleaner
+        create_home: true
+        shell: /bin/bash
+        password: "!"
+        update_password: always
+        state: present
+
+    - name: Create the cleaner SSH directory
+      ansible.builtin.file:
+        path: "/home/{{ chaos_cleaner_user }}/.ssh"
+        state: directory
+        owner: "{{ chaos_cleaner_user }}"
+        group: "{{ chaos_cleaner_user }}"
+        mode: "0700"
+
+    - name: Authorize the evaluation runner public key
+      ansible.builtin.copy:
+        dest: "/home/{{ chaos_cleaner_user }}/.ssh/authorized_keys"
+        content: "restrict {{ chaos_cleaner_public_key | trim }}\n"
+        owner: "{{ chaos_cleaner_user }}"
+        group: "{{ chaos_cleaner_user }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Install the root-owned host chaos checker
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/evaluation-check-host-chaos
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          set -eu
+
+          temporary_directory="$(mktemp -d)"
+          trap 'rm -rf "$temporary_directory"' EXIT
+
+          print_chaos_qdiscs() {
+              awk '$2 == "netem" || $2 == "tbf"'
+          }
+
+          echo "SCOPE host-and-network-namespaces"
+          echo "NETNS host"
+          tc qdisc show | print_chaos_qdiscs
+
+          if ! command -v lsns >/dev/null || ! command -v nsenter >/dev/null; then
+              echo "lsns and nsenter are required to inspect pod network namespaces" >&2
+              exit 1
+          fi
+
+          namespace_rows="$temporary_directory/namespaces"
+          namespace_pids="$temporary_directory/pids"
+          if ! lsns -t net -n -o NS,PID >"$namespace_rows"; then
+              echo "failed to enumerate pod network namespaces" >&2
+              exit 1
+          fi
+          awk '$2 ~ /^[0-9]+$/ && !seen[$1]++ {print $2}' \
+              "$namespace_rows" >"$namespace_pids"
+
+          host_namespace="$(readlink /proc/1/ns/net)"
+          inspection_failed=0
+          while IFS= read -r namespace_pid; do
+              [ -n "$namespace_pid" ] || continue
+              namespace="$(readlink "/proc/$namespace_pid/ns/net" 2>/dev/null || true)"
+              [ -n "$namespace" ] || continue
+              [ "$namespace" != "$host_namespace" ] || continue
+              qdisc_output="$temporary_directory/qdisc-$namespace_pid"
+              if ! nsenter -t "$namespace_pid" -n tc qdisc show >"$qdisc_output"; then
+                  if kill -0 "$namespace_pid" 2>/dev/null; then
+                      echo "failed to inspect network namespace pid=$namespace_pid" >&2
+                      inspection_failed=1
+                  fi
+                  continue
+              fi
+              echo "NETNS pid=$namespace_pid"
+              print_chaos_qdiscs <"$qdisc_output"
+          done <"$namespace_pids"
+
+          echo "STRESS"
+          ps -eo pid=,comm=,args= |
+              awk '$2 == "stress" || $2 == "stress-ng" || $2 ~ /^stress-ng-/'
+          exit "$inspection_failed"
+
+    - name: Install the root-owned host chaos cleaner
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../roles/node_chaos/files/evaluation-clean-host-chaos"
+        dest: /usr/local/sbin/evaluation-clean-host-chaos
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Allow only the root-owned cleaner to run without a password
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ chaos_cleaner_user }}"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+        content: |
+          {{ chaos_cleaner_user }} ALL=(root) NOPASSWD: /usr/local/sbin/evaluation-check-host-chaos, /usr/local/sbin/evaluation-clean-host-chaos
+
+    - name: Ensure SSH is enabled
+      ansible.builtin.systemd:
+        name: ssh
+        enabled: true
+        state: started
+      when: ansible_os_family == "Debian"
+
+    - name: Read the worker SSH host key
+      ansible.builtin.slurp:
+        src: /etc/ssh/ssh_host_ed25519_key.pub
+      register: chaos_cleaner_ssh_host_key
+      no_log: true
+
+    - name: Write pinned worker host keys on the Ansible controller
+      ansible.builtin.copy:
+        dest: >-
+          {{ chaos_cleaner_known_hosts_output }}
+        mode: "0600"
+        content: |
+          {% for host in ansible_play_hosts_all %}
+          {{ hostvars[host].ansible_host }} {{ (hostvars[host].chaos_cleaner_ssh_host_key.content | b64decode).split()[0] }} {{ (hostvars[host].chaos_cleaner_ssh_host_key.content | b64decode).split()[1] }}
+          {% endfor %}
+      delegate_to: localhost
+      become: false
+      run_once: true
+      no_log: true

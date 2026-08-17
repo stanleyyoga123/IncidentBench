@@ -1,0 +1,7 @@
+mcp>=2,<3
+pydantic>=2
+pydantic-settings>=2
+httpx
+ansible
+ansible-runner
+uvicorn

@@ -1,0 +1,211 @@
+- name: Install and run chaosd on worker nodes
+  hosts: service_nodes
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Read chaosd CA certificate from Chaos Mesh secret
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - secret
+          - "{{ chaosd_cert_secret_name }}"
+          - -n
+          - "{{ chaosd_cert_secret_namespace }}"
+          - -o
+          - 'jsonpath={.data.ca\.crt}'
+      delegate_to: localhost
+      become: false
+      run_once: true
+      register: chaosd_ca_crt_b64
+      no_log: true
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig_local }}"
+
+    - name: Read chaosd CA key from Chaos Mesh secret
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - secret
+          - "{{ chaosd_cert_secret_name }}"
+          - -n
+          - "{{ chaosd_cert_secret_namespace }}"
+          - -o
+          - 'jsonpath={.data.ca\.key}'
+      delegate_to: localhost
+      become: false
+      run_once: true
+      register: chaosd_ca_key_b64
+      no_log: true
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig_local }}"
+
+  tasks:
+    - name: Install chaosd runtime and installation dependencies
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - iproute2
+          - ipset
+          - iptables
+          - openssl
+          - tar
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Create chaosd installation parent directory
+      ansible.builtin.file:
+        path: "{{ chaosd_install_parent }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Download chaosd archive
+      ansible.builtin.get_url:
+        url: "{{ chaosd_download_url }}"
+        dest: "/tmp/{{ chaosd_archive }}"
+        mode: "0644"
+
+    - name: Unpack chaosd archive
+      ansible.builtin.unarchive:
+        src: "/tmp/{{ chaosd_archive }}"
+        dest: "{{ chaosd_install_parent }}"
+        remote_src: true
+        creates: "{{ chaosd_install_parent }}/chaosd-{{ chaosd_version }}-linux-amd64/chaosd"
+
+    - name: Link chaosd into PATH
+      ansible.builtin.file:
+        src: "{{ chaosd_install_parent }}/chaosd-{{ chaosd_version }}-linux-amd64/chaosd"
+        dest: /usr/local/bin/chaosd
+        state: link
+        force: true
+
+    - name: Create chaosd PKI directory
+      ansible.builtin.file:
+        path: "{{ chaosd_pki_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Install chaosd CA certificate trusted by Chaos Mesh
+      ansible.builtin.copy:
+        dest: "{{ chaosd_pki_dir }}/ca.crt"
+        owner: root
+        group: root
+        mode: "0600"
+        content: "{{ chaosd_ca_crt_b64.stdout | b64decode }}"
+      notify: Restart chaosd
+      no_log: true
+
+    - name: Install chaosd CA key for signing server certificate
+      ansible.builtin.copy:
+        dest: "{{ chaosd_pki_dir }}/ca.key"
+        owner: root
+        group: root
+        mode: "0600"
+        content: "{{ chaosd_ca_key_b64.stdout | b64decode }}"
+      no_log: true
+
+    - name: Create chaosd server certificate openssl config
+      ansible.builtin.copy:
+        dest: "{{ chaosd_pki_dir }}/openssl.cnf"
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          [req]
+          default_bits = 4096
+          prompt = no
+          default_md = sha256
+          distinguished_name = dn
+          req_extensions = req_ext
+
+          [dn]
+          CN = {{ chaosd_tls_server_name }}
+
+          [req_ext]
+          subjectAltName = @alt_names
+
+          [alt_names]
+          DNS.1 = {{ chaosd_tls_server_name }}
+          DNS.2 = {{ inventory_hostname }}
+          IP.1 = {{ ansible_host }}
+
+          [v3_ext]
+          subjectAltName = @alt_names
+
+    - name: Remove old chaosd server certificate files
+      ansible.builtin.file:
+        path: "{{ chaosd_pki_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - chaosd.key
+        - chaosd.csr
+        - chaosd.crt
+        - ca.srl
+
+    - name: Generate chaosd server key
+      ansible.builtin.command:
+        cmd: "openssl genrsa -out {{ chaosd_pki_dir }}/chaosd.key 4096"
+        creates: "{{ chaosd_pki_dir }}/chaosd.key"
+      no_log: true
+
+    - name: Generate chaosd server CSR
+      ansible.builtin.command:
+        cmd: "openssl req -new -key {{ chaosd_pki_dir }}/chaosd.key -out {{ chaosd_pki_dir }}/chaosd.csr -config {{ chaosd_pki_dir }}/openssl.cnf"
+        creates: "{{ chaosd_pki_dir }}/chaosd.csr"
+      no_log: true
+
+    - name: Generate chaosd server certificate signed by trusted Chaos Mesh CA
+      ansible.builtin.command:
+        cmd: "openssl x509 -req -in {{ chaosd_pki_dir }}/chaosd.csr -CA {{ chaosd_pki_dir }}/ca.crt -CAkey {{ chaosd_pki_dir }}/ca.key -CAcreateserial -out {{ chaosd_pki_dir }}/chaosd.crt -days 3650 -sha256 -extensions v3_ext -extfile {{ chaosd_pki_dir }}/openssl.cnf"
+        creates: "{{ chaosd_pki_dir }}/chaosd.crt"
+      notify: Restart chaosd
+      no_log: true
+
+    - name: Remove CA key from worker node after signing
+      ansible.builtin.file:
+        path: "{{ chaosd_pki_dir }}/ca.key"
+        state: absent
+      no_log: true
+
+    - name: Create chaosd systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/chaosd.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Chaos Mesh chaosd service
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/chaosd server --https-port {{ chaosd_https_port }} --CA={{ chaosd_pki_dir }}/ca.crt --cert={{ chaosd_pki_dir }}/chaosd.crt --key={{ chaosd_pki_dir }}/chaosd.key
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart chaosd
+
+    - name: Enable and start chaosd
+      ansible.builtin.systemd:
+        name: chaosd
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart chaosd
+      ansible.builtin.systemd:
+        name: chaosd
+        state: restarted
+        daemon_reload: true

@@ -1,0 +1,3 @@
+This directory contains the Alembic migration environment for the shared
+anomaly-detection and remediation PostgreSQL schema.
+

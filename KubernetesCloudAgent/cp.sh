@@ -1,0 +1,1 @@
+kubectl cp agents/cloudagent-75d74dd869-9dw5q:/app/remediation ./remediation 

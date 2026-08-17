@@ -1,0 +1,41 @@
+---
+- name: Install database, agents, and evaluation runner
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  pre_tasks:
+    - name: Inspect legacy workloads before the incompatible migration
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ agents_namespace }}"
+        name: "{{ item }}"
+      loop: [cloudagent, anomaly-detector]
+      register: legacy_workloads
+
+    - name: Require explicit reset approval for an existing legacy deployment
+      ansible.builtin.assert:
+        that: allow_agent_workflow_reset | bool
+        fail_msg: >-
+          Existing legacy workloads require allow_agent_workflow_reset=true.
+          The migration deletes their non-empty workflow tables.
+      when: legacy_workloads.results[0].resources | length > 0
+
+    - name: Scale old agent and detector down before schema reset
+      kubernetes.core.k8s_scale:
+        kubeconfig: "{{ k3s_kubeconfig_local }}"
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ agents_namespace }}"
+        name: "{{ item.item }}"
+        replicas: 0
+      loop: "{{ legacy_workloads.results }}"
+      when:
+        - legacy_workloads.results[0].resources | length > 0
+        - item.resources | length > 0
+  roles:
+    - role: database
+    - role: agents
+    - role: evaluation_runner
+      when: install_evaluation_runner | bool

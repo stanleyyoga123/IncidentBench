@@ -1,0 +1,182 @@
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from typing import Any, Iterator
+from uuid import UUID, uuid4
+
+from psycopg import Connection
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+
+from schema import RCAJob, RCAJobRequest, RCAResult
+
+
+class RCAJobStore:
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+
+    @contextmanager
+    def connection(self) -> Iterator[Connection]:
+        with Connection.connect(self.dsn, row_factory=dict_row) as conn:
+            yield conn
+
+    def create(self, request: RCAJobRequest, idempotency_key: str) -> RCAJob:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO rca_job (id, idempotency_key, workflow_id, status, request)
+                VALUES (%s, %s, %s, 'queued', %s)
+                ON CONFLICT (idempotency_key) DO UPDATE
+                SET idempotency_key=EXCLUDED.idempotency_key
+                RETURNING *
+                """,
+                (uuid4(), idempotency_key, request.workflow_id, Jsonb(request.model_dump(mode="json"))),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return RCAJob.model_validate(row)
+
+    def get(self, job_id: UUID) -> RCAJob | None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM rca_job WHERE id=%s", (job_id,))
+            row = cur.fetchone()
+            return RCAJob.model_validate(row) if row else None
+
+    def claim(self, owner: str, lease_seconds: int, max_attempts: int) -> RCAJob | None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM agent_execution_slot WHERE id=1 FOR UPDATE")
+            slot = cur.fetchone()
+            now = datetime.now(timezone.utc)
+            if slot["holder_job_id"]:
+                if slot["lease_expires_at"] and slot["lease_expires_at"] > now:
+                    return None
+                if slot["holder_type"] == "rca":
+                    cur.execute(
+                        """
+                        UPDATE rca_job
+                        SET status=CASE WHEN attempts < %s THEN 'queued' ELSE 'failed' END,
+                            error=%s, lease_owner=NULL, lease_expires_at=NULL,
+                            version=version+1, updated_at=now()
+                        WHERE id=%s AND status='running'
+                        """,
+                        (
+                            max_attempts,
+                            Jsonb({"type": "LeaseExpired", "message": "RCA worker lease expired"}),
+                            slot["holder_job_id"],
+                        ),
+                    )
+                elif slot["holder_type"] == "remediation":
+                    cur.execute(
+                        """
+                        UPDATE remediation_job SET status='needs_review',
+                            error=%s, lease_owner=NULL, lease_expires_at=NULL,
+                            version=version+1, updated_at=now(), completed_at=now()
+                        WHERE id=%s AND status='running'
+                        """,
+                        (
+                            Jsonb({"type": "LeaseExpired", "message": "remediation outcome is ambiguous"}),
+                            slot["holder_job_id"],
+                        ),
+                    )
+                cur.execute(
+                    """UPDATE agent_execution_slot SET holder_type=NULL,
+                       holder_job_id=NULL, lease_owner=NULL, lease_expires_at=NULL,
+                       updated_at=now() WHERE id=1"""
+                )
+            cur.execute(
+                """
+                SELECT * FROM rca_job WHERE status='queued'
+                ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+                """
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            expiry = now + timedelta(seconds=lease_seconds)
+            cur.execute(
+                """
+                UPDATE rca_job SET status='running', attempts=attempts+1,
+                    lease_owner=%s, lease_expires_at=%s, started_at=COALESCE(started_at, now()),
+                    version=version+1, updated_at=now() WHERE id=%s RETURNING *
+                """,
+                (owner, expiry, row["id"]),
+            )
+            job = cur.fetchone()
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET holder_type='rca', holder_job_id=%s,
+                    lease_owner=%s, lease_expires_at=%s, updated_at=now() WHERE id=1
+                """,
+                (row["id"], owner, expiry),
+            )
+            conn.commit()
+            return RCAJob.model_validate(job)
+
+    def succeed(self, job_id: UUID, result: RCAResult, raw_output: str) -> None:
+        self._finish(job_id, "succeeded", result=result.model_dump(mode="json"), raw=raw_output)
+
+    def renew(self, job_id: UUID, owner: str, lease_seconds: int) -> bool:
+        expiry = datetime.now(timezone.utc) + timedelta(seconds=lease_seconds)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET lease_expires_at=%s, updated_at=now()
+                WHERE id=1 AND holder_job_id=%s AND lease_owner=%s
+                """,
+                (expiry, job_id, owner),
+            )
+            renewed = cur.rowcount == 1
+            if renewed:
+                cur.execute(
+                    "UPDATE rca_job SET lease_expires_at=%s, updated_at=now() WHERE id=%s AND lease_owner=%s",
+                    (expiry, job_id, owner),
+                )
+            conn.commit()
+            return renewed
+
+    def fail(self, job: RCAJob, exc: Exception, max_attempts: int) -> None:
+        status = "queued" if job.attempts < max_attempts else "failed"
+        self._finish(
+            job.id,
+            status,
+            error={"type": type(exc).__name__, "message": str(exc)},
+        )
+
+    def record_tool_call(self, job_id: UUID, name: str, arguments: dict, result: Any) -> None:
+        ok = not (isinstance(result, dict) and result.get("ok") is False)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO agent_tool_call (service, job_id, tool_name, arguments, result, ok)
+                VALUES ('rca', %s, %s, %s, %s, %s)
+                """,
+                (job_id, name, Jsonb(arguments), Jsonb(result), ok),
+            )
+            conn.commit()
+
+    def _finish(self, job_id: UUID, status: str, *, result=None, raw=None, error=None) -> None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE rca_job SET status=%s, result=%s, raw_output=%s, error=%s,
+                    lease_owner=NULL, lease_expires_at=NULL, version=version+1,
+                    updated_at=now(), completed_at=CASE WHEN %s IN ('succeeded','failed') THEN now() ELSE NULL END
+                WHERE id=%s
+                """,
+                (
+                    status,
+                    Jsonb(result) if result is not None else None,
+                    raw,
+                    Jsonb(error) if error is not None else None,
+                    status,
+                    job_id,
+                ),
+            )
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET holder_type=NULL, holder_job_id=NULL,
+                    lease_owner=NULL, lease_expires_at=NULL, updated_at=now()
+                WHERE id=1 AND holder_job_id=%s
+                """,
+                (job_id,),
+            )
+            conn.commit()
