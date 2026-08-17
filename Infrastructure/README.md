@@ -69,13 +69,26 @@ ansible-playbook site.yml \
 3. Install Istio, Prometheus and detector rules, Loki, Alloy, Grafana, Jaeger,
    and Chaos Mesh.
 4. Install pinned chaosd and the restricted host cleanup account on service nodes.
-5. Provision PostgreSQL, run Alembic to `head`, deploy MCPTools, RCAAgent,
-   RemediatorAgent, AgentOrchestrator, then AnomalyDetector, and create
-   the Evaluation runner.
+5. Apply runtime Secrets, provision PostgreSQL, synchronize its persisted role
+   password, run Alembic to `head`, deploy MCPTools, RCAAgent, RemediatorAgent,
+   AgentOrchestrator, then AnomalyDetector, and create the Evaluation runner.
 
 Run a single phase with a playbook under `playbooks/`. The platform and
 application playbooks use `generated/kubeconfig.yaml` and do not contact a
 cluster during syntax checks.
+
+Apply only database and application credential Secrets (no application
+deployment) with:
+
+```bash
+cd Infrastructure/ansible
+ansible-playbook playbooks/secrets.yml --ask-vault-pass -e @vault.yml
+```
+
+If `vault_database_password` changes for a PostgreSQL instance with an existing
+data volume, follow this with the database role/application pipeline. The
+database phase updates the persisted PostgreSQL role password to match the
+Secret before running the migration Job.
 
 ## Build images
 

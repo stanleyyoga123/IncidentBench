@@ -1,34 +1,45 @@
 ---
-- name: Require database credentials
-  ansible.builtin.assert:
-    that:
-      - database_name | length > 0
-      - database_user | length > 0
-      - database_password | length > 0
-    fail_msg: Supply vault_database_password through Ansible Vault or --extra-vars.
-
-- name: Create database credentials Secret
-  kubernetes.core.k8s:
-    kubeconfig: "{{ k3s_kubeconfig_local }}"
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: anomaly-detector-postgres
-        namespace: "{{ agents_namespace }}"
-      type: Opaque
-      stringData:
-        POSTGRES_DB: "{{ database_name }}"
-        POSTGRES_USER: "{{ database_user }}"
-        POSTGRES_PASSWORD: "{{ database_password }}"
-  no_log: true
-
 - name: Deploy PostgreSQL
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_kubeconfig_local }}"
     state: present
     src: "{{ role_path }}/../../../kubernetes/database/postgres.yaml"
+
+- name: Restart PostgreSQL when its credential Secret changes
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: patched
+    definition:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: anomaly-detector-postgres
+        namespace: "{{ agents_namespace }}"
+      spec:
+        template:
+          metadata:
+            annotations:
+              agent-platform/database-secret-checksum: "{{ database_password | hash('sha256') }}"
+  no_log: true
+
+- name: Create DatabaseJob non-secret configuration
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    src: "{{ role_path }}/../../../../DatabaseJob/kubernetes/configmap.yaml"
+
+- name: Set explicit database workflow reset approval
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: patched
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: database-job-config
+        namespace: "{{ agents_namespace }}"
+      data:
+        ALLOW_AGENT_WORKFLOW_RESET: "{{ allow_agent_workflow_reset | bool | lower }}"
 
 - name: Wait for PostgreSQL StatefulSet readiness
   kubernetes.core.k8s_info:
@@ -43,6 +54,17 @@
   until:
     - postgres_statefulset.resources | length == 1
     - postgres_statefulset.resources[0].status.readyReplicas | default(0) | int == 1
+
+- name: Synchronize the existing PostgreSQL role with the Secret password
+  kubernetes.core.k8s_exec:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    namespace: "{{ agents_namespace }}"
+    pod: anomaly-detector-postgres-0
+    command: >-
+      /bin/sh -ec 'printf "%s\n%s\n" "$POSTGRES_PASSWORD" "$POSTGRES_PASSWORD" |
+      psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+      -c "\\password $POSTGRES_USER"'
+  no_log: true
 
 - name: Remove an earlier migration Job with the same revision
   kubernetes.core.k8s:
@@ -68,7 +90,7 @@
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_kubeconfig_local }}"
     state: present
-    definition: "{{ lookup('ansible.builtin.template', role_path + '/templates/migration-job.yaml.j2') | from_yaml }}"
+    src: "{{ role_path }}/../../../../DatabaseJob/kubernetes/job.yaml"
 
 - name: Wait for the migration Job to complete
   kubernetes.core.k8s_info:

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anomaly-detector-config
+  namespace: agents
+data:
+  .env: |
+    collector.metadata.namespaces=["online-boutique"]
+    collector.metadata.excluded_nodes=["tools-node"]
+    collector.metrics.base_url=http://prometheus-server.monitoring.svc.cluster.local
+    collector.metrics.timeout=10
+    collector.metrics.history_minutes=65
+    collector.metrics.query_step_seconds=30
+    collector.metrics.max_concurrency=4
+    orchestrator.base_url=http://agent-orchestrator.agents.svc.cluster.local:8080
+    orchestrator.ingestion_token=${AGENT_INGESTION_TOKEN}
+    orchestrator.timeout_seconds=10
+    orchestrator.max_attempts=3
+    detector.interval_seconds=30
+    detector.cooldown_seconds=120
+    detector.api_host=0.0.0.0
+    detector.api_port=8080
+    detector.profile_api_token=${DETECTOR_PROFILE_API_TOKEN}

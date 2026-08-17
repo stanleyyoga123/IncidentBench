@@ -6,14 +6,19 @@ import yaml
 INFRASTRUCTURE = Path(__file__).resolve().parents[1]
 WORKSPACE = INFRASTRUCTURE.parent
 MANIFEST_PATHS = [
+    WORKSPACE / "MCPTools/kubernetes/configmap.yaml",
     WORKSPACE / "MCPTools/kubernetes/rbac.yaml",
     WORKSPACE / "MCPTools/kubernetes/network-probes.yaml",
     WORKSPACE / "MCPTools/kubernetes/investigation.yaml",
     WORKSPACE / "MCPTools/kubernetes/remediation.yaml",
+    WORKSPACE / "RCAAgent/kubernetes/configmap.yaml",
     WORKSPACE / "RCAAgent/kubernetes/manifest.yaml",
+    WORKSPACE / "RemediatorAgent/kubernetes/configmap.yaml",
     WORKSPACE / "RemediatorAgent/kubernetes/manifest.yaml",
+    WORKSPACE / "AgentOrchestrator/kubernetes/configmap.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/manifest.yaml",
     INFRASTRUCTURE / "kubernetes/agents/shared.yaml",
+    WORKSPACE / "AnomalyDetector/kubernetes/configmap.yaml",
     WORKSPACE / "AnomalyDetector/kubernetes/manifest.yaml",
 ]
 
@@ -97,14 +102,14 @@ def test_investigation_rbac_is_read_only_and_accounts_are_split():
     )
 
 
-def test_remediation_pvc_and_secret_mount_contracts():
+def test_remediation_pvc_configmap_and_secret_contracts():
     deployments = resources("Deployment")
     remediation = deployments["mcp-tools-remediation"]
     assert remediation["spec"]["strategy"]["type"] == "Recreate"
     mounts = remediation["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     assert {"name": "artifacts", "mountPath": "/sessions"} in mounts
 
-    expected_secrets = {
+    expected_configmaps = {
         "anomaly-detector": "anomaly-detector-config",
         "agent-orchestrator": "agent-orchestrator-config",
         "rca-agent": "rca-agent-config",
@@ -112,12 +117,20 @@ def test_remediation_pvc_and_secret_mount_contracts():
         "mcp-tools-investigation": "mcp-tools-investigation-config",
         "mcp-tools-remediation": "mcp-tools-remediation-config",
     }
-    for name, secret_name in expected_secrets.items():
+    for name, configmap_name in expected_configmaps.items():
         volumes = deployments[name]["spec"]["template"]["spec"]["volumes"]
         assert any(
-            volume.get("secret", {}).get("secretName") == secret_name
+            volume.get("configMap", {}).get("name") == configmap_name
             for volume in volumes
         )
+        container = deployments[name]["spec"]["template"]["spec"]["containers"][0]
+        assert container["envFrom"] == [
+            {"secretRef": {"name": configmap_name.replace("-config", "-secrets")}}
+        ]
+
+    configmaps = resources("ConfigMap")
+    assert set(expected_configmaps.values()) == set(configmaps)
+    assert all(".env" in configmap["data"] for configmap in configmaps.values())
 
 
 def test_dev_images_use_docker_hub_and_always_pull():
@@ -145,16 +158,50 @@ def test_infrastructure_shared_manifest_contains_only_platform_policy():
     ] == [("NetworkPolicy", "agent-platform-ingress")]
 
 
+def test_database_job_owns_configmap_job_and_dev_build():
+    configmap_path = WORKSPACE / "DatabaseJob/kubernetes/configmap.yaml"
+    job_path = WORKSPACE / "DatabaseJob/kubernetes/job.yaml"
+    build_path = WORKSPACE / "DatabaseJob/build.sh"
+    configmap = load_documents(configmap_path)[0]
+    job = load_documents(job_path)[0]
+    container = job["spec"]["template"]["spec"]["containers"][0]
+
+    assert configmap["metadata"]["name"] == "database-job-config"
+    assert configmap["data"]["ALLOW_AGENT_WORKFLOW_RESET"] == "false"
+    assert job["metadata"]["name"] == "database-migration-20260817-0002"
+    assert container["image"] == "stanleyyoga123/database-job:dev"
+    assert container["imagePullPolicy"] == "Always"
+    assert container["envFrom"] == [
+        {"configMapRef": {"name": "database-job-config"}}
+    ]
+    assert build_path.stat().st_mode & 0o111
+    assert "stanleyyoga123/database-job:dev" in build_path.read_text()
+
+    tasks = (
+        INFRASTRUCTURE / "ansible/roles/database/tasks/main.yml"
+    ).read_text()
+    assert "DatabaseJob/kubernetes/configmap.yaml" in tasks
+    assert "DatabaseJob/kubernetes/job.yaml" in tasks
+    assert "migration-job.yaml.j2" not in tasks
+    assert "database-secret-checksum" in tasks
+    assert "Synchronize the existing PostgreSQL role" in tasks
+
+
 def test_ansible_loads_every_component_manifest_and_preserves_rollout_order():
     tasks = (INFRASTRUCTURE / "ansible/roles/agents/tasks/main.yml").read_text()
     references = [
+        "MCPTools/kubernetes/configmap.yaml",
         "MCPTools/kubernetes/rbac.yaml",
         "MCPTools/kubernetes/network-probes.yaml",
         "MCPTools/kubernetes/investigation.yaml",
         "MCPTools/kubernetes/remediation.yaml",
+        "RCAAgent/kubernetes/configmap.yaml",
         "RCAAgent/kubernetes/manifest.yaml",
+        "RemediatorAgent/kubernetes/configmap.yaml",
         "RemediatorAgent/kubernetes/manifest.yaml",
+        "AgentOrchestrator/kubernetes/configmap.yaml",
         "AgentOrchestrator/kubernetes/manifest.yaml",
+        "AnomalyDetector/kubernetes/configmap.yaml",
         "kubernetes/agents/shared.yaml",
         "AnomalyDetector/kubernetes/manifest.yaml",
     ]
@@ -168,3 +215,23 @@ def test_ansible_loads_every_component_manifest_and_preserves_rollout_order():
     assert tasks.index("Start AgentOrchestrator") < tasks.index(
         "Deploy AnomalyDetector after ingestion is ready"
     )
+
+
+def test_runtime_secrets_are_a_dedicated_first_application_phase():
+    applications = (
+        INFRASTRUCTURE / "ansible/playbooks/applications.yml"
+    ).read_text()
+    secrets = (INFRASTRUCTURE / "ansible/playbooks/secrets.yml").read_text()
+    secret_tasks = (
+        INFRASTRUCTURE / "ansible/roles/runtime_secrets/tasks/main.yml"
+    ).read_text()
+
+    assert "role: runtime_secrets" in secrets
+    assert applications.index("role: runtime_secrets") < applications.index(
+        "role: database"
+    )
+    assert "anomaly-detector-postgres" in secret_tasks
+    assert "agent-orchestrator-secrets" in secret_tasks
+    assert "mcp-tools-investigation-secrets" in secret_tasks
+    assert "mcp-tools-remediation-secrets" in secret_tasks
+    assert "no_log: true" in secret_tasks

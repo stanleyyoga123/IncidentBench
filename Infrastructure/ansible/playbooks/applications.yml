@@ -1,4 +1,12 @@
 ---
+- name: Apply runtime Secrets before database and application changes
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  roles:
+    - role: runtime_secrets
+
 - name: Install database, agents, and evaluation runner
   hosts: localhost
   connection: local

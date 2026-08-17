@@ -1,0 +1,85 @@
+---
+- name: Require database and agent secret inputs
+  ansible.builtin.assert:
+    that:
+      - database_name | length > 0
+      - database_user | length > 0
+      - database_password | length > 0
+      - agent_llm_url | length > 0
+      - agent_ingestion_token | length > 0
+      - agent_control_token | length > 0
+      - rca_submit_token | length > 0
+      - remediator_submit_token | length > 0
+      - mcp_investigation_token | length > 0
+      - mcp_remediation_token | length > 0
+    fail_msg: Supply the required database and agent values through Ansible Vault.
+  no_log: true
+
+- name: Apply PostgreSQL credentials Secret
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: anomaly-detector-postgres
+        namespace: "{{ agents_namespace }}"
+      type: Opaque
+      stringData:
+        POSTGRES_DB: "{{ database_name }}"
+        POSTGRES_USER: "{{ database_user }}"
+        POSTGRES_PASSWORD: "{{ database_password }}"
+  no_log: true
+
+- name: Apply agent runtime Secrets
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ item.name }}"
+        namespace: "{{ agents_namespace }}"
+      type: Opaque
+      stringData: "{{ item.data }}"
+  loop:
+    - name: anomaly-detector-secrets
+      data:
+        AGENT_INGESTION_TOKEN: "{{ agent_ingestion_token }}"
+        DETECTOR_PROFILE_API_TOKEN: "{{ detector_profile_api_token }}"
+    - name: agent-orchestrator-secrets
+      data:
+        DATABASE_DSN: "postgresql://{{ database_user }}:{{ database_password }}@{{ database_host }}:{{ database_port }}/{{ database_name }}"
+        AGENT_INGESTION_TOKEN: "{{ agent_ingestion_token }}"
+        AGENT_CONTROL_TOKEN: "{{ agent_control_token }}"
+        RCA_SUBMIT_TOKEN: "{{ rca_submit_token }}"
+        REMEDIATOR_SUBMIT_TOKEN: "{{ remediator_submit_token }}"
+    - name: rca-agent-secrets
+      data:
+        DATABASE_DSN: "postgresql://{{ database_user }}:{{ database_password }}@{{ database_host }}:{{ database_port }}/{{ database_name }}"
+        RCA_SUBMIT_TOKEN: "{{ rca_submit_token }}"
+        MCP_TOKEN: "{{ mcp_investigation_token }}"
+        CLIENT_URL: "{{ agent_llm_url }}"
+        CLIENT_TOKEN: "{{ agent_llm_token }}"
+        LANGFUSE_PUBLIC_KEY: "{{ langfuse_public_key }}"
+        LANGFUSE_SECRET_KEY: "{{ langfuse_secret_key }}"
+        LANGFUSE_BASE_URL: "{{ langfuse_base_url }}"
+    - name: remediator-agent-secrets
+      data:
+        DATABASE_DSN: "postgresql://{{ database_user }}:{{ database_password }}@{{ database_host }}:{{ database_port }}/{{ database_name }}"
+        REMEDIATOR_SUBMIT_TOKEN: "{{ remediator_submit_token }}"
+        MCP_TOKEN: "{{ mcp_remediation_token }}"
+        CLIENT_URL: "{{ agent_llm_url }}"
+        CLIENT_TOKEN: "{{ agent_llm_token }}"
+        LANGFUSE_PUBLIC_KEY: "{{ langfuse_public_key }}"
+        LANGFUSE_SECRET_KEY: "{{ langfuse_secret_key }}"
+        LANGFUSE_BASE_URL: "{{ langfuse_base_url }}"
+    - name: mcp-tools-investigation-secrets
+      data:
+        MCP_TOKEN: "{{ mcp_investigation_token }}"
+    - name: mcp-tools-remediation-secrets
+      data:
+        MCP_TOKEN: "{{ mcp_remediation_token }}"
+  no_log: true

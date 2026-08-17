@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remediator-agent-config
+  namespace: agents
+data:
+  .env: |
+    database.dsn=${DATABASE_DSN}
+    api.host=0.0.0.0
+    api.port=8082
+    api.submit_token=${REMEDIATOR_SUBMIT_TOKEN}
+    mcp.url=http://mcp-tools-remediation.agents.svc.cluster.local:8090/mcp
+    mcp.token=${MCP_TOKEN}
+    client.model=Qwen/Qwen3.6-35B-A3B
+    client.url=${CLIENT_URL}
+    client.token=${CLIENT_TOKEN}
+    worker.poll_interval_seconds=2
+    worker.lease_seconds=1800
+    manager.max_rounds=50

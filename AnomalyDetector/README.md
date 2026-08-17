@@ -59,8 +59,9 @@ The process serves its health and detector-profile API on port `8080` while the
 detection loop runs in the background.
 
 The component-owned Kubernetes Deployment and ClusterIP Service are in
-`kubernetes/manifest.yaml`; Infrastructure renders the runtime Secret and
-installs the manifest after AgentOrchestrator is ready.
+`kubernetes/configmap.yaml` and `kubernetes/manifest.yaml`; Infrastructure
+renders the credential Secret and installs both manifests after
+AgentOrchestrator is ready.
 
 ## Runtime detector profiles
 

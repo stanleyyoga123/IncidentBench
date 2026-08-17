@@ -7,8 +7,9 @@ execution; RBAC is defense in depth. Live Ansible execution requires a successfu
 check-mode record for the exact playbook content. Artifact tools require an
 explicit session ID and paths must remain below the configured session root.
 
-Own `kubernetes/` for both profile Deployments/Services, ServiceAccounts and
-RBAC, the remediation artifact PVC, and the utility network-probe DaemonSets.
-Infrastructure owns Secret rendering, shared policy, and ordered installation.
+Own `kubernetes/` for both profile ConfigMaps and Deployments/Services,
+ServiceAccounts and RBAC, the remediation artifact PVC, and the utility
+network-probe DaemonSets. Infrastructure owns credential Secret rendering,
+shared policy, and ordered installation.
 
 Run `PYTHONPATH=app pytest -q` and `python -m compileall -q app tests`.

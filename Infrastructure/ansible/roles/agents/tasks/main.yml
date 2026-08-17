@@ -1,38 +1,4 @@
 ---
-- name: Require agent endpoints and service tokens
-  ansible.builtin.assert:
-    that:
-      - agent_llm_url | length > 0
-      - agent_ingestion_token | length > 0
-      - agent_control_token | length > 0
-      - rca_submit_token | length > 0
-      - remediator_submit_token | length > 0
-      - mcp_investigation_token | length > 0
-      - mcp_remediation_token | length > 0
-    fail_msg: Supply the agent endpoint and all runtime tokens through Ansible Vault.
-
-- name: Create service runtime configuration Secrets
-  kubernetes.core.k8s:
-    kubeconfig: "{{ k3s_kubeconfig_local }}"
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: "{{ item.name }}-config"
-        namespace: "{{ agents_namespace }}"
-      type: Opaque
-      stringData:
-        .env: "{{ lookup('ansible.builtin.template', role_path + '/templates/' + item.template) }}"
-  loop:
-    - {name: anomaly-detector, template: anomaly-detector.env.j2}
-    - {name: agent-orchestrator, template: agent-orchestrator.env.j2}
-    - {name: rca-agent, template: rca-agent.env.j2}
-    - {name: remediator-agent, template: remediator-agent.env.j2}
-    - {name: mcp-tools-investigation, template: mcp-investigation.env.j2}
-    - {name: mcp-tools-remediation, template: mcp-remediation.env.j2}
-  no_log: true
-
 - name: Deploy the component-owned agent platform resources
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_kubeconfig_local }}"
@@ -40,7 +6,17 @@
     definition: "{{ item }}"
   loop: >-
     {{
-      (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/rbac.yaml')
+      (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/configmap.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../RCAAgent/kubernetes/configmap.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../RemediatorAgent/kubernetes/configmap.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../AgentOrchestrator/kubernetes/configmap.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../AnomalyDetector/kubernetes/configmap.yaml')
+        | from_yaml_all | select | list)
+      + (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/rbac.yaml')
         | from_yaml_all | select | list)
       + (lookup('ansible.builtin.file', role_path + '/../../../../MCPTools/kubernetes/network-probes.yaml')
         | from_yaml_all | select | list)

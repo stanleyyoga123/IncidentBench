@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-job-config
+  namespace: agents
+data:
+  POSTGRES_HOST: postgres.agents.svc.cluster.local
+  POSTGRES_PORT: "5432"
+  ALLOW_AGENT_WORKFLOW_RESET: "false"

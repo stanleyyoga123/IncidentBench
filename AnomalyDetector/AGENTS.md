@@ -11,8 +11,9 @@ This repository does not own database DDL or cluster installation:
 
 - Schema and Alembic migrations belong to `../DatabaseJob/`.
 - The service Deployment and ClusterIP Service belong to `kubernetes/manifest.yaml`.
-- Prometheus rules, runtime Secret rendering, and cluster installation belong
-  to `../Infrastructure/`.
+- Non-secret runtime configuration belongs to `kubernetes/configmap.yaml`.
+  Credential Secret rendering, Prometheus rules, and cluster installation
+  belong to `../Infrastructure/`.
 - Fault injection and service restart controls belong to `../Evaluation/`.
 
 Read the workspace `../AGENTS.md` and `../docs/` before making cross-component

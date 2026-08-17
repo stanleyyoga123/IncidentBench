@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-tools-investigation-config
+  namespace: agents
+data:
+  .env: |
+    server.host=0.0.0.0
+    server.port=8090
+    server.profile=investigation
+    server.token=${MCP_TOKEN}
+    tools.kubectl.path=/usr/local/bin/kubectl
+    tools.kubectl.timeout_seconds=30
+    tools.prometheus.base_url=http://prometheus-server.monitoring.svc.cluster.local
+    tools.prometheus.timeout_seconds=20
+    tools.loki.base_url=http://loki.observability.svc.cluster.local:3100
+    tools.loki.timeout_seconds=20
+    tools.jaeger.base_url=http://tracing.istio-system.svc.cluster.local:80
+    tools.jaeger.timeout_seconds=120
+    tools.network.namespace=utility
+    tools.network.overlay_selector=app.kubernetes.io/name=mcp-tools-network-probe,app.kubernetes.io/component=overlay
+    tools.network.underlay_selector=app.kubernetes.io/name=mcp-tools-network-probe,app.kubernetes.io/component=underlay
+    tools.remediation_root=/sessions
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-tools-remediation-config
+  namespace: agents
+data:
+  .env: |
+    server.host=0.0.0.0
+    server.port=8090
+    server.profile=remediation
+    server.token=${MCP_TOKEN}
+    tools.kubectl.path=/usr/local/bin/kubectl
+    tools.kubectl.timeout_seconds=30
+    tools.prometheus.base_url=http://prometheus-server.monitoring.svc.cluster.local
+    tools.prometheus.timeout_seconds=20
+    tools.loki.base_url=http://loki.observability.svc.cluster.local:3100
+    tools.loki.timeout_seconds=20
+    tools.jaeger.base_url=http://tracing.istio-system.svc.cluster.local:80
+    tools.jaeger.timeout_seconds=120
+    tools.network.namespace=utility
+    tools.network.overlay_selector=app.kubernetes.io/name=mcp-tools-network-probe,app.kubernetes.io/component=overlay
+    tools.network.underlay_selector=app.kubernetes.io/name=mcp-tools-network-probe,app.kubernetes.io/component=underlay
+    tools.remediation_root=/sessions

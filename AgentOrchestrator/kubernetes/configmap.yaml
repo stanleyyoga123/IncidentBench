@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-orchestrator-config
+  namespace: agents
+data:
+  .env: |
+    database.dsn=${DATABASE_DSN}
+    api.host=0.0.0.0
+    api.port=8080
+    api.ingestion_token=${AGENT_INGESTION_TOKEN}
+    api.control_token=${AGENT_CONTROL_TOKEN}
+    rca.base_url=http://rca-agent.agents.svc.cluster.local:8081
+    rca.token=${RCA_SUBMIT_TOKEN}
+    remediator.base_url=http://remediator-agent.agents.svc.cluster.local:8082
+    remediator.token=${REMEDIATOR_SUBMIT_TOKEN}
+    scheduler.intake_interval_seconds=60
+    scheduler.reconcile_interval_seconds=5
+    scheduler.batch_size=100

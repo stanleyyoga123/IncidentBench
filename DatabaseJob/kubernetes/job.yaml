@@ -19,15 +19,12 @@ spec:
         role: tools
       containers:
         - name: migration
-          image: {{ database_job_image }}
-          imagePullPolicy: IfNotPresent
+          image: stanleyyoga123/database-job:dev
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: database-job-config
           env:
-            - name: ALLOW_AGENT_WORKFLOW_RESET
-              value: "{{ allow_agent_workflow_reset | bool | lower }}"
-            - name: POSTGRES_HOST
-              value: postgres.agents.svc.cluster.local
-            - name: POSTGRES_PORT
-              value: "5432"
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
