@@ -216,8 +216,8 @@ class RemediatorWriteFileRequest(BaseModel):
 
 class RemediatorRunAnsibleRequest(BaseModel):
     session_id: str = Field(description="Explicit remediation job/session UUID.")
-    playbook_file: str = Field(default="remediation.yml", description="Filename within remediation/{session_id} to execute as the Ansible playbook.")
-    inventory_file: str | None = Field(default=None, description="Optional inventory filename within remediation/{session_id}. The agent should create this file with remediator.write_file before execution when inventory is needed.")
+    playbook_file: str = Field(default="remediation.yml", description="Basename of the playbook inside the session folder, usually remediation.yml. Do not include directories or the session UUID.")
+    inventory_file: str | None = Field(default=None, description="Optional inventory basename inside the session folder. Create it with remediator.write_file first when needed.")
     check: bool = Field(default=True, description="Run ansible_runner.run in Ansible check mode when true. Set false for live execution after validation and automation guardrails pass.")
     extra_vars: dict[str, Any] | None = Field(default=None, description="Optional extra variables passed to ansible_runner.run.")
 

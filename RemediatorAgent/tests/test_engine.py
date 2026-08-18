@@ -36,6 +36,9 @@ def test_remediator_prompt_and_tools_exclude_rca_orchestration():
     assert not hasattr(prompt, "AGENT_ORCHESTRATOR_PROMPT")
     assert "agent_spawner" not in TOOLS
     assert "cluster.profile_baseline" not in TOOLS
+    assert "The playbook must contain only the approved mutation" in REMEDIATOR_PROMPT
+    assert "Adding `NotIn` is not enough" in REMEDIATOR_PROMPT
+    assert "basename only" in REMEDIATOR_PROMPT
 
 
 def test_prompt_serializes_approved_context_as_json():
@@ -75,3 +78,33 @@ Next Steps
     ]
     assert result.verification == ["direct kubectl confirmed rollout complete"]
     assert result.artifacts == []
+
+
+def test_require_live_ansible_rejects_check_only_and_failed_runs():
+    engine = RemediationEngine(settings=None)
+
+    engine.note_tool_result(
+        "remediator.run_ansible",
+        {"ok": True, "check": True, "executed": True},
+    )
+    try:
+        engine.require_live_ansible()
+        raise AssertionError("check-only ansible must not count as live execution")
+    except RuntimeError as exc:
+        assert "live Ansible" in str(exc)
+
+    engine.note_tool_result(
+        "remediator.run_ansible",
+        {"ok": False, "check": False, "executed": False},
+    )
+    try:
+        engine.require_live_ansible()
+        raise AssertionError("failed live ansible must not count as success")
+    except RuntimeError:
+        pass
+
+    engine.note_tool_result(
+        "remediator.run_ansible",
+        {"ok": True, "check": False, "executed": True},
+    )
+    engine.require_live_ansible()

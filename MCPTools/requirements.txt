@@ -4,4 +4,6 @@ pydantic-settings>=2
 httpx
 ansible
 ansible-runner
+kubernetes
+jsonpatch
 uvicorn

@@ -12,8 +12,9 @@
 
 Python services require FastAPI/Pydantic; AgentOrchestrator and DatabaseJob
 use psycopg. MCPTools and MCP clients use the official MCP Python SDK 2.x with
-stateless JSON Streamable HTTP. Remediation additionally requires Ansible and
-`ansible-runner`.
+stateless JSON Streamable HTTP. Remediation additionally requires Ansible,
+`ansible-runner`, the `kubernetes` Python client, `jsonpatch`, and the
+`kubernetes.core` Ansible collection.
 
 Authentication is pairwise: detector ingestion, orchestrator control,
 orchestrator job-store, RCA submission, remediation submission, investigation

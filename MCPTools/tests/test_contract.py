@@ -107,3 +107,14 @@ def test_ansible_live_execution_requires_matching_successful_check(tmp_path):
     changed = tool.run_ansible("job-a", check=False)
     assert changed["executed"] is False
     assert "changed after check mode" in changed["error"]
+
+
+def test_write_file_accepts_session_relative_basename(tmp_path):
+    tool = RemediatorTool(str(tmp_path))
+    written = tool.write_file(
+        "job-a", "remediation/remediation.yml", "---\n- hosts: localhost\n"
+    )
+    assert written["ok"] is True
+    assert written["filename"] == "remediation.yml"
+    assert (tmp_path / "job-a" / "remediation.yml").exists()
+    assert tool.write_file("job-a", "../escape.yml", "nope")["ok"] is False

@@ -11,6 +11,25 @@ from schema import RCAJobRequest, RCAResult, RemediationPlan
 
 
 RCA_TOOL_NAMES = ["cluster.profile_baseline", "agent_spawner"]
+REPORT_HEADINGS = (
+    "Remediation Required",
+    "Incident State",
+    "Baseline Profile",
+    "Summary",
+    "Failed Investigation",
+    "Evidence",
+    "Impact Scope",
+    "Missing Or Uncertain",
+    "Remediation Plan",
+    "Corrective Action",
+    "Remediation Targets",
+    "Expected Benefit",
+    "Verification",
+    "Rollback",
+    "Guardrails",
+)
+_HEADING_MARKUP = r"(?:#+\s*|[-*]\s*)?(?:\*{1,2}|_{1,2})?"
+_HEADING_COLON = r"(?:\*{1,2}|_{1,2})?\s*:?\s*(?:\*{1,2}|_{1,2})?"
 
 
 class RCAEngine:
@@ -95,11 +114,20 @@ class RCAEngine:
 
     @classmethod
     def _parse(cls, raw: str) -> RCAResult:
-        remediation = cls._bool_field(raw, "Remediation Required", default=False)
-        incident = cls._field(raw, "Incident State").lower()
-        allowed = {"active", "recovered", "intermittent", "preventive risk", "unconfirmed"}
-        if incident not in allowed:
-            incident = "unconfirmed"
+        incident = cls._normalize_incident(cls._field(raw, "Incident State"))
+        action = (
+            cls._first_line(cls._section(raw, "Corrective Action"))
+            or cls._first_line(cls._section(raw, "Remediation Plan"))
+        )
+        targets = [
+            item for item in cls._lines(cls._section(raw, "Remediation Targets"))
+            if item.lower() not in {"none", "n/a", "na"}
+        ]
+        stated = cls._bool_field(raw, "Remediation Required")
+        if stated is None:
+            remediation = incident == "active" and bool(action or targets)
+        else:
+            remediation = stated
         return RCAResult(
             remediation_required=remediation,
             incident_state=incident,
@@ -109,8 +137,8 @@ class RCAEngine:
             impact_scope=cls._lines(cls._section(raw, "Impact Scope")),
             uncertainty=cls._lines(cls._section(raw, "Missing Or Uncertain")),
             remediation_plan=RemediationPlan(
-                action=cls._section(raw, "Remediation Plan"),
-                targets=cls._lines(cls._section(raw, "Remediation Targets")),
+                action=action,
+                targets=targets,
                 expected_benefit=cls._section(raw, "Expected Benefit"),
                 verification=cls._lines(cls._section(raw, "Verification")),
                 rollback=cls._lines(cls._section(raw, "Rollback")),
@@ -118,28 +146,58 @@ class RCAEngine:
             ),
         )
 
-    @staticmethod
-    def _field(raw: str, name: str) -> str:
-        match = re.search(rf"(?im)^\s*(?:[-*]\s*)?{re.escape(name)}\s*:\s*(.+)$", raw)
-        return match.group(1).strip(" *`") if match else ""
+    @classmethod
+    def _heading(cls, name: str) -> str:
+        return rf"^\s*{_HEADING_MARKUP}\s*{re.escape(name)}\s*{_HEADING_COLON}"
 
     @classmethod
-    def _bool_field(cls, raw: str, name: str, default: bool) -> bool:
+    def _next_heading(cls) -> str:
+        names = "|".join(re.escape(item) for item in REPORT_HEADINGS)
+        return rf"^\s*{_HEADING_MARKUP}\s*(?:{names})\s*{_HEADING_COLON}"
+
+    @classmethod
+    def _field(cls, raw: str, name: str) -> str:
+        match = re.search(
+            rf"(?im){cls._heading(name)}(.+?)\s*(?:\*{{1,2}}|_{{1,2}})?\s*$",
+            raw,
+        )
+        return match.group(1).strip().strip("`*") if match else ""
+
+    @classmethod
+    def _bool_field(cls, raw: str, name: str) -> bool | None:
         value = re.sub(r"[^a-z0-9]+", " ", cls._field(raw, name).lower()).split()
+        if not value:
+            return None
         if any(item in value for item in ("yes", "true", "1")):
             return True
         if any(item in value for item in ("no", "false", "0", "none")):
             return False
-        return default
+        return None
 
-    @staticmethod
-    def _section(raw: str, name: str) -> str:
+    @classmethod
+    def _section(cls, raw: str, name: str) -> str:
         match = re.search(
-            rf"(?ims)^\s*(?:#+\s*|[-*]\s*)?{re.escape(name)}\s*:\s*(.*?)(?=^\s*(?:#+\s*|[-*]\s*)?[A-Z][A-Za-z ]+\s*:|\Z)",
+            rf"(?ims){cls._heading(name)}(.*?)(?={cls._next_heading()}|\Z)",
             raw,
         )
-        return match.group(1).strip() if match else ""
+        return match.group(1).strip().strip("`*") if match else ""
+
+    @staticmethod
+    def _normalize_incident(value: str) -> str:
+        incident = re.sub(r"[^a-z ]+", " ", value.lower()).strip()
+        allowed = {
+            "active", "recovered", "intermittent", "preventive risk", "unconfirmed",
+        }
+        return incident if incident in allowed else "unconfirmed"
+
+    @staticmethod
+    def _first_line(value: str) -> str:
+        for line in value.splitlines():
+            text = line.strip().lstrip("-* ").strip(" \t*`")
+            if text:
+                return text
+        return ""
 
     @staticmethod
     def _lines(value: str) -> list[str]:
-        return [line.strip().lstrip("-* ") for line in value.splitlines() if line.strip()]
+        return [line.strip().lstrip("-* ").strip(" \t*`") for line in value.splitlines() if line.strip()]

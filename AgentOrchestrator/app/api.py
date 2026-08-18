@@ -4,6 +4,7 @@ from typing import Callable
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 
 from clients import AgentClient
 from config import Settings, get_settings
@@ -297,7 +298,7 @@ def create_app(
         )
         if job is None:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-        return job
+        return JSONResponse(content=job.model_dump(mode="json"))
 
     @app.post(
         "/api/v1/internal/execution/renew",

@@ -17,6 +17,33 @@ _AUDIT: ContextVar[Callable[[str, dict, Any], None] | None] = ContextVar(
 )
 
 
+def _mcp_value(obj: Any, *names: str, default: Any = None) -> Any:
+    for name in names:
+        try:
+            value = getattr(obj, name)
+        except AttributeError:
+            continue
+        if value is not None:
+            return value
+    return default
+
+
+def tool_metadata(tools: list[Any]) -> dict[str, dict[str, Any]]:
+    return {
+        tool.name: {
+            "name": tool.name,
+            "description": getattr(tool, "description", None) or "",
+            "schema": _mcp_value(
+                tool,
+                "input_schema",
+                "inputSchema",
+                default={"type": "object", "properties": {}},
+            ),
+        }
+        for tool in tools
+    }
+
+
 class audit_tool_calls:
     def __init__(self, callback):
         self.callback = callback
@@ -40,14 +67,7 @@ class ToolRegistry:
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     response = await session.list_tools()
-                    return {
-                        tool.name: {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "schema": tool.inputSchema,
-                        }
-                        for tool in response.tools
-                    }
+                    return tool_metadata(response.tools)
 
     async def _call_remote(self, name: str, kwargs: dict[str, Any]) -> Any:
         headers = {"Authorization": f"Bearer {SETTINGS.mcp.token}"}
@@ -57,8 +77,11 @@ class ToolRegistry:
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     response = await session.call_tool(name, kwargs)
-                    if getattr(response, "structuredContent", None) is not None:
-                        return response.structuredContent
+                    structured = _mcp_value(
+                        response, "structured_content", "structuredContent"
+                    )
+                    if structured is not None:
+                        return structured
                     values = []
                     for item in response.content:
                         text = getattr(item, "text", None)

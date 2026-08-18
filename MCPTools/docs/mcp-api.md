@@ -7,7 +7,7 @@ bearer token. The investigation deployment exposes `kubectl`, `prometheus`,
 
 The remediation deployment exposes the same investigation tools plus:
 
-- `remediator.write_file(session_id, filename, content)`
+- `remediator.write_file(session_id, filename, content)` — `filename` is a basename such as `remediation.yml`
 - `remediator.run_ansible(session_id, playbook_file, inventory_file, check, extra_vars)`
 
 Run Ansible with `check=true` first. Live execution is rejected unless the

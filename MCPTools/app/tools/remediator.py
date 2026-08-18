@@ -13,15 +13,22 @@ class RemediatorTool:
 
     def write_file(self, session_id: str, filename: str, content: str) -> dict[str, Any]:
         session_dir = self._session_dir(session_id)
+        try:
+            file_path = self._session_file(session_dir, filename)
+        except ValueError as exc:
+            return {
+                "ok": False,
+                "session_id": session_id,
+                "filename": filename,
+                "error": str(exc),
+            }
         session_dir.mkdir(parents=True, exist_ok=True)
-
-        file_path = self._session_file(session_dir, filename)
         file_path.write_text(content, encoding="utf-8")
         return {
             "ok": True,
             "session_id": session_id,
             "session_dir": str(session_dir),
-            "filename": filename,
+            "filename": file_path.name,
             "path": str(file_path),
             "bytes": len(content.encode("utf-8")),
         }
@@ -36,7 +43,19 @@ class RemediatorTool:
     ) -> dict[str, Any]:
         self._remove_env_folder(session_id)
         session_dir = self._session_dir(session_id)
-        playbook_path = self._session_file(session_dir, playbook_file)
+        try:
+            playbook_path = self._session_file(session_dir, playbook_file)
+            inventory_path = (
+                self._session_file(session_dir, inventory_file) if inventory_file else None
+            )
+        except ValueError as exc:
+            return {
+                "ok": False,
+                "executed": False,
+                "check": check,
+                "session_id": session_id,
+                "error": str(exc),
+            }
         if not playbook_path.exists():
             return {
                 "ok": False,
@@ -46,17 +65,14 @@ class RemediatorTool:
                 "error": f"playbook file not found: {playbook_file}",
             }
         playbook_content = playbook_path.read_text(encoding="utf-8")
-        inventory_path = None
-        if inventory_file:
-            inventory_path = self._session_file(session_dir, inventory_file)
-            if not inventory_path.exists():
-                return {
-                    "ok": False,
-                    "executed": False,
-                    "session_id": session_id,
-                    "session_dir": str(session_dir),
-                    "error": f"inventory file not found: {inventory_file}",
-                }
+        if inventory_path is not None and not inventory_path.exists():
+            return {
+                "ok": False,
+                "executed": False,
+                "session_id": session_id,
+                "session_dir": str(session_dir),
+                "error": f"inventory file not found: {inventory_file}",
+            }
 
         ident = "check" if check else "execute"
         extra_vars = dict(extra_vars or {})
@@ -155,9 +171,18 @@ class RemediatorTool:
         return self.output_root / (safe or "default")
 
     def _session_file(self, session_dir: Path, filename: str) -> Path:
-        if "/" in filename or "\\" in filename or filename in {"", ".", ".."}:
+        return session_dir / self._safe_name(filename)
+
+    @staticmethod
+    def _safe_name(filename: str) -> str:
+        text = str(filename or "").replace("\\", "/").strip()
+        path = Path(text)
+        if not text or path.is_absolute() or ".." in path.parts:
             raise ValueError(f"unsafe filename: {filename}")
-        return session_dir / filename
+        name = path.name
+        if name in {"", ".", ".."}:
+            raise ValueError(f"unsafe filename: {filename}")
+        return name
 
     def _changed_summary(self, stats: Any) -> dict[str, Any]:
         if not isinstance(stats, dict):

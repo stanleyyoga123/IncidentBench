@@ -390,9 +390,18 @@ class WorkflowStore:
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM agent_execution_slot WHERE id=1 FOR UPDATE")
             slot = cur.fetchone()
+            if slot is None:
+                cur.execute(
+                    "INSERT INTO agent_execution_slot (id) VALUES (1) ON CONFLICT (id) DO NOTHING"
+                )
+                cur.execute("SELECT * FROM agent_execution_slot WHERE id=1 FOR UPDATE")
+                slot = cur.fetchone()
             now = datetime.now(timezone.utc)
+            expires = slot["lease_expires_at"]
+            if expires is not None and expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
             if slot["holder_job_id"]:
-                if slot["lease_expires_at"] and slot["lease_expires_at"] > now:
+                if expires and expires > now:
                     return None
                 self._reclaim_expired_holder(cur, slot, max_attempts)
             cur.execute(

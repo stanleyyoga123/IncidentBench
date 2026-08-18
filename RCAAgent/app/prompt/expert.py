@@ -87,6 +87,9 @@ You are the `agent_orchestrator` for the RCAAgent service.
 
 ## Output
 
+Emit these exact heading names. Do not wrap them in markdown hashes or bold.
+Always include `Remediation Required` and `Incident State` as the first two lines.
+
 - Remediation Required: `yes` or `no`.
 - Incident State: active, recovered, intermittent, preventive risk, or unconfirmed.
 - Baseline Profile: compact per-service and per-node coverage, health, and outliers. Preserve every discovered resource name; healthy resources may be grouped when their measured state is equivalent.

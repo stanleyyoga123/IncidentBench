@@ -23,8 +23,10 @@ class RemediationEngine:
     def __init__(self, settings, audit_callback=None):
         self.settings = settings
         self.audit_callback = audit_callback
+        self._live_ansible_succeeded = False
 
     def run(self, job_id, request: RemediationJobRequest):
+        self._live_ansible_succeeded = False
         agent = Agent(
             name="remediator-agent",
             model=self.settings.client.model,
@@ -38,14 +40,30 @@ class RemediationEngine:
             top_p=0.95,
         )
         prompt = self._prompt(job_id, request)
-        callback = (
-            lambda name, args, result: self.audit_callback(job_id, name, args, result)
-            if self.audit_callback else None
-        )
+        def callback(name, args, result):
+            self.note_tool_result(name, result)
+            if self.audit_callback:
+                self.audit_callback(job_id, name, args, result)
         with audit_tool_calls(callback):
             with propagate_attributes(session_id=str(job_id), trace_name="remediator"):
                 raw = agent.run(prompt)
+        self.require_live_ansible()
         return self._parse(raw), raw
+
+    def note_tool_result(self, name: str, result) -> None:
+        if (
+            name == "remediator.run_ansible"
+            and isinstance(result, dict)
+            and result.get("ok") is True
+            and result.get("check") is False
+        ):
+            self._live_ansible_succeeded = True
+
+    def require_live_ansible(self) -> None:
+        if not self._live_ansible_succeeded:
+            raise RuntimeError(
+                "remediation did not complete a successful live Ansible run"
+            )
 
     @staticmethod
     def _prompt(job_id, request: RemediationJobRequest) -> str:
