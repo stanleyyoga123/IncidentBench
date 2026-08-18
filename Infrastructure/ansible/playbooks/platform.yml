@@ -21,6 +21,9 @@
         - "{{ observability_namespace }}"
         - "{{ istio_namespace }}"
         - "{{ chaos_mesh_namespace }}"
+        - "{{ agents_namespace }}"
+        - "{{ utility_namespace }}"
+        - "{{ application_namespace }}"
 
     - name: Configure Helm repositories
       kubernetes.core.helm_repository:

@@ -275,6 +275,21 @@ def test_infrastructure_site_is_platform_only():
         assert not (INFRASTRUCTURE / "ansible/playbooks" / deleted_playbook).exists()
 
 
+def test_platform_bootstraps_shared_application_namespaces():
+    variables = yaml.safe_load(
+        (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
+    )
+    platform = (INFRASTRUCTURE / "ansible/playbooks/platform.yml").read_text()
+
+    for key, namespace in {
+        "agents_namespace": "agents",
+        "utility_namespace": "utility",
+        "application_namespace": "online-boutique",
+    }.items():
+        assert variables[key] == namespace
+        assert f'{{{{ {key} }}}}' in platform
+
+
 def test_istio_is_pinned_and_keeps_metrics_and_tracing_providers():
     variables = yaml.safe_load(
         (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
