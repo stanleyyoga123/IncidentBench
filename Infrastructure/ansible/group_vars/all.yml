@@ -12,12 +12,13 @@ k3s_kubeconfig_local: "{{ ansible_config_file | dirname }}/../generated/kubeconf
 chaos_mesh_chart_version: "2.8.3"
 prometheus_chart_version: ""
 grafana_chart_version: ""
-istio_chart_version: ""
+# Keep the control plane, base CRDs, gateway, and injected proxies on the same
+# tested release. Upgrade this deliberately; never follow the latest chart.
+istio_chart_version: "1.29.2"
 loki_chart_version: ""
 alloy_chart_version: ""
 
 install_grafana: true
-install_evaluation_runner: true
 grafana_dashboard_files:
   - dashboard.json
   - dashboard_v2.json
@@ -31,45 +32,6 @@ prometheus_namespace: monitoring
 observability_namespace: observability
 istio_namespace: istio-system
 chaos_mesh_namespace: chaos-mesh
-agents_namespace: agents
-utility_namespace: utility
-application_namespace: online-boutique
-
-# Images are intentionally configurable. Publish immutable digests/tags before
-# running a reproducible evaluation.
-anomaly_detector_image: stanleyyoga123/anomaly-detector:dev
-agent_orchestrator_image: stanleyyoga123/agent-orchestrator:dev
-rca_agent_image: stanleyyoga123/rca-agent:dev
-remediator_agent_image: stanleyyoga123/remediator-agent:dev
-mcp_tools_image: stanleyyoga123/mcp-tools:dev
-evaluation_runner_image: stanleyyoga123/agent-evaluator:1.2.0-rc3
-
-# Supply database_password through Ansible Vault or --extra-vars. Do not commit
-# it. The username/database defaults are non-secret identifiers.
-database_name: anomaly_detector
-database_user: anomaly_detector
-database_password: "{{ vault_database_password | default('') }}"
-database_host: postgres.agents.svc.cluster.local
-database_port: 5432
-
-# Runtime detector profile mutations are disabled when this token is empty.
-detector_profile_api_token: "{{ vault_detector_profile_api_token | default('') }}"
-agent_ingestion_token: "{{ vault_agent_ingestion_token | default('') }}"
-agent_control_token: "{{ vault_agent_control_token | default('') }}"
-rca_submit_token: "{{ vault_rca_submit_token | default('') }}"
-remediator_submit_token: "{{ vault_remediator_submit_token | default('') }}"
-mcp_investigation_token: "{{ vault_mcp_investigation_token | default('') }}"
-mcp_remediation_token: "{{ vault_mcp_remediation_token | default('') }}"
-allow_agent_workflow_reset: false
-
-# Agent model and tracing credentials. Secret values must come from Vault
-# or --extra-vars.
-agent_llm_model: Qwen/Qwen3.6-35B-A3B
-agent_llm_url: "{{ vault_agent_llm_url | default('') }}"
-agent_llm_token: "{{ vault_agent_llm_token | default('EMPTY') }}"
-langfuse_base_url: "{{ vault_langfuse_base_url | default('') }}"
-langfuse_public_key: "{{ vault_langfuse_public_key | default('') }}"
-langfuse_secret_key: "{{ vault_langfuse_secret_key | default('') }}"
 
 # Node chaos and restricted cleanup.
 chaosd_version: v1.4.1
@@ -83,12 +45,4 @@ chaosd_cert_secret_namespace: chaos-mesh
 chaosd_tls_server_name: chaosd.chaos-mesh.org
 chaos_cleaner_user: chaos-cleaner
 chaos_cleaner_public_key_file: "{{ vault_chaos_cleaner_public_key_file | default('') }}"
-chaos_cleaner_private_key_file: "{{ vault_chaos_cleaner_private_key_file | default('') }}"
 chaos_cleaner_known_hosts_output: "{{ ansible_config_file | dirname }}/../generated/evaluation-runner-known_hosts"
-
-# Optional evaluation result upload. All three credential fields must be set to
-# create evaluation-runner-s3.
-evaluation_s3_uri: "{{ vault_evaluation_s3_uri | default('') }}"
-evaluation_aws_access_key_id: "{{ vault_evaluation_aws_access_key_id | default('') }}"
-evaluation_aws_secret_access_key: "{{ vault_evaluation_aws_secret_access_key | default('') }}"
-evaluation_aws_region: ap-southeast-2

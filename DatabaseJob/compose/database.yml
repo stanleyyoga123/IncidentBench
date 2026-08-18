@@ -18,7 +18,7 @@ services:
 
   migration:
     build:
-      context: ../../DatabaseJob
+      context: ..
       dockerfile: Dockerfile
     depends_on:
       postgres:

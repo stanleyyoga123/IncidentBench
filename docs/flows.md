@@ -36,4 +36,6 @@ remediation can be retried with a fresh versioned idempotency key.
 
 Evaluation scales/waits for all six deployments, injects workload/faults,
 captures evidence, and finalizes cleanup. Service restart logic remains in
-Evaluation; installation and network-probe DaemonSets remain in Infrastructure.
+Evaluation. Evaluation also owns its runner Secret, Ansible role/playbook, and
+deploy script. MCPTools owns the network-probe DaemonSets; Infrastructure owns
+only the prerequisite cluster platform and namespaces.

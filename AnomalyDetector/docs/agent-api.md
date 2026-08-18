@@ -40,8 +40,10 @@ Read operations do not require authentication. Mutation operations require:
 X-Detector-Profile-Token: <detector-profile-token>
 ```
 
-The token is configured through `detector.profile_api_token`. Infrastructure
-loads it from the Ansible variable `vault_detector_profile_api_token`.
+The token is configured through `detector.profile_api_token` and supplied as
+`DETECTOR_PROFILE_API_TOKEN` in the component-owned
+`kubernetes/secret.yml`. Replace its `++++++++` placeholder locally before
+deployment.
 
 Never put the token in prompts, logs, anomaly reasons, query parameters, or
 committed configuration. Send it only as the request header. A mutation returns

@@ -12,8 +12,9 @@ This repository does not own database DDL or cluster installation:
 - Schema and Alembic migrations belong to `../DatabaseJob/`.
 - The service Deployment and ClusterIP Service belong to `kubernetes/manifest.yaml`.
 - Non-secret runtime configuration belongs to `kubernetes/configmap.yaml`.
-  Credential Secret rendering, Prometheus rules, and cluster installation
-  belong to `../Infrastructure/`.
+- Runtime credentials belong to `kubernetes/secret.yml`; keep only
+  `++++++++` placeholders committed and deploy them with `deploy.sh`.
+- Prometheus rules and platform installation belong to `../Infrastructure/`.
 - Fault injection and service restart controls belong to `../Evaluation/`.
 
 Read the workspace `../AGENTS.md` and `../docs/` before making cross-component
@@ -47,6 +48,8 @@ window each cycle and does not perform startup backfill.
 - `src/schema/`: Pydantic transport and detection models.
 - `tests/`: unit, provider, manager, profile, and API tests.
 - `kubernetes/manifest.yaml`: component-owned Deployment and ClusterIP Service.
+- `kubernetes/secret.yml` and `deploy.sh`: component-owned placeholder Secret
+  and default-current-context deployment.
 - `../Infrastructure/values/prometheus/recording-rules.*`: metric contract.
 
 ## Adaptability Contract
@@ -115,8 +118,8 @@ requests them and the target is known.
 - Add bounds and tests for every newly mutable parameter.
 - Treat missing required Prometheus recording rules as fatal configuration;
   transient HTTP or payload failures may skip a cycle.
-- Do not recreate database tables, shared Infrastructure policy, Secret
-  rendering, or fault-install scripts in this repository.
+- Do not recreate database tables, platform installation, or fault-install
+  scripts in this repository.
 - Preserve unrelated dirty worktree changes.
 
 ## Verification

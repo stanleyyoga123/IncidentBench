@@ -18,23 +18,26 @@ overrides this file for local implementation details.
 
 - `AnomalyDetector/`: Prometheus collection, adaptive statistical detection,
   deterministic event envelopes, authenticated HTTP delivery, and its
-  Deployment/Service manifest.
+  ConfigMap, Secret, Deployment/Service manifest, and deploy script.
 - `AgentOrchestrator/`: anomaly ingestion, idempotency, workflow state,
   batching, reconciliation, approval/decline/retry, downstream submission, and
-  its Deployment/Service manifest.
+  its ConfigMap, Secret, NetworkPolicy, Deployment/Service, and deploy script.
 - `RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
-  its Deployment/Service manifest.
+  its ConfigMap, Secret, Deployment/Service, and deploy script.
 - `RemediatorAgent/`: approved asynchronous remediation and verification jobs,
-  plus its Deployment/Service manifest.
+  plus its ConfigMap, Secret, Deployment/Service, and deploy script.
 - `MCPTools/`: Kubernetes, observability, network, profiling, and remediation
   tools and their Kubernetes RBAC, deployments, PVC, Services, and network
-  probe DaemonSets. Investigation and remediation use separate profiles.
-- `DatabaseJob/`: Alembic migrations and sole ownership of database DDL.
-- `Infrastructure/`: Ansible, inventory, shared platform policy, Helm values,
-  node setup, secrets assembly, and deployment ordering. It installs
-  component-owned manifests.
+  probe DaemonSets, Secrets, and deploy script. Investigation and remediation
+  use separate profiles.
+- `DatabaseJob/`: Alembic migrations, sole ownership of database DDL,
+  PostgreSQL/Secret/migration manifests, local Compose, and deploy script.
+- `Infrastructure/`: Ansible inventory, cluster/node setup, platform
+  namespaces and tools, and Helm values. It does not deploy applications,
+  PostgreSQL, migrations, or application Secrets.
 - `Evaluation/`: workload/fault execution, service restarts, scaling/waiting,
-  capture, cleanup, and comparison.
+  capture, cleanup, comparison, runner Secrets, runner Ansible role/playbook,
+  and deploy script.
 
 The root is not one Git repository. Some components are independent dirty Git
 worktrees. Never discard unrelated modified or untracked files.
@@ -89,9 +92,12 @@ Downgrade restores table structure only; deleted records cannot be recovered.
 
 - Trace every consumer before changing a status, field, environment key,
   operation ID, metric, Deployment name, label, or artifact shape.
-- Keep applications DML-only. Application repositories own their raw workload
-  manifests; deployment orchestration, runtime Secret assembly, and shared
-  platform policy stay in Infrastructure.
+- Keep applications DML-only. Each component owns its runtime Secret,
+  Kubernetes resources, and default-context deploy script. Replace every
+  required `++++++++` placeholder locally before deployment; never commit
+  populated Secrets.
+- Infrastructure installs only cluster/platform prerequisites and namespaces.
+  Operators preserve dependency order by invoking component deploy scripts.
 - Use mocks for Kubernetes, observability, model, and HTTP boundaries in tests.
 - Never run remediation, chaos, cleanup, namespace reset, cluster installation,
   chart upgrades, or migrations against a live cluster without explicit user
@@ -116,7 +122,8 @@ services.
 ## Coordinated rollout
 
 1. Scale the old agent and detector down.
-2. Run migration `20260817_0002` with the explicit reset flag.
+2. Replace DatabaseJob Secret placeholders and run `DatabaseJob/deploy.sh`
+   with `ALLOW_AGENT_WORKFLOW_RESET=true` for the destructive reset.
 3. Deploy and verify both MCPTools profiles.
 4. Deploy and verify RCAAgent and RemediatorAgent.
 5. Deploy and verify AgentOrchestrator.

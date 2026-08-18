@@ -18,26 +18,23 @@ Priority actions:
 5. Review broad cluster-admin bindings and restrict them to the minimum needed
    by the isolated evaluation environment.
 
-The most important locations to audit are ignored local `.env` files,
-`Infrastructure/backups/`, generated kubeconfigs, and local `.env` files. This
-document intentionally does not repeat
-any secret value.
+The most important locations to audit are component-local populated
+`kubernetes/secret.yml` files, ignored local `.env` files,
+`Infrastructure/backups/`, and generated kubeconfigs. Committed Secrets must
+retain only `++++++++` placeholders. This document intentionally does not
+repeat any secret value.
 
 ## Current technical inconsistencies
 
-- The workspace root is not a Git repository, while three child directories
-  are independent repositories. Cross-project docs therefore have no existing
-  shared version/commit boundary.
 - Infrastructure is now Ansible-managed, but chart versions left empty in
   `group_vars/all.yml` resolve at install time. Pin all versions for repeatable
   research runs.
 - Historical Langfuse backup data has been removed from the workspace; any
   future backups must use managed backup storage.
-- Cloudagent claims the full pending queue without a lease and retries failed
-  `in_progress` rows indefinitely.
-- The migration Job image is a template reference until an immutable image tag
-  is published and wired into the deployment process.
-- Image tags and external endpoint assumptions are embedded in manifests.
+- Development image tags and external endpoint assumptions remain embedded in
+  component manifests; publish and pin immutable release digests.
+- Component deploy scripts intentionally use kubectl's current context.
+  Operators must verify that context before every mutating rollout.
 - The Jaeger store is ephemeral and has a short retention window.
 - Component-local agent notes may describe older detector architecture; live
   code and these cross-project docs take precedence for e2e contracts.

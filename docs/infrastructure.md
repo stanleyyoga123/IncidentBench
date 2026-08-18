@@ -1,38 +1,40 @@
 # Infrastructure
 
 `Infrastructure/ansible/site.yml` is the authoritative installation entrypoint.
-It provisions k3s/node roles, observability, Chaos Mesh/chaosd, PostgreSQL,
-migrations, agent services, network probes, and the optional evaluation runner.
+It provisions k3s/node roles, platform namespaces, observability, Istio,
+Chaos Mesh/chaosd, and the restricted node cleaner. It does not deploy
+PostgreSQL, migrations, agents, network probes, application Secrets, or the
+evaluation runner.
 
 Application ConfigMaps and workload resources are owned beside their code in
-each component's `kubernetes/` directory. Infrastructure applies those
-manifests and owns the shared
-`kubernetes/agents/shared.yaml` NetworkPolicy. MCPTools owns its split service
-accounts, read/remediation RBAC, remediation artifact PVC, and overlay/underlay
-probe DaemonSets.
+each component's `kubernetes/` directory. Components also own their placeholder
+Secrets and default-current-context deploy scripts. AgentOrchestrator owns
+`kubernetes/network-policy.yaml`; MCPTools owns its split service accounts,
+RBAC, remediation artifact PVC, and overlay/underlay probe DaemonSets.
 
-Deployment order is enforced by roles:
+Operators preserve this deployment order:
 
-1. database and service credential Secrets;
-2. PostgreSQL readiness, password synchronization, and Alembic migration;
-3. both MCPTools deployments;
-4. RCAAgent and RemediatorAgent;
-5. AgentOrchestrator;
-6. AnomalyDetector ingestion.
+1. run Infrastructure `site.yml` for platform prerequisites;
+2. replace DatabaseJob placeholders and run `DatabaseJob/deploy.sh`, using
+   `ALLOW_AGENT_WORKFLOW_RESET=true` only for the coordinated destructive reset;
+3. replace placeholders and deploy MCPTools;
+4. deploy RCAAgent and RemediatorAgent;
+5. deploy AgentOrchestrator;
+6. deploy AnomalyDetector;
+7. optionally deploy Evaluation independently.
 
 Each component ConfigMap supplies the non-secret `/app/.env` file. Ansible
-Vault values are rendered only into credential Secrets and injected into the
-container for the `${VARIABLE}` references in that file. Do not put passwords,
-tokens, or database DSNs in ConfigMaps.
+Vault does not render application credentials. Replace every required
+`++++++++` in the owning component's `kubernetes/secret.yml` locally, keep
+populated values uncommitted, and ensure pairwise tokens match. Do not put
+passwords, tokens, or database DSNs in ConfigMaps.
 
-To apply or rotate only the Kubernetes runtime Secrets, without deploying any
-application, run:
+Istio base, control plane, ingress gateway, and newly injected workload proxies
+are pinned to the tested release in `ansible/group_vars/all.yml`; an empty or
+floating Istio version is rejected. Use `playbooks/istio.yml` for an Istio-only
+reconciliation so unrelated platform charts are not upgraded.
 
-```bash
-cd Infrastructure/ansible
-ansible-playbook playbooks/secrets.yml --ask-vault-pass -e @vault.yml
-```
-
-After a database password rotation, run the database phase as well. PostgreSQL
-stores its role password in the persistent data volume, so changing only the
-Kubernetes Secret does not update the existing database role.
+After rotating the DatabaseJob password, rerun `DatabaseJob/deploy.sh`.
+PostgreSQL stores its role password in the persistent data volume, so the
+script rolls the StatefulSet and synchronizes that role over its local socket
+before migration.

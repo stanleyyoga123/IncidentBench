@@ -20,14 +20,26 @@ export ALLOW_AGENT_WORKFLOW_RESET=true  # coordinated reset only
 alembic upgrade head
 ```
 
-Applications perform DML only. DatabaseJob owns its ConfigMap and migration Job
-in `kubernetes/`; Infrastructure supplies database credentials, sets the
-explicit reset flag, and runs the Job before all services.
+Applications perform DML only. DatabaseJob independently owns
+`kubernetes/postgres.yaml`, `kubernetes/secret.yml`,
+`kubernetes/configmap.yaml`, `kubernetes/job.yaml`, `compose/database.yml`, and
+`deploy.sh`. Infrastructure does not provision PostgreSQL or run migrations.
 
-For an existing PostgreSQL PVC, changing the Vault password does not update the
-stored database role automatically. The Infrastructure database role restarts
-the pod on Secret changes and synchronizes that role over PostgreSQL's trusted
-local socket before starting this migration Job.
+For Kubernetes, replace all three `++++++++` values in
+`kubernetes/secret.yml`, select the intended kubectl current context, and run:
+
+```bash
+ALLOW_AGENT_WORKFLOW_RESET=true ./deploy.sh  # destructive coordinated reset
+```
+
+Omit the variable (or set it to `false`) for normal additive migrations. The
+script refuses placeholders, scales a detected legacy CloudAgent and
+AnomalyDetector down before an explicitly authorized reset, applies PostgreSQL,
+waits for readiness, and runs the migration Job. For an existing PVC, changing
+the Secret does not update PostgreSQL's persisted role automatically; the
+script rolls the StatefulSet and synchronizes the role password over its local
+socket before migration. It withholds migration pod logs because they may
+contain sensitive values.
 
 Build and push the development image referenced by `kubernetes/job.yaml`:
 
@@ -38,5 +50,13 @@ Build and push the development image referenced by `kubernetes/job.yaml`:
 The default target platform is `linux/amd64`; override it with `PLATFORM` when
 needed. Docker authentication for the `stanleyyoga123` namespace must already
 be configured.
+
+For a local database, copy `.env.example` to the ignored `.env`, replace every
+placeholder, then run from this directory:
+
+```bash
+docker compose --env-file .env -f compose/database.yml up -d postgres
+docker compose --env-file .env -f compose/database.yml run --rm migration
+```
 
 Run `pytest -q` and `python -m compileall -q migrations tests` before release.

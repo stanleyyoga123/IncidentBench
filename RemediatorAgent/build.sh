@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly IMAGE="stanleyyoga123/remediator-agent:dev"
+readonly PLATFORM="${PLATFORM:-linux/amd64}"
+
+docker buildx build \
+  --platform "${PLATFORM}" \
+  --push \
+  --tag "${IMAGE}" \
+  .

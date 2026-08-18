@@ -4,6 +4,9 @@ metadata:
   name: mesh-default
   namespace: istio-system
 spec:
+  metrics:
+  - providers:
+    - name: prometheus
   tracing:
   - providers:
     - name: jaeger

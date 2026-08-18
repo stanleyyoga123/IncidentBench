@@ -8,5 +8,9 @@ The service receives the approved structured RCA snapshot as JSON, persists
 tool-created artifacts separately, and returns their filenames in the completed
 remediation result.
 
-`kubernetes/manifest.yaml` owns the Deployment and ClusterIP Service.
-Infrastructure renders its Secret and installs it after MCPTools is ready.
+This component owns its ConfigMap, placeholder Secret,
+Deployment/ClusterIP Service, and `deploy.sh`. Replace every `++++++++` in
+`kubernetes/secret.yml`, then run `./deploy.sh` against kubectl's current
+context. The script refuses placeholders. `REMEDIATOR_SUBMIT_TOKEN` must match
+AgentOrchestrator, while `MCP_TOKEN` must match only the remediation MCP
+Secret. Deploy after MCPTools and DatabaseJob.

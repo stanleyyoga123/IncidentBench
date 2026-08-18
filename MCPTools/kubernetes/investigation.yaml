@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: {name: mcp-tools-investigation, namespace: agents}
 spec:
-  replicas: 0
+  replicas: 1
   selector: {matchLabels: {app: mcp-tools-investigation}}
   template:
     metadata: {labels: {app: mcp-tools-investigation, agent-platform: mcp}}

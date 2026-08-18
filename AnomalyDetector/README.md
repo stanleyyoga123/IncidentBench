@@ -58,10 +58,11 @@ Run continuously:
 The process serves its health and detector-profile API on port `8080` while the
 detection loop runs in the background.
 
-The component-owned Kubernetes Deployment and ClusterIP Service are in
-`kubernetes/configmap.yaml` and `kubernetes/manifest.yaml`; Infrastructure
-renders the credential Secret and installs both manifests after
-AgentOrchestrator is ready.
+The component owns `kubernetes/configmap.yaml`, `kubernetes/secret.yml`,
+`kubernetes/manifest.yaml`, and `deploy.sh`. Replace every `++++++++` in the
+Secret before running `./deploy.sh`; the script refuses placeholders and uses
+kubectl's current context. `AGENT_INGESTION_TOKEN` must exactly match the value
+in AgentOrchestrator's Secret. Deploy only after AgentOrchestrator is healthy.
 
 ## Runtime detector profiles
 

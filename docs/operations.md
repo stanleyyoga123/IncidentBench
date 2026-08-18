@@ -4,33 +4,35 @@
 
 1. Back up anything that must survive. Legacy agent workflow rows are deleted.
 2. Scale the old CloudAgent and AnomalyDetector down.
-3. Set `allow_agent_workflow_reset=true` only for this coordinated deployment.
-4. Run the Ansible applications play. Migration `20260817_0002` must finish
-   before any service starts.
-5. Verify `/health` for both MCP profiles, both job services, and the
+3. Install platform prerequisites with Infrastructure `site.yml`.
+4. Replace every DatabaseJob Secret `++++++++` placeholder and run
+   `ALLOW_AGENT_WORKFLOW_RESET=true ./DatabaseJob/deploy.sh`. Migration
+   `20260817_0002` must finish before any service starts.
+5. Replace component Secret placeholders, ensuring the pairwise token matrix
+   matches, then deploy MCPTools, RCAAgent/RemediatorAgent, AgentOrchestrator,
+   and AnomalyDetector in that order.
+6. Verify `/health` for both MCP profiles, both job services, and the
    orchestrator; verify MCP discovery with the appropriate tokens.
-6. Deploy/scale AnomalyDetector and confirm committed ingestion.
-7. Exercise no-action, decline, and approved-remediation mocked flows before a
+7. Confirm committed detector ingestion.
+8. Exercise no-action, decline, and approved-remediation mocked flows before a
    controlled live experiment.
 
 Downgrade recreates legacy table structure only. Deleted records are not
-recoverable. Return `allow_agent_workflow_reset` to false after migration.
+recoverable. Return `ALLOW_AGENT_WORKFLOW_RESET` to false after migration.
 
 ## Development image rollout
 
-After the platform has been installed, the root
-`build-push-deploy-dev.sh` script builds the five agent images for
-`linux/amd64`, pushes `stanleyyoga123/*:dev`, updates the existing Deployments,
-forces `imagePullPolicy: Always`, and waits for each rollout in dependency
-order. Docker Buildx, Docker Hub authentication, kubectl access, and an explicit
-Kubernetes context are required:
+After the platform and database have been installed, the root
+`build-push-deploy-dev.sh` delegates build and deployment to the five agent
+components in dependency order. Docker Buildx, Docker Hub authentication,
+populated component Secrets, and a valid kubectl current context are required:
 
 ```bash
-./build-push-deploy-dev.sh <kubernetes-context>
+./build-push-deploy-dev.sh
 ```
 
-The script mutates the selected cluster. It does not install missing resources
-or run database migrations; use Infrastructure Ansible for initial deployment.
+The script mutates kubectl's current cluster. It accepts no context argument and
+does not install platform prerequisites or run DatabaseJob.
 
 ## Local verification
 

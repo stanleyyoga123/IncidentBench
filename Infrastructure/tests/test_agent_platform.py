@@ -16,11 +16,56 @@ MANIFEST_PATHS = [
     WORKSPACE / "RemediatorAgent/kubernetes/configmap.yaml",
     WORKSPACE / "RemediatorAgent/kubernetes/manifest.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/configmap.yaml",
+    WORKSPACE / "AgentOrchestrator/kubernetes/network-policy.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/manifest.yaml",
-    INFRASTRUCTURE / "kubernetes/agents/shared.yaml",
     WORKSPACE / "AnomalyDetector/kubernetes/configmap.yaml",
     WORKSPACE / "AnomalyDetector/kubernetes/manifest.yaml",
 ]
+SECRET_CONTRACTS = {
+    "AnomalyDetector": {
+        "anomaly-detector-secrets": {
+            "AGENT_INGESTION_TOKEN",
+            "DETECTOR_PROFILE_API_TOKEN",
+        }
+    },
+    "AgentOrchestrator": {
+        "agent-orchestrator-secrets": {
+            "DATABASE_DSN",
+            "AGENT_INGESTION_TOKEN",
+            "AGENT_CONTROL_TOKEN",
+            "RCA_SUBMIT_TOKEN",
+            "REMEDIATOR_SUBMIT_TOKEN",
+        }
+    },
+    "RCAAgent": {
+        "rca-agent-secrets": {
+            "DATABASE_DSN",
+            "RCA_SUBMIT_TOKEN",
+            "MCP_TOKEN",
+            "CLIENT_URL",
+            "CLIENT_TOKEN",
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_BASE_URL",
+        }
+    },
+    "RemediatorAgent": {
+        "remediator-agent-secrets": {
+            "DATABASE_DSN",
+            "REMEDIATOR_SUBMIT_TOKEN",
+            "MCP_TOKEN",
+            "CLIENT_URL",
+            "CLIENT_TOKEN",
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_BASE_URL",
+        }
+    },
+    "MCPTools": {
+        "mcp-tools-investigation-secrets": {"MCP_TOKEN"},
+        "mcp-tools-remediation-secrets": {"MCP_TOKEN"},
+    },
+}
 
 
 def load_documents(path):
@@ -34,10 +79,13 @@ def resources(kind):
     return {item["metadata"]["name"]: item for item in DOCS if item["kind"] == kind}
 
 
-def test_component_manifest_paths_exist_and_old_bundles_are_removed():
+def test_component_manifest_paths_exist_and_central_bundles_are_removed():
     assert all(path.is_file() for path in MANIFEST_PATHS)
     assert not (INFRASTRUCTURE / "kubernetes/agents/agent-platform.yaml").exists()
     assert not (INFRASTRUCTURE / "kubernetes/agents/anomaly-detector.yaml").exists()
+    assert not (INFRASTRUCTURE / "kubernetes/agents/shared.yaml").exists()
+    assert not (INFRASTRUCTURE / "kubernetes/database/postgres.yaml").exists()
+    assert not (INFRASTRUCTURE / "compose/database.yml").exists()
 
 
 def test_resource_identities_are_unique_across_component_manifests():
@@ -53,22 +101,20 @@ def test_resource_identities_are_unique_across_component_manifests():
 
 
 def test_split_deployments_services_pvc_and_probe_ownership():
-    staged = {
+    expected = {
         "agent-orchestrator",
         "rca-agent",
         "remediator-agent",
         "mcp-tools-investigation",
         "mcp-tools-remediation",
+        "anomaly-detector",
     }
-    expected = staged | {"anomaly-detector"}
     deployments = resources("Deployment")
     services = resources("Service")
 
     assert expected == set(deployments)
     assert expected == set(services)
     assert all(services[name]["spec"]["type"] == "ClusterIP" for name in expected)
-    assert all(deployments[name]["spec"]["replicas"] == 0 for name in staged)
-    assert deployments["anomaly-detector"]["spec"]["replicas"] == 1
     assert "mcp-tools-remediation-artifacts" in resources("PersistentVolumeClaim")
     assert {
         "mcp-tools-network-probe-overlay",
@@ -133,6 +179,66 @@ def test_remediation_pvc_configmap_and_secret_contracts():
     assert all(".env" in configmap["data"] for configmap in configmaps.values())
 
 
+def test_component_owned_secrets_have_exact_names_keys_and_placeholders():
+    for component, expected_contract in SECRET_CONTRACTS.items():
+        path = WORKSPACE / component / "kubernetes/secret.yml"
+        actual_contract = {
+            document["metadata"]["name"]: set(document["stringData"])
+            for document in load_documents(path)
+        }
+        assert actual_contract == expected_contract
+        assert "++++++++" in path.read_text()
+
+
+def test_pairwise_tokens_are_declared_by_matching_consumers():
+    keys_by_component = {
+        component: set().union(*contracts.values())
+        for component, contracts in SECRET_CONTRACTS.items()
+    }
+    assert "AGENT_INGESTION_TOKEN" in keys_by_component["AnomalyDetector"]
+    assert "AGENT_INGESTION_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "RCA_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "RCA_SUBMIT_TOKEN" in keys_by_component["RCAAgent"]
+    assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["RemediatorAgent"]
+    assert "MCP_TOKEN" in keys_by_component["RCAAgent"]
+    assert "MCP_TOKEN" in keys_by_component["RemediatorAgent"]
+    assert {
+        "mcp-tools-investigation-secrets",
+        "mcp-tools-remediation-secrets",
+    } == set(SECRET_CONTRACTS["MCPTools"])
+
+
+def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
+    expected_references = {
+        "AnomalyDetector": {"secret.yml", "configmap.yaml", "manifest.yaml"},
+        "AgentOrchestrator": {
+            "secret.yml",
+            "configmap.yaml",
+            "network-policy.yaml",
+            "manifest.yaml",
+        },
+        "RCAAgent": {"secret.yml", "configmap.yaml", "manifest.yaml"},
+        "RemediatorAgent": {"secret.yml", "configmap.yaml", "manifest.yaml"},
+        "MCPTools": {
+            "secret.yml",
+            "configmap.yaml",
+            "rbac.yaml",
+            "network-probes.yaml",
+            "investigation.yaml",
+            "remediation.yaml",
+        },
+    }
+    for component, references in expected_references.items():
+        script = WORKSPACE / component / "deploy.sh"
+        content = script.read_text()
+        assert script.stat().st_mode & 0o111
+        assert "kubectl config current-context" in content
+        assert "++++++++" in content
+        assert all(reference in content for reference in references)
+        assert "--context" not in content
+
+
 def test_dev_images_use_docker_hub_and_always_pull():
     expected_images = {
         "anomaly-detector": "stanleyyoga123/anomaly-detector:dev",
@@ -150,88 +256,47 @@ def test_dev_images_use_docker_hub_and_always_pull():
         assert container["imagePullPolicy"] == "Always"
 
 
-def test_infrastructure_shared_manifest_contains_only_platform_policy():
-    shared = load_documents(INFRASTRUCTURE / "kubernetes/agents/shared.yaml")
-    assert [
-        (item["kind"], item["metadata"]["name"])
-        for item in shared
-    ] == [("NetworkPolicy", "agent-platform-ingress")]
+def test_network_policy_is_owned_by_agent_orchestrator():
+    policies = resources("NetworkPolicy")
+    assert set(policies) == {"agent-platform-ingress"}
+    assert (
+        policies["agent-platform-ingress"]["metadata"]["namespace"] == "agents"
+    )
 
 
-def test_database_job_owns_configmap_job_and_dev_build():
-    configmap_path = WORKSPACE / "DatabaseJob/kubernetes/configmap.yaml"
-    job_path = WORKSPACE / "DatabaseJob/kubernetes/job.yaml"
-    build_path = WORKSPACE / "DatabaseJob/build.sh"
-    configmap = load_documents(configmap_path)[0]
-    job = load_documents(job_path)[0]
-    container = job["spec"]["template"]["spec"]["containers"][0]
+def test_infrastructure_site_is_platform_only():
+    site = (INFRASTRUCTURE / "ansible/site.yml").read_text()
+    assert "playbooks/cluster.yml" in site
+    assert "playbooks/platform.yml" in site
+    assert "playbooks/node-chaosd.yml" in site
+    assert "playbooks/node-cleaner.yml" in site
+    for deleted_playbook in ("applications.yml", "secrets.yml"):
+        assert deleted_playbook not in site
+        assert not (INFRASTRUCTURE / "ansible/playbooks" / deleted_playbook).exists()
 
-    assert configmap["metadata"]["name"] == "database-job-config"
-    assert configmap["data"]["ALLOW_AGENT_WORKFLOW_RESET"] == "false"
-    assert job["metadata"]["name"] == "database-migration-20260817-0002"
-    assert container["image"] == "stanleyyoga123/database-job:dev"
-    assert container["imagePullPolicy"] == "Always"
-    assert container["envFrom"] == [
-        {"configMapRef": {"name": "database-job-config"}}
+
+def test_istio_is_pinned_and_keeps_metrics_and_tracing_providers():
+    variables = yaml.safe_load(
+        (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
+    )
+    platform = (INFRASTRUCTURE / "ansible/playbooks/platform.yml").read_text()
+    dedicated_playbook = (
+        INFRASTRUCTURE / "ansible/playbooks/istio.yml"
+    ).read_text()
+    tasks = (INFRASTRUCTURE / "ansible/roles/istio/tasks/main.yml").read_text()
+    telemetry = load_documents(INFRASTRUCTURE / "values/jaeger/telemetry.yaml")[0]
+
+    assert variables["istio_chart_version"] == "1.29.2"
+    assert "name: istio" in platform
+    assert "role: istio" in dedicated_playbook
+    assert 'chart_version: "{{ istio_chart_version }}"' in tasks
+    assert "chart_ref: istio/base" in tasks
+    assert "chart_ref: istio/istiod" in tasks
+    assert "chart_ref: istio/gateway" in tasks
+    assert "metrics:" in tasks
+    assert "- prometheus" in tasks
+    assert "tracing:" in tasks
+    assert "- jaeger" in tasks
+    assert telemetry["spec"]["metrics"] == [
+        {"providers": [{"name": "prometheus"}]}
     ]
-    assert build_path.stat().st_mode & 0o111
-    assert "stanleyyoga123/database-job:dev" in build_path.read_text()
-
-    tasks = (
-        INFRASTRUCTURE / "ansible/roles/database/tasks/main.yml"
-    ).read_text()
-    assert "DatabaseJob/kubernetes/configmap.yaml" in tasks
-    assert "DatabaseJob/kubernetes/job.yaml" in tasks
-    assert "migration-job.yaml.j2" not in tasks
-    assert "database-secret-checksum" in tasks
-    assert "Synchronize the existing PostgreSQL role" in tasks
-
-
-def test_ansible_loads_every_component_manifest_and_preserves_rollout_order():
-    tasks = (INFRASTRUCTURE / "ansible/roles/agents/tasks/main.yml").read_text()
-    references = [
-        "MCPTools/kubernetes/configmap.yaml",
-        "MCPTools/kubernetes/rbac.yaml",
-        "MCPTools/kubernetes/network-probes.yaml",
-        "MCPTools/kubernetes/investigation.yaml",
-        "MCPTools/kubernetes/remediation.yaml",
-        "RCAAgent/kubernetes/configmap.yaml",
-        "RCAAgent/kubernetes/manifest.yaml",
-        "RemediatorAgent/kubernetes/configmap.yaml",
-        "RemediatorAgent/kubernetes/manifest.yaml",
-        "AgentOrchestrator/kubernetes/configmap.yaml",
-        "AgentOrchestrator/kubernetes/manifest.yaml",
-        "AnomalyDetector/kubernetes/configmap.yaml",
-        "kubernetes/agents/shared.yaml",
-        "AnomalyDetector/kubernetes/manifest.yaml",
-    ]
-    assert all(reference in tasks for reference in references)
-    assert tasks.index("Start MCPTools deployments") < tasks.index(
-        "Start RCA and Remediator services"
-    )
-    assert tasks.index("Start RCA and Remediator services") < tasks.index(
-        "Start AgentOrchestrator"
-    )
-    assert tasks.index("Start AgentOrchestrator") < tasks.index(
-        "Deploy AnomalyDetector after ingestion is ready"
-    )
-
-
-def test_runtime_secrets_are_a_dedicated_first_application_phase():
-    applications = (
-        INFRASTRUCTURE / "ansible/playbooks/applications.yml"
-    ).read_text()
-    secrets = (INFRASTRUCTURE / "ansible/playbooks/secrets.yml").read_text()
-    secret_tasks = (
-        INFRASTRUCTURE / "ansible/roles/runtime_secrets/tasks/main.yml"
-    ).read_text()
-
-    assert "role: runtime_secrets" in secrets
-    assert applications.index("role: runtime_secrets") < applications.index(
-        "role: database"
-    )
-    assert "anomaly-detector-postgres" in secret_tasks
-    assert "agent-orchestrator-secrets" in secret_tasks
-    assert "mcp-tools-investigation-secrets" in secret_tasks
-    assert "mcp-tools-remediation-secrets" in secret_tasks
-    assert "no_log: true" in secret_tasks

@@ -21,8 +21,6 @@
         - "{{ observability_namespace }}"
         - "{{ istio_namespace }}"
         - "{{ chaos_mesh_namespace }}"
-        - "{{ agents_namespace }}"
-        - "{{ utility_namespace }}"
 
     - name: Configure Helm repositories
       kubernetes.core.helm_repository:
@@ -36,37 +34,9 @@
         - {name: istio, url: "https://istio-release.storage.googleapis.com/charts"}
         - {name: chaos-mesh, url: "https://charts.chaos-mesh.org"}
 
-    - name: Install Istio base
-      kubernetes.core.helm:
-        kubeconfig: "{{ k3s_kubeconfig_local }}"
-        name: istio-base
-        chart_ref: istio/base
-        chart_version: "{{ istio_chart_version | default(omit, true) }}"
-        release_namespace: "{{ istio_namespace }}"
-        wait: true
-
-    - name: Install Istio control plane with Jaeger tracing provider
-      kubernetes.core.helm:
-        kubeconfig: "{{ k3s_kubeconfig_local }}"
-        name: istiod
-        chart_ref: istio/istiod
-        chart_version: "{{ istio_chart_version | default(omit, true) }}"
-        release_namespace: "{{ istio_namespace }}"
-        wait: true
-        values:
-          global:
-            defaultNodeSelector:
-              role: tools
-          meshConfig:
-            enableTracing: true
-            extensionProviders:
-              - name: jaeger
-                opentelemetry:
-                  service: jaeger-collector.istio-system.svc.cluster.local
-                  port: 4317
-            defaultProviders:
-              tracing:
-                - jaeger
+    - name: Install the pinned Istio platform
+      ansible.builtin.include_role:
+        name: istio
 
     - name: Install Prometheus and detector recording rules
       kubernetes.core.helm:

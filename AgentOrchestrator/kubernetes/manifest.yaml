@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: {name: agent-orchestrator, namespace: agents}
 spec:
-  replicas: 0
+  replicas: 1
   selector: {matchLabels: {app: agent-orchestrator}}
   template:
     metadata: {labels: {app: agent-orchestrator, agent-platform: coordinator}}

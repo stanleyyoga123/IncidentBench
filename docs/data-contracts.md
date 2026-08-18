@@ -28,3 +28,12 @@ changes, verification, artifacts, raw audit context, and errors.
 
 Jobs and workflows use UUID identities, status/version, timestamps, attempts,
 errors, lease owner/expiry, JSONB request/result, and idempotency keys.
+
+## Deployment credentials
+
+Committed `kubernetes/secret.yml` files contain only `++++++++` placeholders.
+Pairwise bearer values must match exactly between detector/orchestrator,
+orchestrator/RCA, orchestrator/remediator, RCA/investigation MCP, and
+remediator/remediation MCP. The two MCP tokens and AgentOrchestrator's control
+token remain distinct. DatabaseJob separately owns the PostgreSQL identity used
+to construct each application's `DATABASE_DSN`.

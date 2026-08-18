@@ -9,5 +9,10 @@ execution slot at a time.
 Run DatabaseJob migrations before starting. Copy `.env.example` to `.env`,
 then run `./run.sh`. OpenAPI is available at `/docs`.
 
-`kubernetes/manifest.yaml` owns the Deployment and ClusterIP Service.
-Infrastructure renders its Secret and installs it in dependency order.
+This component owns its ConfigMap, placeholder Secret, NetworkPolicy,
+Deployment/ClusterIP Service, and `deploy.sh`. Replace every `++++++++` in
+`kubernetes/secret.yml`, then run `./deploy.sh` against kubectl's current
+context. The script refuses placeholders. Match `AGENT_INGESTION_TOKEN` with
+AnomalyDetector, `RCA_SUBMIT_TOKEN` with RCAAgent, and
+`REMEDIATOR_SUBMIT_TOKEN` with RemediatorAgent; keep `AGENT_CONTROL_TOKEN`
+independent. Deploy after both MCP profiles and the two job services.

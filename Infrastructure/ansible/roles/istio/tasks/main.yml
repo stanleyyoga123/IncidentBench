@@ -1,0 +1,71 @@
+---
+- name: Require a pinned Istio chart version
+  ansible.builtin.assert:
+    that:
+      - istio_chart_version | length > 0
+      - istio_chart_version is match('^[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: Set istio_chart_version to an explicit semantic version.
+
+- name: Ensure the Istio namespace exists
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ istio_namespace }}"
+
+- name: Configure the Istio Helm repository
+  kubernetes.core.helm_repository:
+    name: istio
+    repo_url: https://istio-release.storage.googleapis.com/charts
+    force_update: true
+
+- name: Install the pinned Istio base
+  kubernetes.core.helm:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    name: istio-base
+    chart_ref: istio/base
+    chart_version: "{{ istio_chart_version }}"
+    release_namespace: "{{ istio_namespace }}"
+    wait: true
+
+- name: Install the pinned Istio control plane
+  kubernetes.core.helm:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    name: istiod
+    chart_ref: istio/istiod
+    chart_version: "{{ istio_chart_version }}"
+    release_namespace: "{{ istio_namespace }}"
+    wait: true
+    values:
+      global:
+        defaultNodeSelector:
+          role: tools
+      meshConfig:
+        enableTracing: true
+        extensionProviders:
+          - name: jaeger
+            opentelemetry:
+              service: jaeger-collector.istio-system.svc.cluster.local
+              port: 4317
+        defaultProviders:
+          metrics:
+            - prometheus
+          tracing:
+            - jaeger
+
+- name: Install the pinned Istio ingress gateway
+  kubernetes.core.helm:
+    kubeconfig: "{{ k3s_kubeconfig_local }}"
+    name: istio-ingress
+    chart_ref: istio/gateway
+    chart_version: "{{ istio_chart_version }}"
+    release_namespace: "{{ istio_namespace }}"
+    wait: true
+    values:
+      nodeSelector:
+        role: tools
+      service:
+        type: NodePort

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: {name: remediator-agent, namespace: agents}
 spec:
-  replicas: 0
+  replicas: 1
   selector: {matchLabels: {app: remediator-agent}}
   template:
     metadata: {labels: {app: remediator-agent, agent-platform: job-service}}

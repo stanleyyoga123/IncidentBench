@@ -1,17 +1,15 @@
 # Infrastructure
 
-This directory is the source of truth for cluster creation, node preparation,
-platform tools, shared policy, Helm values, runtime configuration assembly, and
-ordered installation. Application directories own their raw workload
-manifests; Evaluation retains experiment-time restart and cleanup behavior.
+This directory owns cluster creation, node preparation, platform namespaces
+and tools, and Helm values. It does not install PostgreSQL, migrations, agent
+services, application Secrets, or the Evaluation runner. Those resources and
+their default-current-context deploy scripts live with their components.
 
 ## Layout
 
-- `ansible/`: inventory, cluster/tool/node/application playbooks, and roles.
-- `kubernetes/`: authored manifests for PostgreSQL, shared agent policy, and
-  Online Boutique. Agent workload manifests live under each component.
+- `ansible/`: inventory plus cluster, platform, and node-preparation playbooks.
+- `kubernetes/`: Online Boutique platform/workload inputs.
 - `values/`: Prometheus, Grafana, Loki, Alloy, Jaeger, and tracing configuration.
-- `compose/database.yml`: local PostgreSQL plus the DatabaseJob migration.
 - `generated/`: ignored kubeconfig and pinned SSH host keys produced by Ansible.
 - `backups/`: ignored placeholder for externally managed restores; never used
   by automation or images.
@@ -30,19 +28,17 @@ pip install -r requirements.txt
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Update `inventory.ini` before targeting a different cluster. Create the ignored,
-encrypted `vault.yml` with the interactive helper:
+Update `inventory.ini` before targeting a different cluster. The optional
+encrypted `vault.yml` now contains only the chaos-cleaner public-key path:
 
 ```bash
 cd Infrastructure/ansible
 ./create-vault.sh
 ```
 
-The helper generates independent database and service tokens, prompts locally
-for external model/tracing/evaluation values, and invokes `ansible-vault`
-without printing secret values. `vault.example.yml` and `group_vars/all.yml`
-document the required variables; no secret values belong in inventory,
-manifests, or command-line arguments.
+Application and database credentials are not generated from this Vault. Replace
+the committed `++++++++` placeholders only in each component's local
+`kubernetes/secret.yml`, and never commit populated Secrets.
 
 ## Provision a cluster
 
@@ -53,7 +49,7 @@ ssh-keygen -t ed25519 -f "$HOME/.ssh/evaluation-chaos-cleaner" \
   -C evaluation-chaos-cleaner
 ```
 
-Then run the complete, ordered deployment:
+Then install the platform:
 
 ```bash
 cd Infrastructure/ansible
@@ -62,33 +58,25 @@ ansible-playbook site.yml \
   -e @/absolute/path/to/secrets.vault.yml
 ```
 
-`site.yml` performs these phases:
+`site.yml` performs only these phases:
 
 1. Install the k3s server and join tool/service nodes using the stable channel.
 2. Fetch a generated kubeconfig and apply the `role=tools`/`role=services` labels.
 3. Install Istio, Prometheus and detector rules, Loki, Alloy, Grafana, Jaeger,
    and Chaos Mesh.
 4. Install pinned chaosd and the restricted host cleanup account on service nodes.
-5. Apply runtime Secrets, provision PostgreSQL, synchronize its persisted role
-   password, run Alembic to `head`, deploy MCPTools, RCAAgent, RemediatorAgent,
-   AgentOrchestrator, then AnomalyDetector, and create the Evaluation runner.
 
-Run a single phase with a playbook under `playbooks/`. The platform and
-application playbooks use `generated/kubeconfig.yaml` and do not contact a
-cluster during syntax checks.
+Run a single platform phase with a playbook under `playbooks/`. Syntax checks
+do not contact a cluster.
 
-Apply only database and application credential Secrets (no application
-deployment) with:
+Istio is deliberately pinned by `istio_chart_version` in
+`ansible/group_vars/all.yml`. Apply only the pinned Istio base, control plane,
+and ingress gateway, without touching the other platform charts, with:
 
 ```bash
 cd Infrastructure/ansible
-ansible-playbook playbooks/secrets.yml --ask-vault-pass -e @vault.yml
+ansible-playbook playbooks/istio.yml
 ```
-
-If `vault_database_password` changes for a PostgreSQL instance with an existing
-data volume, follow this with the database role/application pipeline. The
-database phase updates the persisted PostgreSQL role password to match the
-Secret before running the migration Job.
 
 ## Build images
 
@@ -101,15 +89,14 @@ docker build -f Evaluation/Dockerfile -t <registry>/agent-evaluator:<tag> .
 docker build -f DatabaseJob/Dockerfile -t <registry>/database-job:<tag> DatabaseJob
 ```
 
-Set immutable image tags in `ansible/group_vars/all.yml` or in a release vars
-file before a reproducible deployment.
+Set immutable image tags in component manifests before a reproducible release.
 
 ## Runtime boundary
 
-Evaluation's `services/restart.sh`, `cleanup_chaos_state.sh`, and
-`check_chaos_state.sh` remain in Evaluation because they execute during an
-experiment. They read deployment inputs from `INFRASTRUCTURE_ROOT` (the sibling
-`Infrastructure` directory locally and `/infrastructure` in the runner image).
+Evaluation owns `deploy.sh`, its runner Secrets, its Ansible runner
+role/playbook, `services/restart.sh`, `cleanup_chaos_state.sh`, and
+`check_chaos_state.sh`. Runtime scripts still read Online Boutique and inventory
+inputs through `INFRASTRUCTURE_ROOT`.
 
 ## Local database
 
@@ -117,9 +104,9 @@ From the workspace root:
 
 ```bash
 docker compose --env-file DatabaseJob/.env \
-  -f Infrastructure/compose/database.yml up -d postgres
+  -f DatabaseJob/compose/database.yml up -d postgres
 docker compose --env-file DatabaseJob/.env \
-  -f Infrastructure/compose/database.yml run --rm migration
+  -f DatabaseJob/compose/database.yml run --rm migration
 ```
 
 Copy `DatabaseJob/.env.example` to the ignored `.env` and replace every

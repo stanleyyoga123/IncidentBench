@@ -1,131 +1,89 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly DOCKERHUB_NAMESPACE="stanleyyoga123"
-readonly IMAGE_TAG="dev"
-readonly KUBE_NAMESPACE="agents"
-readonly PLATFORM="${PLATFORM:-linux/amd64}"
-readonly ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-5m}"
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  echo "Usage: $0 <kubernetes-context>"
+  echo "Usage: $0"
   echo
-  echo "Builds and pushes the five agent images as stanleyyoga123/*:dev,"
-  echo "then updates and restarts their existing Deployments in namespace agents."
+  echo "Builds, pushes, and deploys the five agent services using kubectl's"
+  echo "current context. Database migrations remain a separate DatabaseJob workflow."
 }
 
-if [[ $# -ne 1 ]]; then
+if (( $# != 0 )); then
   usage >&2
   exit 2
 fi
 
-readonly KUBE_CONTEXT="$1"
+declare -ar COMPONENTS=(
+  "MCPTools"
+  "RCAAgent"
+  "RemediatorAgent"
+  "AgentOrchestrator"
+  "AnomalyDetector"
+)
 
 for command in docker kubectl; do
   if ! command -v "${command}" >/dev/null 2>&1; then
-    echo "Required command not found: ${command}" >&2
+    echo "Error: required command not found: ${command}" >&2
     exit 1
   fi
 done
 
 if ! docker buildx version >/dev/null 2>&1; then
-  echo "Docker Buildx is required to build and push ${PLATFORM} images." >&2
-  exit 1
-fi
-
-context_found=false
-while IFS= read -r context; do
-  if [[ "${context}" == "${KUBE_CONTEXT}" ]]; then
-    context_found=true
-    break
-  fi
-done < <(kubectl config get-contexts -o name)
-
-if [[ "${context_found}" != "true" ]]; then
-  echo "Kubernetes context does not exist: ${KUBE_CONTEXT}" >&2
+  echo "Error: Docker Buildx is required to build and push the agent images." >&2
   exit 1
 fi
 
 if ! docker info >/dev/null 2>&1; then
-  echo "Docker is unavailable. Start Docker and authenticate to Docker Hub." >&2
+  echo "Error: Docker is unavailable. Start Docker and authenticate to Docker Hub." >&2
   exit 1
 fi
 
-if ! kubectl --context "${KUBE_CONTEXT}" get namespace "${KUBE_NAMESPACE}" >/dev/null 2>&1; then
-  echo "Namespace ${KUBE_NAMESPACE} is unavailable in context ${KUBE_CONTEXT}." >&2
+context="$(kubectl config current-context 2>/dev/null || true)"
+if [[ -z "${context}" ]]; then
+  echo "Error: kubectl has no current context." >&2
   exit 1
 fi
 
-declare -a DEPLOYMENTS=(
-  "mcp-tools-investigation"
-  "mcp-tools-remediation"
-  "rca-agent"
-  "remediator-agent"
-  "agent-orchestrator"
-  "anomaly-detector"
-)
-
-for deployment in "${DEPLOYMENTS[@]}"; do
-  if ! kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    get deployment "${deployment}" >/dev/null 2>&1; then
-    echo "Deployment ${KUBE_NAMESPACE}/${deployment} does not exist." >&2
-    echo "Install the platform with Infrastructure Ansible before using this script." >&2
+for namespace in agents utility online-boutique; do
+  if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+    echo "Error: namespace '${namespace}' is unavailable in current context '${context}'." >&2
     exit 1
   fi
 done
 
-declare -a BUILDS=(
-  "anomaly-detector|AnomalyDetector"
-  "agent-orchestrator|AgentOrchestrator"
-  "mcp-tools|MCPTools"
-  "rca-agent|RCAAgent"
-  "remediator-agent|RemediatorAgent"
-)
-
-build_and_push() {
-  local image_name="$1"
-  local context_dir="$2"
-  local image="${DOCKERHUB_NAMESPACE}/${image_name}:${IMAGE_TAG}"
-
-  echo "Building and pushing ${image}"
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    --tag "${image}" \
-    --push \
-    "${ROOT_DIR}/${context_dir}"
-}
-
-for build in "${BUILDS[@]}"; do
-  IFS="|" read -r image_name context_dir <<<"${build}"
-  build_and_push "${image_name}" "${context_dir}"
+for component in "${COMPONENTS[@]}"; do
+  for script in build.sh deploy.sh; do
+    script_path="${ROOT_DIR}/${component}/${script}"
+    if [[ ! -f "${script_path}" ]]; then
+      echo "Error: required component script not found: ${script_path}" >&2
+      exit 1
+    fi
+    if [[ ! -x "${script_path}" ]]; then
+      echo "Error: required component script is not executable: ${script_path}" >&2
+      exit 1
+    fi
+  done
 done
 
-set_deployment_image() {
-  local deployment="$1"
-  local container="$2"
-  local image_name="$3"
-  local image="${DOCKERHUB_NAMESPACE}/${image_name}:${IMAGE_TAG}"
+for component in "${COMPONENTS[@]}"; do
+  echo "==> Building and pushing ${component}"
+  (cd "${ROOT_DIR}/${component}" && ./build.sh) || {
+    status=$?
+    echo "Error: building and pushing ${component} failed (exit status ${status})." >&2
+    exit "${status}"
+  }
+done
 
-  kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    get deployment "${deployment}" >/dev/null
-  kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    set image "deployment/${deployment}" "${container}=${image}"
-  kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    patch "deployment/${deployment}" --type=strategic \
-    --patch "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${container}\",\"imagePullPolicy\":\"Always\"}]}}}}"
-  kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    rollout restart "deployment/${deployment}"
-  kubectl --context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
-    rollout status "deployment/${deployment}" --timeout="${ROLLOUT_TIMEOUT}"
-}
+for component in "${COMPONENTS[@]}"; do
+  echo "==> Deploying ${component} to context ${context}"
+  (cd "${ROOT_DIR}/${component}" && ./deploy.sh) || {
+    status=$?
+    echo "Error: deploying ${component} failed (exit status ${status})." >&2
+    exit "${status}"
+  }
+done
 
-# Preserve the coordinated dependency order used by Infrastructure Ansible.
-set_deployment_image "mcp-tools-investigation" "mcp-tools-investigation" "mcp-tools"
-set_deployment_image "mcp-tools-remediation" "mcp-tools-remediation" "mcp-tools"
-set_deployment_image "rca-agent" "rca-agent" "rca-agent"
-set_deployment_image "remediator-agent" "remediator-agent" "remediator-agent"
-set_deployment_image "agent-orchestrator" "agent-orchestrator" "agent-orchestrator"
-set_deployment_image "anomaly-detector" "anomaly-detector" "anomaly-detector"
-
-echo "All dev images are deployed in ${KUBE_CONTEXT}/${KUBE_NAMESPACE}."
+echo "All five agent dev images were built, pushed, and deployed to context ${context}."
+echo "DatabaseJob was not run; execute migrations separately and explicitly."

@@ -16,6 +16,7 @@ Read in this order:
 8. [Evaluation](evaluation.md)
 9. [Detector adaptation API](../AnomalyDetector/docs/agent-api.md)
 
-The legacy KubernetesCloudAgent monolith has been removed. Database DDL belongs
-exclusively to `DatabaseJob/` and all cluster installation belongs to
-`Infrastructure/`.
+The legacy KubernetesCloudAgent monolith has been removed. Each component owns
+its Kubernetes resources, placeholder Secret, and deployment. DatabaseJob owns
+PostgreSQL, local Compose, migrations, and database deployment. Infrastructure
+installs only cluster/platform prerequisites and namespaces.

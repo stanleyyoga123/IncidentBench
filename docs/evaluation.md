@@ -7,6 +7,14 @@ under repeatable Online Boutique workload and controlled faults. It captures raw
 evidence for later analysis; it does not declare success solely because an agent
 produced a remediation message.
 
+Evaluation independently owns `deploy.sh`, `kubernetes/secret.yml`, and its
+Ansible `evaluation_runner` role/playbook. Replace the required SSH
+`++++++++` placeholders before deployment. Either replace all four optional S3
+placeholders or leave all four unchanged; the deploy script then skips the S3
+Secret. It uses kubectl's current context and a readable Infrastructure
+inventory, while Infrastructure installs only the prerequisite namespaces and
+platform tools.
+
 ## Inputs
 
 ### Workload

@@ -2,15 +2,19 @@
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
-| AnomalyDetector | Prometheus queries, adaptive profiles, event envelopes, HTTP delivery, workload manifest | PostgreSQL or workflow state |
-| AgentOrchestrator | ingestion, deduplication, batching, workflows, approvals, retries, workload manifest | LLM reasoning or cluster tools |
-| RCAAgent | asynchronous RCA, evidence, sub-agent spawning, RCA audit, workload manifest | remediation execution |
-| RemediatorAgent | approved execution, verification, changes/artifacts audit, workload manifest | approval policy or detector tuning |
-| MCPTools | kubectl, Prometheus, Loki, Jaeger, network, baseline, Ansible artifacts/execution, profile manifests, RBAC, PVC, probes | workflow DML |
-| DatabaseJob | Alembic schema versioning | long-running coordination |
-| Infrastructure | Ansible, nodes, charts, shared policy, secrets, component-manifest installation | application workload manifest ownership or experiment-time restarts |
-| Evaluation | experiments, restarts, scale/wait, cleanup, artifacts | installation |
+| AnomalyDetector | detection, delivery, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL or workflow state |
+| AgentOrchestrator | workflows/approvals, ConfigMap, Secret, NetworkPolicy, workload manifest, deploy script | LLM reasoning or cluster tools |
+| RCAAgent | asynchronous RCA, audit, ConfigMap, Secret, workload manifest, deploy script | remediation execution |
+| RemediatorAgent | approved execution/verification, ConfigMap, Secret, workload manifest, deploy script | approval policy or detector tuning |
+| MCPTools | cluster tools, profile Secrets/manifests, RBAC, PVC, probes, deploy script | workflow DML |
+| DatabaseJob | PostgreSQL, Secret, Compose, Alembic schema/migration Job, deploy script | long-running coordination |
+| Infrastructure | cluster/node Ansible, platform namespaces/tools, Helm values | application/database/evaluation deployment or Secrets |
+| Evaluation | experiments, restarts, cleanup, artifacts, runner Secret/Ansible/deploy script | platform installation |
 
 API entry points are `/api/v1/anomalies`, `/api/v1/workflows`,
 `/api/v1/rca/jobs`, `/api/v1/remediation/jobs`, and `/mcp`. Each HTTP service
 also exposes `/health`; FastAPI services publish OpenAPI at `/docs`.
+
+Every committed Secret uses `++++++++` placeholders. Populate each local file
+without committing it; deploy scripts refuse required placeholders and use
+kubectl's current context.
