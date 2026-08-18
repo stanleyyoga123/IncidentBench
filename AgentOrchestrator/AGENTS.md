@@ -7,10 +7,11 @@ defaults, and explicit approval before remediation. Applications may perform
 DML only; schema changes belong to `../DatabaseJob/`. Downstream failures must
 remain visible and retry must create an explicitly versioned submission.
 
-Own `kubernetes/configmap.yaml`, placeholder-only `kubernetes/secret.yml`,
+Own `kubernetes/configmap.yaml`, placeholder-only `kubernetes/secret.example.yml`,
 `kubernetes/network-policy.yaml`, the Deployment/ClusterIP Service in
-`kubernetes/manifest.yaml`, and `deploy.sh`. Replace every `++++++++` locally
-before deploying; the script uses kubectl's current context and refuses
-unreplaced placeholders. Infrastructure installs platform prerequisites only.
+`kubernetes/manifest.yaml`, and `deploy.sh`. Copy the example Secret to ignored
+`kubernetes/secret.yml` and replace every `++++++++` locally before deploying;
+the script uses kubectl's current context and refuses unreplaced placeholders.
+Infrastructure installs platform prerequisites only.
 
 Run `PYTHONPATH=app pytest -q` and `python -m compileall -q app tests`.

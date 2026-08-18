@@ -12,7 +12,7 @@ def load_documents(name):
 
 
 def test_database_secret_has_exact_name_keys_and_placeholders():
-    secret = load_documents("kubernetes/secret.yml")[0]
+    secret = load_documents("kubernetes/secret.example.yml")[0]
 
     assert secret["metadata"] == {
         "name": "anomaly-detector-postgres",
@@ -66,6 +66,8 @@ def test_compose_and_deploy_are_databasejob_owned_and_safe():
     assert "kubectl config current-context" in content
     assert "replace every ++++++++ placeholder" in content
     assert "ALLOW_AGENT_WORKFLOW_RESET" in content
+    assert "kubernetes/secret.example.yml" in content
+    assert "kubernetes/secret.yml" in content
     assert "kubernetes/postgres.yaml" in content
     assert "kubernetes/job.yaml" in content
     assert "database-secret-checksum" in content

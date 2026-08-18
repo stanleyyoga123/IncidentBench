@@ -19,7 +19,12 @@ fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 secret_file="$script_dir/kubernetes/secret.yml"
+secret_example="$script_dir/kubernetes/secret.example.yml"
 
+if [[ ! -f "$secret_file" ]]; then
+  echo "Error: copy $secret_example to $secret_file and replace its placeholders." >&2
+  exit 1
+fi
 if [[ "$(<"$secret_file")" == *"++++++++"* ]]; then
   echo "Error: replace every ++++++++ placeholder in $secret_file before deploying." >&2
   exit 1

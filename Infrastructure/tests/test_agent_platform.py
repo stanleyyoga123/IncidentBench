@@ -181,7 +181,7 @@ def test_remediation_pvc_configmap_and_secret_contracts():
 
 def test_component_owned_secrets_have_exact_names_keys_and_placeholders():
     for component, expected_contract in SECRET_CONTRACTS.items():
-        path = WORKSPACE / component / "kubernetes/secret.yml"
+        path = WORKSPACE / component / "kubernetes/secret.example.yml"
         actual_contract = {
             document["metadata"]["name"]: set(document["stringData"])
             for document in load_documents(path)
@@ -211,16 +211,33 @@ def test_pairwise_tokens_are_declared_by_matching_consumers():
 
 def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
     expected_references = {
-        "AnomalyDetector": {"secret.yml", "configmap.yaml", "manifest.yaml"},
+        "AnomalyDetector": {
+            "secret.example.yml",
+            "secret.yml",
+            "configmap.yaml",
+            "manifest.yaml",
+        },
         "AgentOrchestrator": {
+            "secret.example.yml",
             "secret.yml",
             "configmap.yaml",
             "network-policy.yaml",
             "manifest.yaml",
         },
-        "RCAAgent": {"secret.yml", "configmap.yaml", "manifest.yaml"},
-        "RemediatorAgent": {"secret.yml", "configmap.yaml", "manifest.yaml"},
+        "RCAAgent": {
+            "secret.example.yml",
+            "secret.yml",
+            "configmap.yaml",
+            "manifest.yaml",
+        },
+        "RemediatorAgent": {
+            "secret.example.yml",
+            "secret.yml",
+            "configmap.yaml",
+            "manifest.yaml",
+        },
         "MCPTools": {
+            "secret.example.yml",
             "secret.yml",
             "configmap.yaml",
             "rbac.yaml",
@@ -315,3 +332,23 @@ def test_istio_is_pinned_and_keeps_metrics_and_tracing_providers():
     assert telemetry["spec"]["metrics"] == [
         {"providers": [{"name": "prometheus"}]}
     ]
+
+
+def test_cluster_and_observability_versions_are_explicitly_pinned():
+    variables = yaml.safe_load(
+        (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
+    )
+
+    assert {
+        "k3s_version": variables["k3s_version"],
+        "prometheus_chart_version": variables["prometheus_chart_version"],
+        "grafana_chart_version": variables["grafana_chart_version"],
+        "loki_chart_version": variables["loki_chart_version"],
+        "alloy_chart_version": variables["alloy_chart_version"],
+    } == {
+        "k3s_version": "v1.34.6+k3s1",
+        "prometheus_chart_version": "29.25.0",
+        "grafana_chart_version": "12.10.4",
+        "loki_chart_version": "18.9.0",
+        "alloy_chart_version": "1.11.1",
+    }

@@ -5,12 +5,14 @@
 1. Back up anything that must survive. Legacy agent workflow rows are deleted.
 2. Scale the old CloudAgent and AnomalyDetector down.
 3. Install platform prerequisites with Infrastructure `site.yml`.
-4. Replace every DatabaseJob Secret `++++++++` placeholder and run
+4. Copy `DatabaseJob/kubernetes/secret.example.yml` to ignored
+   `kubernetes/secret.yml`, replace every `++++++++` placeholder, and run
    `ALLOW_AGENT_WORKFLOW_RESET=true ./DatabaseJob/deploy.sh`. Migration
    `20260817_0002` must finish before any service starts.
-5. Replace component Secret placeholders, ensuring the pairwise token matrix
-   matches, then deploy MCPTools, RCAAgent/RemediatorAgent, AgentOrchestrator,
-   and AnomalyDetector in that order.
+5. Copy each component `secret.example.yml` to ignored `secret.yml`, replace
+   placeholders while keeping the pairwise token matrix matching, then deploy
+   MCPTools, RCAAgent/RemediatorAgent, AgentOrchestrator, and AnomalyDetector
+   in that order.
 6. Verify `/health` for both MCP profiles, both job services, and the
    orchestrator; verify MCP discovery with the appropriate tokens.
 7. Confirm committed detector ingestion.

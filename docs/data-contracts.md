@@ -31,7 +31,8 @@ errors, lease owner/expiry, JSONB request/result, and idempotency keys.
 
 ## Deployment credentials
 
-Committed `kubernetes/secret.yml` files contain only `++++++++` placeholders.
+Committed `kubernetes/secret.example.yml` files contain only `++++++++`
+placeholders. Copy them to ignored `kubernetes/secret.yml` before deployment.
 Pairwise bearer values must match exactly between detector/orchestrator,
 orchestrator/RCA, orchestrator/remediator, RCA/investigation MCP, and
 remediator/remediation MCP. The two MCP tokens and AgentOrchestrator's control

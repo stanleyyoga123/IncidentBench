@@ -8,8 +8,9 @@ PVC and never writes workflow data directly to PostgreSQL.
 
 `kubernetes/` owns both profile Deployments and Services, their RBAC, the
 remediation PVC, overlay/underlay probe DaemonSets, and the two placeholder
-Secrets. Replace every `++++++++` in `kubernetes/secret.yml`, then run
-`./deploy.sh` against kubectl's current context; it refuses placeholders.
+Secrets. Copy `kubernetes/secret.example.yml` to ignored
+`kubernetes/secret.yml`, replace every `++++++++`, then run `./deploy.sh`
+against kubectl's current context; it refuses placeholders.
 Use distinct investigation and remediation tokens. The investigation value
 must match RCAAgent's `MCP_TOKEN`; the remediation value must match
 RemediatorAgent's `MCP_TOKEN`. Deploy MCPTools before either job service.

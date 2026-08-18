@@ -15,6 +15,6 @@ API entry points are `/api/v1/anomalies`, `/api/v1/workflows`,
 `/api/v1/rca/jobs`, `/api/v1/remediation/jobs`, and `/mcp`. Each HTTP service
 also exposes `/health`; FastAPI services publish OpenAPI at `/docs`.
 
-Every committed Secret uses `++++++++` placeholders. Populate each local file
-without committing it; deploy scripts refuse required placeholders and use
-kubectl's current context.
+Every committed `kubernetes/secret.example.yml` uses `++++++++` placeholders.
+Copy each example to ignored `kubernetes/secret.yml` without committing it;
+deploy scripts refuse required placeholders and use kubectl's current context.

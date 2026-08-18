@@ -20,9 +20,9 @@ Priority actions:
 
 The most important locations to audit are component-local populated
 `kubernetes/secret.yml` files, ignored local `.env` files,
-`Infrastructure/backups/`, and generated kubeconfigs. Committed Secrets must
-retain only `++++++++` placeholders. This document intentionally does not
-repeat any secret value.
+`Infrastructure/backups/`, and generated kubeconfigs. Committed
+`kubernetes/secret.example.yml` files must retain only `++++++++`
+placeholders. This document intentionally does not repeat any secret value.
 
 ## Current technical inconsistencies
 

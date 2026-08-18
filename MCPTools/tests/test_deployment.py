@@ -15,7 +15,7 @@ def documents(name):
 
 
 def test_owned_secrets_manifests_and_deploy_script_contract():
-    secret_documents = documents("kubernetes/secret.yml")
+    secret_documents = documents("kubernetes/secret.example.yml")
     secrets = {
         item["metadata"]["name"]: set(item["stringData"])
         for item in secret_documents
@@ -47,6 +47,7 @@ def test_owned_secrets_manifests_and_deploy_script_contract():
     assert all(
         name in deploy
         for name in (
+            "secret.example.yml",
             "secret.yml",
             "configmap.yaml",
             "rbac.yaml",

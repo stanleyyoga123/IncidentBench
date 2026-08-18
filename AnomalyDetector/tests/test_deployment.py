@@ -15,7 +15,7 @@ def documents(name):
 
 
 def test_owned_secret_manifest_and_deploy_script_contract():
-    secret = documents("kubernetes/secret.yml")[0]
+    secret = documents("kubernetes/secret.example.yml")[0]
     assert secret["metadata"]["name"] == "anomaly-detector-secrets"
     assert set(secret["stringData"]) == {
         "AGENT_INGESTION_TOKEN",
@@ -35,5 +35,5 @@ def test_owned_secret_manifest_and_deploy_script_contract():
     assert "++++++++" in deploy
     assert all(
         name in deploy
-        for name in ("secret.yml", "configmap.yaml", "manifest.yaml")
+        for name in ("secret.example.yml", "secret.yml", "configmap.yaml", "manifest.yaml")
     )

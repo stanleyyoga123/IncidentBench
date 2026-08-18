@@ -15,7 +15,7 @@ def documents(name):
 
 
 def test_owned_secret_manifests_and_deploy_script_contract():
-    secret = documents("kubernetes/secret.yml")[0]
+    secret = documents("kubernetes/secret.example.yml")[0]
     assert secret["metadata"]["name"] == "agent-orchestrator-secrets"
     assert set(secret["stringData"]) == {
         "DATABASE_DSN",
@@ -41,6 +41,7 @@ def test_owned_secret_manifests_and_deploy_script_contract():
     assert all(
         name in deploy
         for name in (
+            "secret.example.yml",
             "secret.yml",
             "configmap.yaml",
             "network-policy.yaml",

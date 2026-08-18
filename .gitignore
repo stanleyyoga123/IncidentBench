@@ -7,6 +7,7 @@
 **/*.pem
 **/*.key
 **/kubeconfig*
+**/kubernetes/secret.yml
 
 # Runtime data and generated artifacts
 **/__pycache__/

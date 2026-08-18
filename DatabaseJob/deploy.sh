@@ -4,6 +4,7 @@ set -Eeuo pipefail
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly NAMESPACE="agents"
 readonly SECRET_FILE="${SCRIPT_DIR}/kubernetes/secret.yml"
+readonly SECRET_EXAMPLE="${SCRIPT_DIR}/kubernetes/secret.example.yml"
 readonly POSTGRES_FILE="${SCRIPT_DIR}/kubernetes/postgres.yaml"
 readonly CONFIGMAP_FILE="${SCRIPT_DIR}/kubernetes/configmap.yaml"
 readonly JOB_FILE="${SCRIPT_DIR}/kubernetes/job.yaml"
@@ -28,6 +29,9 @@ case "${ALLOW_AGENT_WORKFLOW_RESET}" in
   true | false) ;;
   *) fail "ALLOW_AGENT_WORKFLOW_RESET must be exactly true or false" ;;
 esac
+
+[[ -f "${SECRET_FILE}" ]] ||
+  fail "copy ${SECRET_EXAMPLE} to ${SECRET_FILE} and replace its placeholders"
 
 if awk '
   /^[[:space:]]+POSTGRES_(DB|USER|PASSWORD):[[:space:]]*["'"'"']?\+{8}["'"'"']?[[:space:]]*$/ {

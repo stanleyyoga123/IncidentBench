@@ -58,10 +58,10 @@ Run continuously:
 The process serves its health and detector-profile API on port `8080` while the
 detection loop runs in the background.
 
-The component owns `kubernetes/configmap.yaml`, `kubernetes/secret.yml`,
-`kubernetes/manifest.yaml`, and `deploy.sh`. Replace every `++++++++` in the
-Secret before running `./deploy.sh`; the script refuses placeholders and uses
-kubectl's current context. `AGENT_INGESTION_TOKEN` must exactly match the value
+The component owns `kubernetes/configmap.yaml`, `kubernetes/secret.example.yml`,
+`kubernetes/manifest.yaml`, and `deploy.sh`. Copy the example Secret to ignored
+`kubernetes/secret.yml`, replace every `++++++++`, then run `./deploy.sh`; the
+script refuses placeholders and uses kubectl's current context. `AGENT_INGESTION_TOKEN` must exactly match the value
 in AgentOrchestrator's Secret. Deploy only after AgentOrchestrator is healthy.
 
 ## Runtime detector profiles

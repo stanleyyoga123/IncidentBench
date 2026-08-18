@@ -21,12 +21,13 @@ alembic upgrade head
 ```
 
 Applications perform DML only. DatabaseJob independently owns
-`kubernetes/postgres.yaml`, `kubernetes/secret.yml`,
+`kubernetes/postgres.yaml`, `kubernetes/secret.example.yml`,
 `kubernetes/configmap.yaml`, `kubernetes/job.yaml`, `compose/database.yml`, and
 `deploy.sh`. Infrastructure does not provision PostgreSQL or run migrations.
 
-For Kubernetes, replace all three `++++++++` values in
-`kubernetes/secret.yml`, select the intended kubectl current context, and run:
+For Kubernetes, copy `kubernetes/secret.example.yml` to ignored
+`kubernetes/secret.yml`, replace all three `++++++++` values, select the
+intended kubectl current context, and run:
 
 ```bash
 ALLOW_AGENT_WORKFLOW_RESET=true ./deploy.sh  # destructive coordinated reset

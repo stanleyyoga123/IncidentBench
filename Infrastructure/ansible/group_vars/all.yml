@@ -1,22 +1,21 @@
 ---
-# Cluster lifecycle. The stable channel resolves the current supported k3s
-# release when the playbook runs; pin k3s_version for reproducible rebuilds.
+# Cluster lifecycle. Keep the channel as installation metadata, but always use
+# the explicit version below for reproducible rebuilds and upgrades.
 k3s_channel: stable
-k3s_version: ""
+k3s_version: "v1.34.6+k3s1"
 k3s_server_url: "https://{{ hostvars[groups['control_plane'][0]].ansible_host }}:6443"
 k3s_kubeconfig_local: "{{ ansible_config_file | dirname }}/../generated/kubeconfig.yaml"
 
-# Current explicit platform pin. Empty chart versions mean the newest chart in
-# the refreshed upstream repository; set them in a release vars file to lock a
-# reproducible environment.
+# Tested chart versions currently running in the research cluster. Upgrade
+# these deliberately after validating the complete observability pipeline.
 chaos_mesh_chart_version: "2.8.3"
-prometheus_chart_version: ""
-grafana_chart_version: ""
+prometheus_chart_version: "29.25.0"
+grafana_chart_version: "12.10.4"
 # Keep the control plane, base CRDs, gateway, and injected proxies on the same
 # tested release. Upgrade this deliberately; never follow the latest chart.
 istio_chart_version: "1.29.2"
-loki_chart_version: ""
-alloy_chart_version: ""
+loki_chart_version: "18.9.0"
+alloy_chart_version: "1.11.1"
 
 install_grafana: true
 grafana_dashboard_files:

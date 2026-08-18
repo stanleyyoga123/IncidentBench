@@ -93,9 +93,10 @@ Downgrade restores table structure only; deleted records cannot be recovered.
 - Trace every consumer before changing a status, field, environment key,
   operation ID, metric, Deployment name, label, or artifact shape.
 - Keep applications DML-only. Each component owns its runtime Secret,
-  Kubernetes resources, and default-context deploy script. Replace every
-  required `++++++++` placeholder locally before deployment; never commit
-  populated Secrets.
+  Kubernetes resources, and default-context deploy script. Copy each
+  `kubernetes/secret.example.yml` to ignored `kubernetes/secret.yml` and
+  replace every required `++++++++` placeholder locally before deployment;
+  never commit populated Secrets.
 - Infrastructure installs only cluster/platform prerequisites and namespaces.
   Operators preserve dependency order by invoking component deploy scripts.
 - Use mocks for Kubernetes, observability, model, and HTTP boundaries in tests.

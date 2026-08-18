@@ -25,7 +25,8 @@ Operators preserve this deployment order:
 
 Each component ConfigMap supplies the non-secret `/app/.env` file. Ansible
 Vault does not render application credentials. Replace every required
-`++++++++` in the owning component's `kubernetes/secret.yml` locally, keep
+`++++++++` after copying the owning component's
+`kubernetes/secret.example.yml` to ignored `kubernetes/secret.yml`, keep
 populated values uncommitted, and ensure pairwise tokens match. Do not put
 passwords, tokens, or database DSNs in ConfigMaps.
 

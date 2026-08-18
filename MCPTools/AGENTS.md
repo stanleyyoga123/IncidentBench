@@ -9,9 +9,10 @@ explicit session ID and paths must remain below the configured session root.
 
 Own `kubernetes/` for both profile ConfigMaps and Deployments/Services,
 ServiceAccounts and RBAC, the remediation artifact PVC, and the utility
-network-probe DaemonSets. Also own placeholder-only `kubernetes/secret.yml` and
-`deploy.sh`; replace every `++++++++` locally before deploying. The script uses
-kubectl's current context and refuses unreplaced placeholders. Infrastructure
-installs platform prerequisites and namespaces only.
+network-probe DaemonSets. Also own placeholder-only
+`kubernetes/secret.example.yml` and `deploy.sh`; copy the example to ignored
+`kubernetes/secret.yml` and replace every `++++++++` locally before deploying.
+The script uses kubectl's current context and refuses unreplaced placeholders.
+Infrastructure installs platform prerequisites and namespaces only.
 
 Run `PYTHONPATH=app pytest -q` and `python -m compileall -q app tests`.

@@ -37,8 +37,9 @@ cd Infrastructure/ansible
 ```
 
 Application and database credentials are not generated from this Vault. Replace
-the committed `++++++++` placeholders only in each component's local
-`kubernetes/secret.yml`, and never commit populated Secrets.
+the committed `++++++++` placeholders only after copying each component's
+`kubernetes/secret.example.yml` to ignored `kubernetes/secret.yml`, and never
+commit populated Secrets.
 
 ## Provision a cluster
 
