@@ -1,17 +1,29 @@
 import secrets
 from contextlib import asynccontextmanager
 from typing import Callable
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 
 from clients import AgentClient
 from config import Settings, get_settings
 from schema import (
     AnomalyBatchRequest,
+    ArtifactListResponse,
+    ArtifactUpsertRequest,
     DecisionRequest,
+    ExecutionClaimRequest,
+    ExecutionRenewRequest,
     IngestionResponse,
+    RCAFinishRequest,
+    RCAJob,
+    RCAJobCreateRequest,
+    RemediationFinishRequest,
+    RemediationJob,
+    RemediationJobCreateRequest,
+    RenewResponse,
     RetryRequest,
+    ToolCallRequest,
     Workflow,
     WorkflowCollection,
 )
@@ -67,6 +79,7 @@ def create_app(
     )
     ingest_auth = Depends(_bearer(settings.api.ingestion_token))
     control_auth = Depends(_bearer(settings.api.control_token))
+    store_auth = Depends(_bearer(settings.api.store_token))
 
     @app.get("/health", operation_id="get_agent_orchestrator_health")
     def health() -> dict:
@@ -213,6 +226,177 @@ def create_app(
                 {"type": type(exc).__name__, "message": str(exc)},
             )
             raise HTTPException(status_code=502, detail="downstream retry submission failed") from exc
+
+    @app.post(
+        "/api/v1/internal/rca/jobs",
+        response_model=RCAJob,
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[store_auth],
+        operation_id="create_internal_rca_job",
+    )
+    def create_internal_rca_job(
+        request: RCAJobCreateRequest,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    ) -> RCAJob:
+        return store.create_rca_job(
+            request.model_dump(mode="json"),
+            idempotency_key or str(uuid4()),
+        )
+
+    @app.get(
+        "/api/v1/internal/rca/jobs/{job_id}",
+        response_model=RCAJob,
+        dependencies=[store_auth],
+        operation_id="get_internal_rca_job",
+    )
+    def get_internal_rca_job(job_id: UUID) -> RCAJob:
+        job = store.get_rca_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="RCA job not found")
+        return job
+
+    @app.post(
+        "/api/v1/internal/remediation/jobs",
+        response_model=RemediationJob,
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[store_auth],
+        operation_id="create_internal_remediation_job",
+    )
+    def create_internal_remediation_job(
+        request: RemediationJobCreateRequest,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    ) -> RemediationJob:
+        return store.create_remediation_job(
+            request.model_dump(mode="json"),
+            idempotency_key or str(uuid4()),
+        )
+
+    @app.get(
+        "/api/v1/internal/remediation/jobs/{job_id}",
+        response_model=RemediationJob,
+        dependencies=[store_auth],
+        operation_id="get_internal_remediation_job",
+    )
+    def get_internal_remediation_job(job_id: UUID) -> RemediationJob:
+        job = store.get_remediation_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="remediation job not found")
+        return job
+
+    @app.post(
+        "/api/v1/internal/execution/claim",
+        dependencies=[store_auth],
+        operation_id="claim_agent_execution",
+    )
+    def claim_execution(request: ExecutionClaimRequest):
+        job = store.claim_execution(
+            request.service,
+            request.owner,
+            request.lease_seconds,
+            request.max_attempts,
+        )
+        if job is None:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+        return job
+
+    @app.post(
+        "/api/v1/internal/execution/renew",
+        response_model=RenewResponse,
+        dependencies=[store_auth],
+        operation_id="renew_agent_execution",
+    )
+    def renew_execution(request: ExecutionRenewRequest) -> RenewResponse:
+        return RenewResponse(
+            renewed=store.renew_execution(
+                request.service,
+                request.job_id,
+                request.owner,
+                request.lease_seconds,
+            )
+        )
+
+    @app.post(
+        "/api/v1/internal/rca/jobs/{job_id}/finish",
+        response_model=RCAJob,
+        dependencies=[store_auth],
+        operation_id="finish_internal_rca_job",
+    )
+    def finish_internal_rca_job(job_id: UUID, request: RCAFinishRequest) -> RCAJob:
+        job = store.finish_rca_job(
+            job_id,
+            request.outcome,
+            result=request.result,
+            raw_output=request.raw_output,
+            error=request.error,
+            max_attempts=request.max_attempts,
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="RCA job not found")
+        return job
+
+    @app.post(
+        "/api/v1/internal/remediation/jobs/{job_id}/finish",
+        response_model=RemediationJob,
+        dependencies=[store_auth],
+        operation_id="finish_internal_remediation_job",
+    )
+    def finish_internal_remediation_job(
+        job_id: UUID, request: RemediationFinishRequest
+    ) -> RemediationJob:
+        job = store.finish_remediation_job(
+            job_id,
+            request.status,
+            result=request.result,
+            raw_output=request.raw_output,
+            error=request.error,
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="remediation job not found")
+        return job
+
+    @app.post(
+        "/api/v1/internal/rca/jobs/{job_id}/tool-calls",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=[store_auth],
+        operation_id="record_internal_rca_tool_call",
+    )
+    def record_internal_rca_tool_call(job_id: UUID, request: ToolCallRequest) -> None:
+        store.record_tool_call(
+            "rca", job_id, request.tool_name, request.arguments, request.result
+        )
+
+    @app.post(
+        "/api/v1/internal/remediation/jobs/{job_id}/tool-calls",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=[store_auth],
+        operation_id="record_internal_remediation_tool_call",
+    )
+    def record_internal_remediation_tool_call(
+        job_id: UUID, request: ToolCallRequest
+    ) -> None:
+        store.record_tool_call(
+            "remediator", job_id, request.tool_name, request.arguments, request.result
+        )
+
+    @app.post(
+        "/api/v1/internal/remediation/jobs/{job_id}/artifacts",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=[store_auth],
+        operation_id="upsert_internal_remediation_artifact",
+    )
+    def upsert_internal_remediation_artifact(
+        job_id: UUID, request: ArtifactUpsertRequest
+    ) -> None:
+        store.upsert_artifact(job_id, request.filename, request.content)
+
+    @app.get(
+        "/api/v1/internal/remediation/jobs/{job_id}/artifacts",
+        response_model=ArtifactListResponse,
+        dependencies=[store_auth],
+        operation_id="list_internal_remediation_artifacts",
+    )
+    def list_internal_remediation_artifacts(job_id: UUID) -> ArtifactListResponse:
+        return ArtifactListResponse(filenames=store.list_artifacts(job_id))
 
     app.state.store = store
     app.state.coordinator = coordinator

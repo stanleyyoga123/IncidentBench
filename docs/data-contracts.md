@@ -25,6 +25,8 @@ changes, verification, artifacts, raw audit context, and errors.
 `remediation_job`. `agent_execution_slot` has exactly one row (`id=1`).
 `agent_tool_call` records service/job/tool/arguments/result/outcome.
 `remediation_artifact` stores job-scoped filename, content, and SHA-256.
+AgentOrchestrator is the only application that performs DML against these
+tables.
 
 Jobs and workflows use UUID identities, status/version, timestamps, attempts,
 errors, lease owner/expiry, JSONB request/result, and idempotency keys.
@@ -34,7 +36,8 @@ errors, lease owner/expiry, JSONB request/result, and idempotency keys.
 Committed `kubernetes/secret.example.yml` files contain only `++++++++`
 placeholders. Copy them to ignored `kubernetes/secret.yml` before deployment.
 Pairwise bearer values must match exactly between detector/orchestrator,
-orchestrator/RCA, orchestrator/remediator, RCA/investigation MCP, and
-remediator/remediation MCP. The two MCP tokens and AgentOrchestrator's control
-token remain distinct. DatabaseJob separately owns the PostgreSQL identity used
-to construct each application's `DATABASE_DSN`.
+orchestrator/RCA, orchestrator/remediator, orchestrator/RCA/remediator store
+token, RCA/investigation MCP, and remediator/remediation MCP. The two MCP
+tokens and AgentOrchestrator's control token remain distinct. DatabaseJob
+separately owns the PostgreSQL identity used to construct AgentOrchestrator's
+`DATABASE_DSN`. RCAAgent and RemediatorAgent have no database credentials.

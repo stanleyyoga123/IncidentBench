@@ -18,7 +18,7 @@ def test_owned_secret_manifest_and_deploy_script_contract():
     secret = documents("kubernetes/secret.example.yml")[0]
     assert secret["metadata"]["name"] == "rca-agent-secrets"
     assert set(secret["stringData"]) == {
-        "DATABASE_DSN",
+        "AGENT_STORE_TOKEN",
         "RCA_SUBMIT_TOKEN",
         "MCP_TOKEN",
         "CLIENT_URL",

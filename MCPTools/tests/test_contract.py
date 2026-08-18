@@ -1,8 +1,10 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from starlette.testclient import TestClient
+
 from config import Settings
-from server import create_server
+from server import create_app, create_server
 from tools.remediator import RemediatorTool
 
 
@@ -39,6 +41,51 @@ def test_investigation_profile_rejects_mutating_kubectl():
     result = tools("investigation")["kubectl"].fn("delete pod checkout")
     assert result["blocked"] is True
     assert result["ok"] is False
+
+
+def test_streamable_http_uses_exact_mcp_route_and_explicit_allowed_hosts():
+    values = {
+        **BASE,
+        "server": {
+            **BASE["server"],
+            "allowed_hosts": ["mcp-tools-investigation.agents.svc.cluster.local:8090"],
+        },
+    }
+    wrapped = create_app(Settings.model_validate(values))
+    app = wrapped.app
+
+    assert [route.path for route in app.routes] == ["/mcp", "/health"]
+    security = app.routes[0].endpoint.session_manager.security_settings
+    assert security.enable_dns_rebinding_protection is True
+    assert "localhost:*" in security.allowed_hosts
+    assert (
+        "mcp-tools-investigation.agents.svc.cluster.local:8090"
+        in security.allowed_hosts
+    )
+
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "contract-test", "version": "1"},
+        },
+    }
+    headers = {
+        "Authorization": "Bearer test-token",
+        "Accept": "application/json, text/event-stream",
+    }
+    service_url = "http://mcp-tools-investigation.agents.svc.cluster.local:8090"
+    with TestClient(wrapped, base_url=service_url) as client:
+        response = client.post("/mcp", headers=headers, json=initialize)
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/json")
+
+    invalid_host_app = create_app(Settings.model_validate(values))
+    with TestClient(invalid_host_app, base_url="http://invalid:8090") as client:
+        assert client.post("/mcp", headers=headers, json=initialize).status_code == 421
 
 
 def test_ansible_live_execution_requires_matching_successful_check(tmp_path):

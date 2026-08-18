@@ -4,7 +4,7 @@ pydantic>=2
 pydantic-settings>=2
 python-dotenv
 openai
-psycopg[binary]
-mcp>=2,<3
+mcp==2.0.0
+httpx
 httpx2
 langfuse

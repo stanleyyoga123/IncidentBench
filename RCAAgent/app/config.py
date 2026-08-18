@@ -4,8 +4,10 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class DatabaseSettings(BaseModel):
-    dsn: str
+class OrchestratorSettings(BaseModel):
+    base_url: str
+    token: str
+    timeout_seconds: float = 30.0
 
 
 class ApiSettings(BaseModel):
@@ -39,7 +41,7 @@ class ManagerSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    database: DatabaseSettings
+    orchestrator: OrchestratorSettings
     api: ApiSettings
     mcp: MCPSettings
     client: ClientSettings

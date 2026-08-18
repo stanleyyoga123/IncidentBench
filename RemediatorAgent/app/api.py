@@ -17,7 +17,11 @@ def create_app(
     engine: RemediationEngine | None = None,
 ):
     settings = settings or get_settings()
-    store = store or RemediationJobStore(settings.database.dsn)
+    store = store or RemediationJobStore(
+        settings.orchestrator.base_url,
+        settings.orchestrator.token,
+        settings.orchestrator.timeout_seconds,
+    )
     engine = engine or RemediationEngine(
         settings,
         audit_callback=lambda job_id, name, args, result: store.record_tool_call(

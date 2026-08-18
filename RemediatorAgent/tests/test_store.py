@@ -1,90 +1,108 @@
-from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+import hashlib
+import json
 from uuid import uuid4
 
+import httpx
+
+from config import Settings
+from schema import RemediationJobRequest, RemediationResult
 from store import RemediationJobStore
 
 
-class Cursor:
-    def __init__(self, rows=None, all_rows=None):
-        self.rows = iter(rows or [])
-        self.all_rows = all_rows or []
-        self.queries = []
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return None
-
-    def execute(self, query, params=None):
-        self.queries.append((" ".join(query.split()), params))
-
-    def fetchone(self):
-        return next(self.rows)
-
-    def fetchall(self):
-        return self.all_rows
-
-
-class Connection:
-    def __init__(self, cursor):
-        self._cursor = cursor
-        self.committed = False
-
-    def cursor(self):
-        return self._cursor
-
-    def commit(self):
-        self.committed = True
-
-
-class Store(RemediationJobStore):
-    def __init__(self, connection):
-        self._connection = connection
-
-    @contextmanager
-    def connection(self):
-        yield self._connection
-
-
-def test_claim_requeues_or_fails_expired_rca_holder():
-    cursor = Cursor(
-        rows=[
-            {
-                "holder_type": "rca",
-                "holder_job_id": "rca-job",
-                "lease_expires_at": datetime.now(timezone.utc) - timedelta(seconds=1),
-            },
-            None,
-        ]
+def store_with(handler) -> RemediationJobStore:
+    transport = httpx.MockTransport(handler)
+    client = httpx.Client(
+        transport=transport,
+        base_url="http://orchestrator",
+        headers={"Authorization": "Bearer store"},
     )
-    store = Store(Connection(cursor))
-
-    assert store.claim("worker", lease_seconds=60) is None
-    sql = "\n".join(query for query, _ in cursor.queries)
-    assert "UPDATE rca_job SET status=CASE WHEN attempts < 3" in sql
-    assert "UPDATE agent_execution_slot SET holder_type=NULL" in sql
+    return RemediationJobStore("http://orchestrator", "store", client=client)
 
 
-def test_write_file_audit_persists_and_lists_artifact():
+def approved_request() -> RemediationJobRequest:
+    rca_result = {"remediation_required": True, "summary": "verified"}
+    digest = hashlib.sha256(
+        json.dumps(rca_result, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return RemediationJobRequest(
+        rca_job_id=uuid4(),
+        rca_result=rca_result,
+        rca_result_sha256=digest,
+        approval={"actor": "operator", "reason": "evidence reviewed", "workflow_version": 1},
+    )
+
+
+def test_settings_require_orchestrator_not_database():
+    settings = Settings.model_validate(
+        {
+            "orchestrator": {"base_url": "http://orchestrator", "token": "store"},
+            "api": {"submit_token": "submit"},
+            "mcp": {"url": "http://mcp/mcp", "token": "mcp"},
+            "client": {"model": "test", "url": "http://model"},
+        }
+    )
+    assert settings.orchestrator.token == "store"
+    assert not hasattr(settings, "database")
+
+
+def test_create_claim_artifacts_and_needs_review_use_orchestrator_http():
     job_id = uuid4()
-    write_cursor = Cursor()
-    connection = Connection(write_cursor)
-    store = Store(connection)
+    now = datetime.now(timezone.utc).isoformat()
+    paths = []
 
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == "/api/v1/internal/remediation/jobs":
+            return httpx.Response(
+                201,
+                json={
+                    "id": str(job_id),
+                    "rca_job_id": str(uuid4()),
+                    "status": "queued",
+                    "version": 1,
+                    "attempts": 0,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+        if request.url.path == "/api/v1/internal/execution/claim":
+            body = json.loads(request.content)
+            assert body["service"] == "remediation"
+            assert body["max_attempts"] == 3
+            return httpx.Response(204)
+        if request.url.path == f"/api/v1/internal/remediation/jobs/{job_id}/artifacts":
+            return httpx.Response(200, json={"filenames": ["remediation.yml"]})
+        if request.url.path == f"/api/v1/internal/remediation/jobs/{job_id}/tool-calls":
+            return httpx.Response(204)
+        if request.url.path == f"/api/v1/internal/remediation/jobs/{job_id}/finish":
+            body = json.loads(request.content)
+            assert body["status"] == "needs_review"
+            return httpx.Response(
+                200,
+                json={
+                    "id": str(job_id),
+                    "rca_job_id": str(uuid4()),
+                    "status": "needs_review",
+                    "version": 2,
+                    "attempts": 1,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+        return httpx.Response(404)
+
+    store = store_with(handler)
+    created = store.create(approved_request(), "key-1")
+    assert created.id == job_id
+    assert store.claim("worker", 60) is None
+    assert store.list_artifacts(job_id) == ["remediation.yml"]
     store.record_tool_call(
         job_id,
         "remediator.write_file",
-        {"filename": "remediation.yml", "content": "---\n- hosts: localhost\n"},
+        {"filename": "remediation.yml", "content": "---\n"},
         {"ok": True},
     )
-
-    sql = "\n".join(query for query, _ in write_cursor.queries)
-    assert "INSERT INTO agent_tool_call" in sql
-    assert "INSERT INTO remediation_artifact" in sql
-    assert connection.committed is True
-
-    list_cursor = Cursor(all_rows=[{"filename": "remediation.yml"}])
-    store = Store(Connection(list_cursor))
-    assert store.list_artifacts(job_id) == ["remediation.yml"]
+    store.needs_review(job_id, RuntimeError("ambiguous execution"))
+    assert "/api/v1/internal/execution/claim" in paths
+    assert f"/api/v1/internal/remediation/jobs/{job_id}/finish" in paths

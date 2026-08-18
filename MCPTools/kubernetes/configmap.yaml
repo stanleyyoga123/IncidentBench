@@ -9,6 +9,7 @@ data:
     server.port=8090
     server.profile=investigation
     server.token=${MCP_TOKEN}
+    server.allowed_hosts=["mcp-tools-investigation:8090","mcp-tools-investigation.agents:8090","mcp-tools-investigation.agents.svc:8090","mcp-tools-investigation.agents.svc.cluster.local:8090"]
     tools.kubectl.path=/usr/local/bin/kubectl
     tools.kubectl.timeout_seconds=30
     tools.prometheus.base_url=http://prometheus-server.monitoring.svc.cluster.local
@@ -33,6 +34,7 @@ data:
     server.port=8090
     server.profile=remediation
     server.token=${MCP_TOKEN}
+    server.allowed_hosts=["mcp-tools-remediation:8090","mcp-tools-remediation.agents:8090","mcp-tools-remediation.agents.svc:8090","mcp-tools-remediation.agents.svc.cluster.local:8090"]
     tools.kubectl.path=/usr/local/bin/kubectl
     tools.kubectl.timeout_seconds=30
     tools.prometheus.base_url=http://prometheus-server.monitoring.svc.cluster.local

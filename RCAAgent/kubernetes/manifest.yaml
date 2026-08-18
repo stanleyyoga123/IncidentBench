@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: {name: rca-agent, namespace: agents}
 spec:
-  replicas: 0
+  replicas: 1
   selector: {matchLabels: {app: rca-agent}}
   template:
     metadata: {labels: {app: rca-agent, agent-platform: job-service}}

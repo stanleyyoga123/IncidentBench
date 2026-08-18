@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from datetime import datetime, timedelta, timezone
+from typing import Any, Iterator, Literal
 from uuid import UUID, uuid4
 
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from schema import AnomalyEventInput, Workflow
+from schema import AnomalyEventInput, RCAJob, RemediationJob, Workflow
 
 
 class WorkflowConflictError(RuntimeError):
@@ -317,3 +318,345 @@ class WorkflowStore:
                     (anomaly_status, workflow_id),
                 )
             conn.commit()
+
+    def create_rca_job(self, request: dict[str, Any], idempotency_key: str) -> RCAJob:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO rca_job (id, idempotency_key, workflow_id, status, request)
+                VALUES (%s, %s, %s, 'queued', %s)
+                ON CONFLICT (idempotency_key) DO UPDATE
+                SET idempotency_key=EXCLUDED.idempotency_key
+                RETURNING *
+                """,
+                (
+                    uuid4(),
+                    idempotency_key,
+                    request.get("workflow_id"),
+                    Jsonb(request),
+                ),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return RCAJob.model_validate(row)
+
+    def get_rca_job(self, job_id: UUID) -> RCAJob | None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM rca_job WHERE id=%s", (job_id,))
+            row = cur.fetchone()
+            return RCAJob.model_validate(row) if row else None
+
+    def create_remediation_job(
+        self, request: dict[str, Any], idempotency_key: str
+    ) -> RemediationJob:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO remediation_job
+                    (id, idempotency_key, workflow_id, rca_job_id, status, request)
+                VALUES (%s, %s, %s, %s, 'queued', %s)
+                ON CONFLICT (idempotency_key) DO UPDATE
+                SET idempotency_key=EXCLUDED.idempotency_key
+                RETURNING *
+                """,
+                (
+                    uuid4(),
+                    idempotency_key,
+                    request.get("workflow_id"),
+                    request["rca_job_id"],
+                    Jsonb(request),
+                ),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return RemediationJob.model_validate(row)
+
+    def get_remediation_job(self, job_id: UUID) -> RemediationJob | None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM remediation_job WHERE id=%s", (job_id,))
+            row = cur.fetchone()
+            return RemediationJob.model_validate(row) if row else None
+
+    def claim_execution(
+        self,
+        service: Literal["rca", "remediation"],
+        owner: str,
+        lease_seconds: int,
+        max_attempts: int = 3,
+    ) -> RCAJob | RemediationJob | None:
+        table = "rca_job" if service == "rca" else "remediation_job"
+        holder_type = "rca" if service == "rca" else "remediation"
+        model = RCAJob if service == "rca" else RemediationJob
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM agent_execution_slot WHERE id=1 FOR UPDATE")
+            slot = cur.fetchone()
+            now = datetime.now(timezone.utc)
+            if slot["holder_job_id"]:
+                if slot["lease_expires_at"] and slot["lease_expires_at"] > now:
+                    return None
+                self._reclaim_expired_holder(cur, slot, max_attempts)
+            cur.execute(
+                f"""
+                SELECT * FROM {table} WHERE status='queued'
+                ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+                """
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.commit()
+                return None
+            expiry = now + timedelta(seconds=lease_seconds)
+            cur.execute(
+                f"""
+                UPDATE {table} SET status='running', attempts=attempts+1,
+                    lease_owner=%s, lease_expires_at=%s,
+                    started_at=COALESCE(started_at, now()),
+                    version=version+1, updated_at=now()
+                WHERE id=%s RETURNING *
+                """,
+                (owner, expiry, row["id"]),
+            )
+            job = cur.fetchone()
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET holder_type=%s, holder_job_id=%s,
+                    lease_owner=%s, lease_expires_at=%s, updated_at=now()
+                WHERE id=1
+                """,
+                (holder_type, row["id"], owner, expiry),
+            )
+            conn.commit()
+            return model.model_validate(job)
+
+    def _reclaim_expired_holder(self, cur, slot, max_attempts: int) -> None:
+        if slot["holder_type"] == "rca":
+            cur.execute(
+                """
+                UPDATE rca_job
+                SET status=CASE WHEN attempts < %s THEN 'queued' ELSE 'failed' END,
+                    error=%s, lease_owner=NULL, lease_expires_at=NULL,
+                    version=version+1, updated_at=now()
+                WHERE id=%s AND status='running'
+                """,
+                (
+                    max_attempts,
+                    Jsonb({"type": "LeaseExpired", "message": "RCA worker lease expired"}),
+                    slot["holder_job_id"],
+                ),
+            )
+        elif slot["holder_type"] == "remediation":
+            cur.execute(
+                """
+                UPDATE remediation_job SET status='needs_review',
+                    error=%s, lease_owner=NULL, lease_expires_at=NULL,
+                    version=version+1, updated_at=now(), completed_at=now()
+                WHERE id=%s AND status='running'
+                """,
+                (
+                    Jsonb(
+                        {
+                            "type": "LeaseExpired",
+                            "message": "remediation outcome is ambiguous",
+                        }
+                    ),
+                    slot["holder_job_id"],
+                ),
+            )
+        cur.execute(
+            """
+            UPDATE agent_execution_slot SET holder_type=NULL,
+                holder_job_id=NULL, lease_owner=NULL, lease_expires_at=NULL,
+                updated_at=now() WHERE id=1
+            """
+        )
+
+    def renew_execution(
+        self,
+        service: Literal["rca", "remediation"],
+        job_id: UUID,
+        owner: str,
+        lease_seconds: int,
+    ) -> bool:
+        table = "rca_job" if service == "rca" else "remediation_job"
+        expiry = datetime.now(timezone.utc) + timedelta(seconds=lease_seconds)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET lease_expires_at=%s, updated_at=now()
+                WHERE id=1 AND holder_job_id=%s AND lease_owner=%s
+                """,
+                (expiry, job_id, owner),
+            )
+            renewed = cur.rowcount == 1
+            if renewed:
+                cur.execute(
+                    f"""
+                    UPDATE {table} SET lease_expires_at=%s, updated_at=now()
+                    WHERE id=%s AND lease_owner=%s
+                    """,
+                    (expiry, job_id, owner),
+                )
+            conn.commit()
+            return renewed
+
+    def finish_rca_job(
+        self,
+        job_id: UUID,
+        outcome: Literal["succeeded", "failed"],
+        *,
+        result: dict[str, Any] | None = None,
+        raw_output: str | None = None,
+        error: dict[str, Any] | None = None,
+        max_attempts: int = 3,
+    ) -> RCAJob | None:
+        job = self.get_rca_job(job_id)
+        if job is None:
+            return None
+        status = outcome
+        if outcome == "failed":
+            status = "queued" if job.attempts < max_attempts else "failed"
+        self._finish_job("rca_job", job_id, status, result=result, raw=raw_output, error=error)
+        return self.get_rca_job(job_id)
+
+    def finish_remediation_job(
+        self,
+        job_id: UUID,
+        status: Literal["succeeded", "needs_review"],
+        *,
+        result: dict[str, Any] | None = None,
+        raw_output: str | None = None,
+        error: dict[str, Any] | None = None,
+    ) -> RemediationJob | None:
+        if self.get_remediation_job(job_id) is None:
+            return None
+        self._finish_job(
+            "remediation_job",
+            job_id,
+            status,
+            result=result,
+            raw=raw_output,
+            error=error,
+            completed=True,
+        )
+        return self.get_remediation_job(job_id)
+
+    def _finish_job(
+        self,
+        table: str,
+        job_id: UUID,
+        status: str,
+        *,
+        result=None,
+        raw=None,
+        error=None,
+        completed: bool | None = None,
+    ) -> None:
+        if completed is None:
+            completed = status in {"succeeded", "failed", "needs_review"}
+        with self.connection() as conn, conn.cursor() as cur:
+            if completed is True:
+                cur.execute(
+                    f"""
+                    UPDATE {table} SET status=%s, result=%s, raw_output=%s, error=%s,
+                        lease_owner=NULL, lease_expires_at=NULL, version=version+1,
+                        updated_at=now(), completed_at=now()
+                    WHERE id=%s
+                    """,
+                    (
+                        status,
+                        Jsonb(result) if result is not None else None,
+                        raw,
+                        Jsonb(error) if error is not None else None,
+                        job_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    UPDATE {table} SET status=%s, result=%s, raw_output=%s, error=%s,
+                        lease_owner=NULL, lease_expires_at=NULL, version=version+1,
+                        updated_at=now(),
+                        completed_at=CASE WHEN %s IN ('succeeded','failed') THEN now() ELSE NULL END
+                    WHERE id=%s
+                    """,
+                    (
+                        status,
+                        Jsonb(result) if result is not None else None,
+                        raw,
+                        Jsonb(error) if error is not None else None,
+                        status,
+                        job_id,
+                    ),
+                )
+            cur.execute(
+                """
+                UPDATE agent_execution_slot SET holder_type=NULL, holder_job_id=NULL,
+                    lease_owner=NULL, lease_expires_at=NULL, updated_at=now()
+                WHERE id=1 AND holder_job_id=%s
+                """,
+                (job_id,),
+            )
+            conn.commit()
+
+    def record_tool_call(
+        self,
+        service: Literal["rca", "remediator"],
+        job_id: UUID,
+        tool_name: str,
+        arguments: dict[str, Any],
+        result: Any,
+    ) -> None:
+        ok = not (isinstance(result, dict) and result.get("ok") is False)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO agent_tool_call (service, job_id, tool_name, arguments, result, ok)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (service, job_id, tool_name, Jsonb(arguments), Jsonb(result), ok),
+            )
+            if service == "remediator" and tool_name == "remediator.write_file" and ok:
+                content = str(arguments.get("content", ""))
+                filename = str(arguments.get("filename", "artifact"))
+                cur.execute(
+                    """
+                    INSERT INTO remediation_artifact
+                        (remediation_job_id, filename, content, sha256)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (remediation_job_id, filename) DO UPDATE
+                    SET content=EXCLUDED.content, sha256=EXCLUDED.sha256
+                    """,
+                    (
+                        job_id,
+                        filename,
+                        content,
+                        hashlib.sha256(content.encode()).hexdigest(),
+                    ),
+                )
+            conn.commit()
+
+    def upsert_artifact(self, job_id: UUID, filename: str, content: str) -> None:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO remediation_artifact
+                    (remediation_job_id, filename, content, sha256)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (remediation_job_id, filename) DO UPDATE
+                SET content=EXCLUDED.content, sha256=EXCLUDED.sha256
+                """,
+                (job_id, filename, content, hashlib.sha256(content.encode()).hexdigest()),
+            )
+            conn.commit()
+
+    def list_artifacts(self, job_id: UUID) -> list[str]:
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT filename FROM remediation_artifact
+                WHERE remediation_job_id=%s ORDER BY filename
+                """,
+                (job_id,),
+            )
+            return [row["filename"] for row in cur.fetchall()]
+

@@ -29,7 +29,7 @@ class Store:
 
 def test_rca_api_auth_idempotency_status_and_openapi():
     settings = Settings.model_validate({
-        "database": {"dsn": "postgresql://unused"},
+        "orchestrator": {"base_url": "http://orchestrator", "token": "store"},
         "api": {"submit_token": "submit"},
         "mcp": {"url": "http://mcp/mcp", "token": "mcp"},
         "client": {"model": "test", "url": "http://model"},

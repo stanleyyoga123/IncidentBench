@@ -29,6 +29,18 @@ def test_owned_secrets_manifests_and_deploy_script_contract():
         for item in secret_documents
     )
 
+
+def test_configmaps_allow_only_their_mcp_service_hosts():
+    configmaps = documents("kubernetes/configmap.yaml")
+    by_name = {item["metadata"]["name"]: item["data"][".env"] for item in configmaps}
+
+    investigation = by_name["mcp-tools-investigation-config"]
+    remediation = by_name["mcp-tools-remediation-config"]
+    assert "mcp-tools-investigation.agents.svc.cluster.local:8090" in investigation
+    assert "mcp-tools-remediation.agents.svc.cluster.local:8090" not in investigation
+    assert "mcp-tools-remediation.agents.svc.cluster.local:8090" in remediation
+    assert "mcp-tools-investigation.agents.svc.cluster.local:8090" not in remediation
+
     expected = {
         "kubernetes/investigation.yaml": "mcp-tools-investigation-secrets",
         "kubernetes/remediation.yaml": "mcp-tools-remediation-secrets",

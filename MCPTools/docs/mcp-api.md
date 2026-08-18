@@ -14,3 +14,4 @@ Run Ansible with `check=true` first. Live execution is rejected unless the
 same session has a successful check record for the exact playbook SHA-256.
 Never reuse a session ID across remediation jobs. Tool results are returned to
 the calling agent; MCPTools does not persist workflow/audit rows itself.
+RCAAgent and RemediatorAgent record those audits through AgentOrchestrator.

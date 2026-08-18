@@ -13,6 +13,7 @@ class ApiSettings(BaseModel):
     port: int = Field(default=8080, ge=1, le=65535)
     ingestion_token: str
     control_token: str
+    store_token: str
 
 
 class ServiceClientSettings(BaseModel):

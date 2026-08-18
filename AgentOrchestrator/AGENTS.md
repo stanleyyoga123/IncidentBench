@@ -1,11 +1,18 @@
 # AgentOrchestrator instructions
 
-Own anomaly ingestion and durable workflow coordination, not RCA logic or
-cluster tools. Preserve separate ingestion/control tokens, deterministic event
+Own anomaly ingestion, durable workflow coordination, and all application DML.
+RCAAgent and RemediatorAgent persist jobs, leases, tool-call audits, and
+artifacts only through the authenticated `/api/v1/internal/...` job-store APIs.
+Preserve separate ingestion/control/store tokens, deterministic event
 idempotency, optimistic workflow versions, the 60-second/100-event claim
 defaults, and explicit approval before remediation. Applications may perform
 DML only; schema changes belong to `../DatabaseJob/`. Downstream failures must
 remain visible and retry must create an explicitly versioned submission.
+
+The singleton `agent_execution_slot` serializes RCA and remediation, including
+direct job API submissions. Approval waiting does not occupy the slot. Expired
+RCA holders requeue while `attempts < max_attempts` and otherwise fail.
+Expired or failed remediation becomes `needs_review` and is never requeued.
 
 Own `kubernetes/configmap.yaml`, placeholder-only `kubernetes/secret.example.yml`,
 `kubernetes/network-policy.yaml`, the Deployment/ClusterIP Service in

@@ -20,8 +20,9 @@ overrides this file for local implementation details.
   deterministic event envelopes, authenticated HTTP delivery, and its
   ConfigMap, Secret, Deployment/Service manifest, and deploy script.
 - `AgentOrchestrator/`: anomaly ingestion, idempotency, workflow state,
-  batching, reconciliation, approval/decline/retry, downstream submission, and
-  its ConfigMap, Secret, NetworkPolicy, Deployment/Service, and deploy script.
+  job/slot/audit/artifact DML, batching, reconciliation, approval/decline/retry,
+  downstream submission, and its ConfigMap, Secret, NetworkPolicy,
+  Deployment/Service, and deploy script.
 - `RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
   its ConfigMap, Secret, Deployment/Service, and deploy script.
 - `RemediatorAgent/`: approved asynchronous remediation and verification jobs,
@@ -59,7 +60,7 @@ worktrees. Never discard unrelated modified or untracked files.
 10. Remediation follows validation, artifact creation, Ansible check mode,
     guarded live execution, then direct post-action verification.
 11. MCPTools never writes workflow state. RCAAgent and RemediatorAgent audit
-    tool calls and results in PostgreSQL.
+    tool calls through AgentOrchestrator; only AgentOrchestrator performs DML.
 12. The investigation MCP profile rejects mutating kubectl commands in code;
     read-only RBAC is a second enforcement layer.
 13. Remediation artifact calls always carry an explicit `session_id`.
@@ -67,8 +68,10 @@ worktrees. Never discard unrelated modified or untracked files.
 
 ## APIs and authentication
 
-- AgentOrchestrator ingestion and control use different bearer tokens.
-- RCAAgent and RemediatorAgent each use a submission bearer token.
+- AgentOrchestrator ingestion, control, and internal job-store use different
+  bearer tokens.
+- RCAAgent and RemediatorAgent each use a submission bearer token and share
+  `AGENT_STORE_TOKEN` with AgentOrchestrator.
 - The two MCP deployments use distinct bearer tokens and service accounts.
 - All HTTP services are ClusterIP-only and publish stable OpenAPI operation IDs.
 - MCP uses stateless JSON Streamable HTTP at `/mcp`.
@@ -78,7 +81,8 @@ Secrets as sensitive. Never log, quote, commit, or duplicate their values.
 
 ## Database rules
 
-Only `DatabaseJob/` may create or alter tables. The active schema is:
+Only `DatabaseJob/` may create or alter tables. Only `AgentOrchestrator/`
+performs application DML. The active schema is:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`;
 - singleton `agent_execution_slot`;

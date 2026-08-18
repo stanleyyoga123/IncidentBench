@@ -10,6 +10,7 @@ class ServerSettings(BaseModel):
     port: int = 8090
     profile: Literal["investigation", "remediation"] = "investigation"
     token: str
+    allowed_hosts: list[str] = Field(default_factory=list)
 
 
 class EndpointSettings(BaseModel):

@@ -10,6 +10,7 @@ data:
     api.port=8080
     api.ingestion_token=${AGENT_INGESTION_TOKEN}
     api.control_token=${AGENT_CONTROL_TOKEN}
+    api.store_token=${AGENT_STORE_TOKEN}
     rca.base_url=http://rca-agent.agents.svc.cluster.local:8081
     rca.token=${RCA_SUBMIT_TOKEN}
     remediator.base_url=http://remediator-agent.agents.svc.cluster.local:8082

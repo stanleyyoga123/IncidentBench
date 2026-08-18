@@ -37,3 +37,23 @@ def test_owned_secret_manifest_and_deploy_script_contract():
         name in deploy
         for name in ("secret.example.yml", "secret.yml", "configmap.yaml", "manifest.yaml")
     )
+
+
+def test_image_uses_runtime_mounted_env_instead_of_missing_config_directory():
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    deployment = documents("kubernetes/manifest.yaml")[0]
+    pod_spec = deployment["spec"]["template"]["spec"]
+    container = pod_spec["containers"][0]
+
+    assert "COPY src ./src" in dockerfile
+    assert "COPY config" not in dockerfile
+    assert {
+        "name": "config",
+        "mountPath": "/app/.env",
+        "subPath": ".env",
+        "readOnly": True,
+    } in container["volumeMounts"]
+    assert {
+        "name": "config",
+        "configMap": {"name": "anomaly-detector-config"},
+    } in pod_spec["volumes"]

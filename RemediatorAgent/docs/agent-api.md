@@ -10,4 +10,5 @@ Use the remediation submission bearer token.
 
 The snapshot must say `remediation_required=true`, include actor/reason, and
 match its canonical JSON SHA-256. `needs_review` is terminal until a human or
-control agent explicitly reviews and retries through AgentOrchestrator.
+control agent explicitly reviews and retries through AgentOrchestrator. The
+public job API persists by calling AgentOrchestrator's internal job-store.

@@ -9,8 +9,9 @@
 4. Only then does AnomalyDetector start per-series cooldown.
 5. Every 60 seconds AgentOrchestrator claims the oldest 100 pending events and
    creates one RCA job.
-6. RCAAgent acquires the global lease, gathers evidence through investigation
-   MCPTools, persists a structured result and audits, then releases the lease.
+6. RCAAgent acquires the global lease through AgentOrchestrator, gathers
+   evidence through investigation MCPTools, persists a structured result and
+   audits via the job-store APIs, then releases the lease.
 7. A no-action result completes the workflow. A remediation plan enters
    `awaiting_approval`, which consumes no execution slot.
 

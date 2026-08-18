@@ -10,6 +10,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
-COPY config ./config
+
+# Kubernetes mounts the component ConfigMap at /app/.env. Local runs use an
+# ignored .env copied from .env.example; there is no build-time config folder.
 
 CMD ["python", "src/main.py"]

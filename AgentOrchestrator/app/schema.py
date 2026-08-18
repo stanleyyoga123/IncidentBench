@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import hashlib
+import json
 from typing import Any, Literal
 from uuid import UUID
 
@@ -83,6 +85,112 @@ class DownstreamJob(BaseModel):
     result: dict[str, Any] | None = None
     raw_output: str | None = None
     error: dict[str, Any] | None = None
+
+
+class RCAJobCreateRequest(BaseModel):
+    workflow_id: UUID | None = None
+    anomalies: list[dict[str, Any]] = Field(min_length=1, max_length=100)
+    caller_context: str | None = Field(default=None, max_length=8000)
+
+
+class RemediationApproval(BaseModel):
+    actor: str = Field(min_length=1)
+    reason: str = Field(min_length=3)
+    workflow_version: int = Field(ge=1)
+
+
+class RemediationJobCreateRequest(BaseModel):
+    workflow_id: UUID | None = None
+    rca_job_id: UUID
+    rca_result: dict[str, Any]
+    rca_result_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approval: RemediationApproval
+
+    @model_validator(mode="after")
+    def remediation_must_be_required(self) -> "RemediationJobCreateRequest":
+        if self.rca_result.get("remediation_required") is not True:
+            raise ValueError("RCA result does not require remediation")
+        canonical = json.dumps(self.rca_result, sort_keys=True, separators=(",", ":"))
+        if hashlib.sha256(canonical.encode()).hexdigest() != self.rca_result_sha256:
+            raise ValueError("rca_result_sha256 does not match rca_result")
+        return self
+
+
+class RCAJob(BaseModel):
+    id: UUID
+    workflow_id: UUID | None = None
+    status: Literal["queued", "running", "succeeded", "failed", "needs_review", "cancelled"]
+    version: int
+    request: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    raw_output: str | None = None
+    error: dict[str, Any] | None = None
+    attempts: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class RemediationJob(BaseModel):
+    id: UUID
+    workflow_id: UUID | None = None
+    rca_job_id: UUID
+    status: Literal["queued", "running", "succeeded", "failed", "needs_review", "cancelled"]
+    version: int
+    request: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    raw_output: str | None = None
+    error: dict[str, Any] | None = None
+    attempts: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExecutionClaimRequest(BaseModel):
+    service: Literal["rca", "remediation"]
+    owner: str = Field(min_length=1, max_length=400)
+    lease_seconds: int = Field(ge=60)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+
+
+class ExecutionRenewRequest(BaseModel):
+    service: Literal["rca", "remediation"]
+    job_id: UUID
+    owner: str = Field(min_length=1, max_length=400)
+    lease_seconds: int = Field(ge=60)
+
+
+class RCAFinishRequest(BaseModel):
+    outcome: Literal["succeeded", "failed"]
+    result: dict[str, Any] | None = None
+    raw_output: str | None = None
+    error: dict[str, Any] | None = None
+    max_attempts: int = Field(default=3, ge=1, le=10)
+
+
+class RemediationFinishRequest(BaseModel):
+    status: Literal["succeeded", "needs_review"]
+    result: dict[str, Any] | None = None
+    raw_output: str | None = None
+    error: dict[str, Any] | None = None
+
+
+class ToolCallRequest(BaseModel):
+    tool_name: str = Field(min_length=1, max_length=200)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    result: Any = None
+
+
+class ArtifactUpsertRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=500)
+    content: str = ""
+
+
+class RenewResponse(BaseModel):
+    renewed: bool
+
+
+class ArtifactListResponse(BaseModel):
+    filenames: list[str]
 
 
 def utcnow() -> datetime:

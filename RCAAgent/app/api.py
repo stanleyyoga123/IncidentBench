@@ -16,7 +16,11 @@ def create_app(
     store: RCAJobStore | None = None, engine: RCAEngine | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    store = store or RCAJobStore(settings.database.dsn)
+    store = store or RCAJobStore(
+        settings.orchestrator.base_url,
+        settings.orchestrator.token,
+        settings.orchestrator.timeout_seconds,
+    )
     engine = engine or RCAEngine(
         settings,
         audit_callback=lambda job_id, name, args, result: store.record_tool_call(

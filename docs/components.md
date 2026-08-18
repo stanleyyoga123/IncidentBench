@@ -3,9 +3,9 @@
 | Component | Owns | Does not own |
 | --- | --- | --- |
 | AnomalyDetector | detection, delivery, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL or workflow state |
-| AgentOrchestrator | workflows/approvals, ConfigMap, Secret, NetworkPolicy, workload manifest, deploy script | LLM reasoning or cluster tools |
-| RCAAgent | asynchronous RCA, audit, ConfigMap, Secret, workload manifest, deploy script | remediation execution |
-| RemediatorAgent | approved execution/verification, ConfigMap, Secret, workload manifest, deploy script | approval policy or detector tuning |
+| AgentOrchestrator | workflows/approvals, all application DML, ConfigMap, Secret, NetworkPolicy, workload manifest, deploy script | LLM reasoning or cluster tools |
+| RCAAgent | asynchronous RCA, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL DML or remediation execution |
+| RemediatorAgent | approved execution/verification, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL DML, approval policy, or detector tuning |
 | MCPTools | cluster tools, profile Secrets/manifests, RBAC, PVC, probes, deploy script | workflow DML |
 | DatabaseJob | PostgreSQL, Secret, Compose, Alembic schema/migration Job, deploy script | long-running coordination |
 | Infrastructure | cluster/node Ansible, platform namespaces/tools, Helm values | application/database/evaluation deployment or Secrets |

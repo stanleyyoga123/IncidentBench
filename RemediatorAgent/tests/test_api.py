@@ -29,7 +29,7 @@ class Store:
 
 def test_remediation_requires_approval_plan_and_matching_hash():
     settings = Settings.model_validate({
-        "database": {"dsn": "postgresql://unused"},
+        "orchestrator": {"base_url": "http://orchestrator", "token": "store"},
         "api": {"submit_token": "submit"},
         "mcp": {"url": "http://mcp/mcp", "token": "mcp"},
         "client": {"model": "test", "url": "http://model"},

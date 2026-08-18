@@ -12,7 +12,8 @@
 5. Copy each component `secret.example.yml` to ignored `secret.yml`, replace
    placeholders while keeping the pairwise token matrix matching, then deploy
    MCPTools, RCAAgent/RemediatorAgent, AgentOrchestrator, and AnomalyDetector
-   in that order.
+   in that order. `AGENT_STORE_TOKEN` must match across Orchestrator, RCA, and
+   Remediator.
 6. Verify `/health` for both MCP profiles, both job services, and the
    orchestrator; verify MCP discovery with the appropriate tokens.
 7. Confirm committed detector ingestion.

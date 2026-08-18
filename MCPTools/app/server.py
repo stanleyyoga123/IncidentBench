@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import contextlib
 import secrets
 import shlex
 from datetime import datetime
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
-from starlette.applications import Starlette
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Mount, Route
 
 from config import Settings, get_settings
 from tools import (
@@ -258,20 +256,26 @@ def create_server(settings: Settings | None = None):
 def create_app(settings: Settings | None = None):
     settings = settings or get_settings()
     mcp = create_server(settings)
-    mcp_app = mcp.streamable_http_app(
-        streamable_http_path="/", stateless_http=True, json_response=True
-    )
 
+    @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request):
         return JSONResponse({"status": "ok", "profile": settings.server.profile})
 
-    @contextlib.asynccontextmanager
-    async def lifespan(_app):
-        async with mcp.session_manager.run():
-            yield
-
-    root = Starlette(
-        routes=[Route("/health", health), Mount("/mcp", app=mcp_app)],
-        lifespan=lifespan,
+    allowed_hosts = [
+        "127.0.0.1:*",
+        "localhost:*",
+        "[::1]:*",
+        *settings.server.allowed_hosts,
+    ]
+    app = mcp.streamable_http_app(
+        streamable_http_path="/mcp",
+        stateless_http=True,
+        json_response=True,
+        host=settings.server.host,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=list(dict.fromkeys(allowed_hosts)),
+            allowed_origins=[],
+        ),
     )
-    return BearerMiddleware(root, settings.server.token)
+    return BearerMiddleware(app, settings.server.token)

@@ -21,6 +21,7 @@ def test_owned_secret_manifests_and_deploy_script_contract():
         "DATABASE_DSN",
         "AGENT_INGESTION_TOKEN",
         "AGENT_CONTROL_TOKEN",
+        "AGENT_STORE_TOKEN",
         "RCA_SUBMIT_TOKEN",
         "REMEDIATOR_SUBMIT_TOKEN",
     }

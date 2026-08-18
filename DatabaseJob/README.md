@@ -20,7 +20,8 @@ export ALLOW_AGENT_WORKFLOW_RESET=true  # coordinated reset only
 alembic upgrade head
 ```
 
-Applications perform DML only. DatabaseJob independently owns
+Applications perform DML only; AgentOrchestrator is the sole application DML
+owner. DatabaseJob independently owns
 `kubernetes/postgres.yaml`, `kubernetes/secret.example.yml`,
 `kubernetes/configmap.yaml`, `kubernetes/job.yaml`, `compose/database.yml`, and
 `deploy.sh`. Infrastructure does not provision PostgreSQL or run migrations.

@@ -33,13 +33,14 @@ SECRET_CONTRACTS = {
             "DATABASE_DSN",
             "AGENT_INGESTION_TOKEN",
             "AGENT_CONTROL_TOKEN",
+            "AGENT_STORE_TOKEN",
             "RCA_SUBMIT_TOKEN",
             "REMEDIATOR_SUBMIT_TOKEN",
         }
     },
     "RCAAgent": {
         "rca-agent-secrets": {
-            "DATABASE_DSN",
+            "AGENT_STORE_TOKEN",
             "RCA_SUBMIT_TOKEN",
             "MCP_TOKEN",
             "CLIENT_URL",
@@ -51,7 +52,7 @@ SECRET_CONTRACTS = {
     },
     "RemediatorAgent": {
         "remediator-agent-secrets": {
-            "DATABASE_DSN",
+            "AGENT_STORE_TOKEN",
             "REMEDIATOR_SUBMIT_TOKEN",
             "MCP_TOKEN",
             "CLIENT_URL",
@@ -197,10 +198,16 @@ def test_pairwise_tokens_are_declared_by_matching_consumers():
     }
     assert "AGENT_INGESTION_TOKEN" in keys_by_component["AnomalyDetector"]
     assert "AGENT_INGESTION_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "AGENT_STORE_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "AGENT_STORE_TOKEN" in keys_by_component["RCAAgent"]
+    assert "AGENT_STORE_TOKEN" in keys_by_component["RemediatorAgent"]
     assert "RCA_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
     assert "RCA_SUBMIT_TOKEN" in keys_by_component["RCAAgent"]
     assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
     assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["RemediatorAgent"]
+    assert "DATABASE_DSN" in keys_by_component["AgentOrchestrator"]
+    assert "DATABASE_DSN" not in keys_by_component["RCAAgent"]
+    assert "DATABASE_DSN" not in keys_by_component["RemediatorAgent"]
     assert "MCP_TOKEN" in keys_by_component["RCAAgent"]
     assert "MCP_TOKEN" in keys_by_component["RemediatorAgent"]
     assert {

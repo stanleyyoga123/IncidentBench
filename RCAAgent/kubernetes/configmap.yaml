@@ -5,7 +5,8 @@ metadata:
   namespace: agents
 data:
   .env: |
-    database.dsn=${DATABASE_DSN}
+    orchestrator.base_url=http://agent-orchestrator.agents.svc.cluster.local:8080
+    orchestrator.token=${AGENT_STORE_TOKEN}
     api.host=0.0.0.0
     api.port=8081
     api.submit_token=${RCA_SUBMIT_TOKEN}
