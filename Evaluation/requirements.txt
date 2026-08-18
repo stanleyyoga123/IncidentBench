@@ -1,0 +1,5 @@
+faker
+awscli
+locust
+pandas
+PyYAML>=6.0

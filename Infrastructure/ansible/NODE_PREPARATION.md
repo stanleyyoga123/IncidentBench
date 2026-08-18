@@ -20,9 +20,9 @@ root-owned audit/cleanup helpers, limits passwordless sudo to those helpers,
 and writes pinned host keys to `../generated/evaluation-runner-known_hosts`.
 The private SSH key is never checked in or baked into an image.
 
-The Evaluation runner uses the same inventory through a ConfigMap and the
-restricted identity through Evaluation's component-owned Secret and
-`Evaluation/ansible/roles/evaluation_runner` role.
+The Evaluation runner uses the same inventory through the Infrastructure
+copy baked into its image, and the restricted identity through Evaluation's
+component-owned Secret and `kubernetes/pod.yaml`.
 TCP port 22 must be reachable from the runner on the tool node to all service
 nodes. Re-run the cleaner playbook whenever a node is rebuilt or the helper
 changes.

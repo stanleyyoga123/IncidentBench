@@ -94,10 +94,9 @@ Set immutable image tags in component manifests before a reproducible release.
 
 ## Runtime boundary
 
-Evaluation owns `deploy.sh`, its runner Secrets, its Ansible runner
-role/playbook, `services/restart.sh`, `cleanup_chaos_state.sh`, and
-`check_chaos_state.sh`. Runtime scripts still read Online Boutique and inventory
-inputs through `INFRASTRUCTURE_ROOT`.
+Evaluation owns `deploy.sh`, its runner Secrets, `kubernetes/pod.yaml`,
+`prerun/run.sh`, and `postrun/run.sh`. Runtime scripts still read Online Boutique
+and inventory inputs through `INFRASTRUCTURE_ROOT`.
 
 ## Local database
 

@@ -1,0 +1,6 @@
+results/
+backup/
+tmp/
+ansible/
+node-preparation/evaluation-runner-known_hosts
+cloud-data/

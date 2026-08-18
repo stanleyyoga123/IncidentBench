@@ -1,5 +1,5 @@
 # Deferred component
-/Evaluation/
+/eda/
 
 # Credentials and machine-local configuration
 **/.env
@@ -8,6 +8,7 @@
 **/*.key
 **/kubeconfig*
 **/kubernetes/secret.yml
+/Infrastructure/ansible/inventory.ini
 
 # Runtime data and generated artifacts
 **/__pycache__/

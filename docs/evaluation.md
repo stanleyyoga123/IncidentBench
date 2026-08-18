@@ -8,13 +8,12 @@ evidence for later analysis; it does not declare success solely because an agent
 produced a remediation message.
 
 Evaluation independently owns `deploy.sh`, `kubernetes/secret.example.yml`, and
-its Ansible `evaluation_runner` role/playbook. Copy the example to ignored
-`kubernetes/secret.yml` and replace the required SSH
+`kubernetes/pod.yaml`. Copy the example to ignored
+`kubernetes/secret.yml` and replace the required SSH and `POSTGRES_DSN`
 `++++++++` placeholders before deployment. Either replace all four optional S3
 placeholders or leave all four unchanged; the deploy script then skips the S3
-Secret. It uses kubectl's current context and a readable Infrastructure
-inventory, while Infrastructure installs only the prerequisite namespaces and
-platform tools.
+Secret. It uses kubectl's current context, while Infrastructure installs only
+the prerequisite namespaces and platform tools.
 
 ## Inputs
 
@@ -39,23 +38,22 @@ actual Ready pod placement and records a fingerprint.
 ### Chaos
 
 Scenarios refer to complete YAML files under `collections/chaos` by filename
-stem. Multiple references in one step begin together. Collections include pod,
-node, network, and physical-machine failure modes. Exact available collections
-should be discovered from the tree rather than hard-coded into automation.
+stem. Multiple references in one step begin together. The catalog contains the
+node CPU, delay, loss, and pod CPU Schedules used by
+`collections/real-scenario`.
 
-The current scenario collections cover ad hoc work, canonical multi-step
-scenarios, combined pod/node faults, multiple-pod and multiple-single faults,
-node network faults, curated real-world scenarios, single-node scenarios, and
-single-pod scenarios. `collections/chaos` is the common resource catalog used by
-all of them.
+The only scenario collection is `collections/real-scenario`: 19 one-hour
+faults with a 10-minute recovery step, ordered as node incidents then CPU-only
+pod incidents. `collections/chaos` is the Schedule catalog used by that suite.
 
 ## Safety model
 
 - Full cluster/host chaos cleanup occurs before setup and in finalization.
+- `prerun/run.sh` recreates `online-boutique` and wipes agent workflow tables.
 - Application reset uncordons only placement-referenced nodes; it does not
   change labels, taints, tolerations, replica counts, or HPAs.
 - Missing, NotReady, unschedulable, incorrectly labeled, or blocked nodes fail
-  before namespace reset.
+  after prerun recreates the namespace and before baseline collection.
 - Every Schedule must be absent before the next step.
 - Host cleaner/audit failure is unsafe and aborts the run.
 - Finalization runs on success, failure, exception, and interruption.
@@ -83,20 +81,23 @@ Key options for one run:
 - `--grace-period`: delay after agent startup before chaos.
 - `--skip-agents`: control run.
 - `--prometheus-url`: explicit metrics endpoint.
-- `--postgres-dsn`: permits database cleanup during application reset.
+- `--postgres-dsn`: prerun database wipe and postrun session export.
 - `--port-forward`: manages a frontend port-forward for local execution.
 - `--output-dir`: stable artifact directory.
+
+`./run.sh` runs `prerun/run.sh`, then `testbed/run.sh`, then `postrun/run.sh`
+for every scenario. `--help` and incomplete arguments skip prerun/postrun.
 
 ## Outputs and analysis
 
 The run directory is the unit of evidence. Preserve its metadata, inputs,
-commands, snapshots, metric data, and failure outputs together. Do not compare
-runs by copying only charts or aggregate CSV rows.
+commands, snapshots, metric data, `sessions/` database export, and failure
+outputs together. Do not compare runs by copying only charts or aggregate CSV
+rows.
 
 The reporting pipeline accepts metadata schema version 2 and emits per-step
-summaries plus paired agent/no-agent comparisons. The separate scenario
-evaluator can call an OpenAI-compatible endpoint for qualitative analysis; this
-is post-processing and is not part of experiment execution.
+summaries plus paired agent/no-agent comparisons. Qualitative post-processing
+is outside this component.
 
 ## Interpreting results
 
