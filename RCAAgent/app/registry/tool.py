@@ -46,6 +46,25 @@ def tool_metadata(tools: list[Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+class ToolOutput:
+    def __init__(self, name: str, kwargs: dict[str, Any], result: Any):
+        self.name = name
+        self.kwargs = kwargs
+        self.result = result
+
+    def model_dump(self) -> dict[str, Any]:
+        return json.loads(self.model_dump_json())
+
+    def model_dump_json(self) -> str:
+        return json.dumps(
+            {"name": self.name, "kwargs": self.kwargs, "result": self.result},
+            default=str,
+        )
+
+    def __str__(self) -> str:
+        return self.model_dump_json()
+
+
 class audit_tool_calls:
     def __init__(self, callback):
         self.callback = callback
@@ -158,7 +177,7 @@ class ToolRegistry:
         callback = _AUDIT.get()
         if callback:
             callback(canonical, kwargs, result)
-        return type("ToolOutput", (), {"model_dump_json": lambda self: json.dumps({"name": canonical, "kwargs": kwargs, "result": result}, default=str)})()
+        return ToolOutput(canonical, kwargs, result)
 
 
 TOOL_REGISTRY = ToolRegistry()

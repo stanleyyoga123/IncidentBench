@@ -227,11 +227,16 @@ class Agent:
                                 input={"arguments": args},
                             ) as tool_span:
                                 tool_output = self._exec_tool(name, args)
-                                tool_output = self._serialize_tool_output(tool_output)
+                                payload = self._serialize_tool_output(tool_output)
                                 tool_span.update(metadata={"tool": name, "args": args})
-                                tool_span.update(output=tool_output)
+                                tool_span.update(output=payload)
 
-                            self._append_tool(tool_call.id, tool_output)
+                            self._append_tool(
+                                tool_call.id,
+                                payload
+                                if isinstance(payload, str)
+                                else json.dumps(payload, default=str),
+                            )
                             if (
                                 index == len(tool_calls) - 1
                                 and self._should_trim_context()
@@ -280,12 +285,27 @@ class Agent:
     def _append_context_trimming(self):
         self._messages.append({"role": "user", "content": CONTEXT_TRIMMING_PROMPT})
 
-    def _serialize_tool_output(self, output: Any) -> str:
+    @staticmethod
+    def _serialize_tool_output(output: Any) -> Any:
         if isinstance(output, str):
             return output
+        dump = getattr(output, "model_dump", None)
+        if callable(dump):
+            payload = dump()
+            if isinstance(payload, dict):
+                return payload
         if isinstance(output, BaseModel):
-            return output.model_dump_json()
-        return json.dumps(output, default=str)
+            return output.model_dump()
+        dump_json = getattr(output, "model_dump_json", None)
+        if callable(dump_json):
+            dumped = dump_json()
+            if isinstance(dumped, str):
+                try:
+                    return json.loads(dumped)
+                except json.JSONDecodeError:
+                    return dumped
+            return dumped
+        return json.loads(json.dumps(output, default=str))
 
     def _usage_total(self, response: Any) -> int:
         usage = getattr(response, "usage", None)
