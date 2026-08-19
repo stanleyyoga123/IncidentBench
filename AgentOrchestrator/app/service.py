@@ -1,14 +1,18 @@
 import logging
 import threading
 from typing import Any
+from uuid import UUID
 
 import httpx
 
 from clients import AgentClient
-from store import WorkflowStore
+from schema import Workflow
+from store import WorkflowConflictError, WorkflowStore
 
 
 LOGGER = logging.getLogger("AgentOrchestrator")
+AUTO_APPROVAL_ACTOR = "agent-orchestrator"
+AUTO_APPROVAL_REASON = "automatic approval after RCA required remediation"
 
 
 class WorkflowCoordinator:
@@ -41,11 +45,46 @@ class WorkflowCoordinator:
             LOGGER.exception("Failed to submit RCA workflow %s", workflow.id)
             return 0
 
+    def submit_approved_remediation(
+        self,
+        workflow_id: UUID,
+        actor: str,
+        reason: str,
+        expected_version: int,
+    ) -> Workflow:
+        workflow = self.store.decide(
+            workflow_id, "approved", actor, reason, expected_version
+        )
+        try:
+            rca_job = self.rca.get_rca(workflow.rca_job_id)
+            job = self.remediator.create_remediation(
+                workflow.id,
+                rca_job,
+                {
+                    "actor": actor,
+                    "reason": reason,
+                    "workflow_version": workflow.version,
+                },
+            )
+            self.store.attach_remediation_job(workflow.id, job.id)
+            return self.store.get_workflow(workflow.id)
+        except Exception as exc:
+            self.store.mark_submission_failed(workflow.id, self._error(exc))
+            raise
+
     def reconcile_once(self) -> int:
         updated = 0
         for workflow in self.store.list_reconcilable():
             try:
-                if workflow.status.startswith("rca_") and workflow.rca_job_id:
+                if workflow.status == "awaiting_approval":
+                    self.submit_approved_remediation(
+                        workflow.id,
+                        AUTO_APPROVAL_ACTOR,
+                        AUTO_APPROVAL_REASON,
+                        workflow.version,
+                    )
+                    updated += 1
+                elif workflow.status.startswith("rca_") and workflow.rca_job_id:
                     job = self.rca.get_rca(workflow.rca_job_id)
                     expected = "rca_running" if job.status == "running" else "rca_queued"
                     if job.status in {"queued", "running"} and workflow.status == expected:
@@ -57,6 +96,18 @@ class WorkflowCoordinator:
                         error=job.error,
                     )
                     updated += 1
+                    if (
+                        job.status == "succeeded"
+                        and (job.result or {}).get("remediation_required") is True
+                    ):
+                        current = self.store.get_workflow(workflow.id)
+                        if current is not None:
+                            self.submit_approved_remediation(
+                                current.id,
+                                AUTO_APPROVAL_ACTOR,
+                                AUTO_APPROVAL_REASON,
+                                current.version,
+                            )
                 elif workflow.status.startswith("remediation_") and workflow.remediation_job_id:
                     job = self.remediator.get_remediation(workflow.remediation_job_id)
                     expected = "remediation_running" if job.status == "running" else "remediation_queued"
@@ -68,7 +119,7 @@ class WorkflowCoordinator:
                         error=job.error,
                     )
                     updated += 1
-            except (httpx.HTTPError, ValueError):
+            except (httpx.HTTPError, ValueError, WorkflowConflictError):
                 LOGGER.exception("Failed to reconcile workflow %s", workflow.id)
         return updated
 

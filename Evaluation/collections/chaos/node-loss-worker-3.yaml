@@ -1,0 +1,22 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: node-loss-worker-3
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PhysicalMachineChaos
+  physicalmachineChaos:
+    action: network-loss
+    mode: one
+    selector:
+      physicalMachines:
+        chaos-mesh:
+        - worker-node-3
+    network-loss:
+      device: eth0
+      percent: '20'
+      correlation: '25'
+    duration: 25s

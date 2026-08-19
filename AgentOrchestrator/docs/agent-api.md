@@ -9,8 +9,8 @@ the store token can call only `/internal/...` job-store endpoints.
 | `ingest_anomaly_events` | `POST /anomalies` | Commit 1–1000 event envelopes; returns accepted/duplicate counts. |
 | `list_agent_workflows` | `GET /workflows` | List workflow status and job references. |
 | `get_agent_workflow` | `GET /workflows/{id}` | Read one workflow/version/decision/error. |
-| `approve_agent_workflow` | `POST /workflows/{id}/approve` | Supply actor, reason, expected_version and submit remediation. |
-| `decline_agent_workflow` | `POST /workflows/{id}/decline` | Close without mutation. |
+| `approve_agent_workflow` | `POST /workflows/{id}/approve` | Optional manual approve; the reconciler auto-approves as `agent-orchestrator` when RCA requires remediation. |
+| `decline_agent_workflow` | `POST /workflows/{id}/decline` | Close without mutation while status is still `awaiting_approval`. |
 | `retry_agent_workflow` | `POST /workflows/{id}/retry` | Explicitly resubmit a failed/reviewed phase. |
 | `get_agent_orchestrator_health` | `GET /health` | Health and global-slot availability. |
 | `create_internal_rca_job` | `POST /internal/rca/jobs` | Persist an RCA job for RCAAgent. |
@@ -27,4 +27,6 @@ the store token can call only `/internal/...` job-store endpoints.
 | `list_internal_remediation_artifacts` | `GET /internal/remediation/jobs/{id}/artifacts` | List artifact filenames. |
 
 Treat HTTP 409 as a stale version or invalid transition and re-read before
-deciding. Treat duplicate ingestion as success. Never auto-approve remediation.
+deciding. Treat duplicate ingestion as success. When RCA succeeds with
+`remediation_required=true`, AgentOrchestrator auto-approves as
+`agent-orchestrator` and submits remediator with the canonical SHA-256 snapshot.

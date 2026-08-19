@@ -6,7 +6,7 @@ This workspace implements a durable Kubernetes incident loop:
 
 ```text
 Evaluation -> Prometheus -> AnomalyDetector -> AgentOrchestrator
-  -> RCAAgent -> MCPTools investigation -> approval
+  -> RCAAgent -> MCPTools investigation
   -> RemediatorAgent -> MCPTools remediation -> cluster verification
 ```
 
@@ -20,9 +20,9 @@ overrides this file for local implementation details.
   deterministic event envelopes, authenticated HTTP delivery, and its
   ConfigMap, Secret, Deployment/Service manifest, and deploy script.
 - `AgentOrchestrator/`: anomaly ingestion, idempotency, workflow state,
-  job/slot/audit/artifact DML, batching, reconciliation, approval/decline/retry,
-  downstream submission, and its ConfigMap, Secret, NetworkPolicy,
-  Deployment/Service, and deploy script.
+  job/slot/audit/artifact DML, batching, reconciliation, automatic remediation
+  submission after RCA, decline/retry, downstream submission, and its ConfigMap,
+  Secret, NetworkPolicy, Deployment/Service, and deploy script.
 - `RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
   its ConfigMap, Secret, Deployment/Service, and deploy script.
 - `RemediatorAgent/`: approved asynchronous remediation and verification jobs,
@@ -52,7 +52,9 @@ worktrees. Never discard unrelated modified or untracked files.
 4. AgentOrchestrator claims at most 100 oldest pending events every 60 seconds.
 5. RCA and Remediator share the singleton `agent_execution_slot`; only one job
    may run globally, including jobs submitted directly to their APIs.
-6. Waiting for approval does not occupy the execution slot.
+6. `awaiting_approval` is a brief automated state and does not occupy the
+   execution slot. AgentOrchestrator then submits remediator as
+   `agent-orchestrator`.
 7. Detector signals are leads. RCA must corroborate them with current evidence.
 8. Remediation requires an approved RCA snapshot and matching SHA-256 hash.
 9. RCA transient failures retry at most three times. An ambiguous remediation

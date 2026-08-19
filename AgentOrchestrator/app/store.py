@@ -132,7 +132,7 @@ class WorkflowStore:
             cur.execute(
                 """
                 SELECT * FROM agent_workflow
-                WHERE status IN ('rca_queued', 'rca_running',
+                WHERE status IN ('rca_queued', 'rca_running', 'awaiting_approval',
                                  'remediation_queued', 'remediation_running')
                 ORDER BY created_at
                 """
@@ -168,7 +168,7 @@ class WorkflowStore:
 
     def set_rca_state(self, workflow_id: UUID, status: str, *, result=None, error=None) -> None:
         if status == "succeeded":
-            remediation_required = bool((result or {}).get("remediation_required"))
+            remediation_required = (result or {}).get("remediation_required") is True
             workflow_status = "awaiting_approval" if remediation_required else "completed_no_action"
             self._update_workflow(
                 workflow_id,

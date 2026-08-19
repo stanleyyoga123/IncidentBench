@@ -143,29 +143,26 @@ def create_app(
 
     def decision(workflow_id: UUID, request: DecisionRequest, value: str) -> Workflow:
         try:
-            workflow = store.decide(
+            if value == "approved":
+                return coordinator.submit_approved_remediation(
+                    workflow_id,
+                    request.actor,
+                    request.reason,
+                    request.expected_version,
+                )
+            return store.decide(
                 workflow_id, value, request.actor, request.reason, request.expected_version
             )
-            if value == "approved":
-                rca_job = rca.get_rca(workflow.rca_job_id)
-                job = remediator.create_remediation(
-                    workflow.id,
-                    rca_job,
-                    {"actor": request.actor, "reason": request.reason,
-                     "workflow_version": workflow.version},
-                )
-                store.attach_remediation_job(workflow.id, job.id)
-                return store.get_workflow(workflow.id)
-            return workflow
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="workflow not found") from exc
         except WorkflowConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except Exception as exc:
-            store.mark_submission_failed(
-                workflow_id,
-                {"type": type(exc).__name__, "message": str(exc)},
-            )
+            if value != "approved":
+                store.mark_submission_failed(
+                    workflow_id,
+                    {"type": type(exc).__name__, "message": str(exc)},
+                )
             raise HTTPException(status_code=502, detail="downstream job submission failed") from exc
 
     @app.post(

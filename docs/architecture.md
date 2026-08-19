@@ -11,7 +11,7 @@ flowchart LR
   R -->|store token + job APIs| O
   R --> MI[MCPTools investigation]
   MI --> K
-  O -->|approval snapshot| M[RemediatorAgent]
+  O -->|RCA snapshot plus hash| M[RemediatorAgent]
   M -->|store token + job APIs| O
   M --> MR[MCPTools remediation]
   MR --> K
@@ -26,7 +26,8 @@ read-oriented RBAC, and a remediation profile with a separate token, bounded
 RBAC, one replica, and a PVC.
 
 The singleton `agent_execution_slot` serializes all RCA and remediation jobs,
-including direct API submissions. Approval waiting does not hold the lease.
+including direct API submissions. Automated `awaiting_approval` does not hold
+the lease; remediator claims it after RCA releases.
 Every HTTP Service is ClusterIP-only. NetworkPolicy, bearer authentication,
 server-side tool profiles, and Kubernetes RBAC are independent security layers.
 

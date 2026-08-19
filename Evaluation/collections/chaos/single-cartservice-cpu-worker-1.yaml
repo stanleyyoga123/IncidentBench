@@ -1,0 +1,30 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: single-cartservice-cpu-worker-1
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - online-boutique
+      nodes:
+      - worker-node-1
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - cartservice
+    stressors:
+      cpu:
+        workers: 1
+        # 55% of one CPU approximates the 600m limit minus 50m.
+        load: 55
+    duration: 29s

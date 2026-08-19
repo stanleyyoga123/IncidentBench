@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-paymentservice-cpu-node5-one-hour",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-paymentservice-cpu-node5-chaos",
+      "chaos": ["single-paymentservice-cpu-worker-5"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

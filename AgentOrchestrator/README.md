@@ -1,7 +1,7 @@
 # AgentOrchestrator
 
 AgentOrchestrator accepts authenticated AnomalyDetector events, persists them,
-and coordinates asynchronous RCA and explicitly approved remediation jobs.
+and coordinates asynchronous RCA and automatically submitted remediation jobs.
 It is the only application that talks to PostgreSQL: workflow rows, RCA and
 remediation jobs, the singleton execution slot, tool-call audits, and
 remediation artifacts. It polls pending events every 60 seconds and batches at

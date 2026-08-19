@@ -16,8 +16,10 @@ and a bounded `remediation_plan`. Raw model text is audit context only.
 ## Remediation request/result
 
 Requests contain workflow and RCA IDs, an RCA result snapshot, its canonical
-JSON SHA-256, and approval actor/reason. Results contain execution summary,
-changes, verification, artifacts, raw audit context, and errors.
+JSON SHA-256, and approval actor/reason. After RCA requires remediation,
+AgentOrchestrator fills those fields as `agent-orchestrator` / automatic
+approval. Results contain execution summary, changes, verification, artifacts,
+raw audit context, and errors.
 
 ## Database
 

@@ -13,25 +13,30 @@
    evidence through investigation MCPTools, persists a structured result and
    audits via the job-store APIs, then releases the lease.
 7. A no-action result completes the workflow. A remediation plan enters
-   `awaiting_approval`, which consumes no execution slot.
+   `awaiting_approval` briefly; reconcile immediately auto-approves as
+   `agent-orchestrator` and submits Remediator. That wait does not consume the
+   execution slot.
 
 Delivery uses bounded retries and no local outbox. A failed event is eligible
 for detection next cycle. If the underlying anomaly recovers before that next
 cycle, the event can be lost; this is an accepted fail-and-re-detect tradeoff.
 
-## Approval and remediation
+## Remediation
 
-1. A control caller approves with actor, reason, and expected workflow version.
-2. AgentOrchestrator snapshots the RCA result, calculates its canonical SHA-256,
-   and submits a remediation job.
-3. RemediatorAgent validates approval/hash and waits for the shared lease.
-4. It validates current state, writes session artifacts, runs Ansible check mode,
+1. When RCA sets `remediation_required=true`, AgentOrchestrator auto-approves
+   as `agent-orchestrator`, snapshots the RCA result, calculates its canonical
+   SHA-256, and submits a remediation job. Control `POST /workflows/{id}/approve`
+   remains available; `decline` still works only while status is
+   `awaiting_approval`.
+2. RemediatorAgent validates the snapshot hash and approval metadata, then waits
+   for the shared lease.
+3. It validates current state, writes session artifacts, runs Ansible check mode,
    performs guarded live execution, then verifies directly.
-5. Success completes the workflow. A crash or ambiguous failure after execution
+4. Success completes the workflow. A crash or ambiguous failure after execution
    begins becomes `needs_review`; only an explicit retry decision can proceed.
 
-Decline closes the workflow without remediation. Failed RCA or reviewed
-remediation can be retried with a fresh versioned idempotency key.
+Failed RCA or reviewed remediation can be retried with a fresh versioned
+idempotency key.
 
 ## Evaluation
 

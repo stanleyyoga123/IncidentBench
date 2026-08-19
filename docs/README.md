@@ -1,8 +1,9 @@
 # Agent platform documentation
 
 The implemented platform detects Kubernetes anomalies, commits them to a
-durable coordinator, performs evidence-backed RCA, requires approval for
-mutations, remediates through guarded tools, and evaluates the outcome.
+durable coordinator, performs evidence-backed RCA, automatically submits
+required remediation with a snapshot hash, remediates through guarded tools,
+and evaluates the outcome.
 
 Read in this order:
 

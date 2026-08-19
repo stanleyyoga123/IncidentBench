@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-productcatalogservice-cpu-all-one-hour",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-productcatalogservice-cpu-all-chaos",
+      "chaos": ["single-productcatalogservice-cpu"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: node-cpu-worker-1
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PhysicalMachineChaos
+  physicalmachineChaos:
+    action: stress-cpu
+    mode: one
+    selector:
+      physicalMachines:
+        chaos-mesh:
+        - worker-node-1
+    stress-cpu:
+      workers: 8
+      load: 90
+    duration: 29s

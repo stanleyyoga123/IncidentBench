@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-cartservice-cpu-node1-one-hour",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-cartservice-cpu-node1-chaos",
+      "chaos": ["single-cartservice-cpu-worker-1"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

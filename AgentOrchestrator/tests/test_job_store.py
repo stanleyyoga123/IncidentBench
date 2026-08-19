@@ -151,3 +151,24 @@ def test_write_file_audit_persists_and_lists_artifact():
     list_cursor = Cursor(all_rows=[{"filename": "remediation.yml"}])
     store = Store(Connection(list_cursor))
     assert store.list_artifacts(job_id) == ["remediation.yml"]
+
+
+def test_list_reconcilable_includes_awaiting_approval():
+    store = Store(Connection(Cursor(all_rows=[])))
+    store.list_reconcilable()
+    sql = "\n".join(query for query, _ in store._connection._cursor.queries)
+    assert "awaiting_approval" in sql
+
+
+def test_set_rca_state_requires_boolean_true():
+    yes_cursor = Cursor()
+    Store(Connection(yes_cursor)).set_rca_state(
+        uuid4(), "succeeded", result={"remediation_required": "yes"}
+    )
+    assert yes_cursor.queries[0][1][0] == "completed_no_action"
+
+    true_cursor = Cursor()
+    Store(Connection(true_cursor)).set_rca_state(
+        uuid4(), "succeeded", result={"remediation_required": True}
+    )
+    assert true_cursor.queries[0][1][0] == "awaiting_approval"
