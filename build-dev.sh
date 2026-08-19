@@ -4,6 +4,7 @@ set -Eeuo pipefail
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 declare -ar COMPONENTS=(
   "MCPTools"
+  "LearningAgent"
   "RCAAgent"
   "RemediatorAgent"
   "AgentOrchestrator"
@@ -13,7 +14,7 @@ declare -ar COMPONENTS=(
 usage() {
   echo "Usage: $0"
   echo
-  echo "Builds and pushes the five agent :dev images. Does not deploy, restart"
+  echo "Builds and pushes the six agent-platform :dev images. Does not deploy, restart"
   echo "workloads, or run DatabaseJob. Use ./restart-dev.sh after a successful push."
 }
 
@@ -58,5 +59,5 @@ for component in "${COMPONENTS[@]}"; do
   }
 done
 
-echo "All five agent dev images were built and pushed."
+echo "All six agent-platform dev images were built and pushed."
 echo "DatabaseJob was not run. Deployments were not restarted; run ./restart-dev.sh to pull the new images."

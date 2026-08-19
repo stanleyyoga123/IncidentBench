@@ -36,8 +36,6 @@ class WorkerSettings(BaseModel):
 
 class ManagerSettings(BaseModel):
     max_rounds: int = Field(default=10, ge=1, le=50)
-    memory_path: str = "/app/MEMORY.md"
-    memory_max_prompt_chars: int = 32000
 
 
 class Settings(BaseSettings):

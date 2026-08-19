@@ -4,11 +4,15 @@ This directory is the sole owner of PostgreSQL DDL for the split agent
 platform. It contains Alembic migrations and a migration image; it is not a
 long-running coordination service.
 
-Head revision `20260817_0002` replaces the legacy CloudAgent tables with:
+Head revision `20260819_0003` retains the split-agent schema and adds:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`;
-- singleton `agent_execution_slot` for global RCA/remediation serialization;
-- `agent_tool_call` and `remediation_artifact` audit tables.
+- singleton `agent_execution_slot` for global RCA/remediation/learning serialization;
+- `agent_tool_call`, `remediation_artifact`, `learning_job`, and
+  `incident_lesson` tables.
+
+Revision `20260817_0002` performs the destructive legacy replacement;
+`20260819_0003` is additive and also repairs a missing singleton slot row.
 
 The upgrade is intentionally destructive. When any legacy table has records,
 it refuses to proceed unless `ALLOW_AGENT_WORKFLOW_RESET=true` is supplied.

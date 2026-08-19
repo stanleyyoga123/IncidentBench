@@ -61,4 +61,5 @@ dump_query anomaly
 dump_query rca_session
 dump_query remediation_run
 dump_query remediation_session
+dump_query learning_session
 dump_query workflow

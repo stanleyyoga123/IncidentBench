@@ -16,11 +16,21 @@ class AgentClient:
             timeout=timeout_seconds,
         )
 
-    def create_rca(self, workflow_id: UUID, anomalies: list[dict[str, Any]], attempt: int = 1) -> DownstreamJob:
+    def create_rca(
+        self,
+        workflow_id: UUID,
+        anomalies: list[dict[str, Any]],
+        attempt: int = 1,
+        historical_lessons: list[dict[str, Any]] | None = None,
+    ) -> DownstreamJob:
         response = self._client.post(
             "/api/v1/rca/jobs",
             headers={"Idempotency-Key": f"workflow:{workflow_id}:rca:{attempt}"},
-            json={"workflow_id": str(workflow_id), "anomalies": anomalies},
+            json={
+                "workflow_id": str(workflow_id),
+                "anomalies": anomalies,
+                "historical_lessons": historical_lessons or [],
+            },
         )
         response.raise_for_status()
         return DownstreamJob.model_validate(response.json())
@@ -55,6 +65,31 @@ class AgentClient:
 
     def get_remediation(self, job_id: UUID) -> DownstreamJob:
         response = self._client.get(f"/api/v1/remediation/jobs/{job_id}")
+        response.raise_for_status()
+        return DownstreamJob.model_validate(response.json())
+
+    def create_learning(
+        self,
+        workflow_id: UUID,
+        source: dict[str, Any],
+        attempt: int = 1,
+    ) -> DownstreamJob:
+        canonical = json.dumps(source, sort_keys=True, separators=(",", ":"))
+        source_hash = hashlib.sha256(canonical.encode()).hexdigest()
+        response = self._client.post(
+            "/api/v1/learning/jobs",
+            headers={"Idempotency-Key": f"workflow:{workflow_id}:learning:{attempt}"},
+            json={
+                "workflow_id": str(workflow_id),
+                "source": source,
+                "source_sha256": source_hash,
+            },
+        )
+        response.raise_for_status()
+        return DownstreamJob.model_validate(response.json())
+
+    def get_learning(self, job_id: UUID) -> DownstreamJob:
+        response = self._client.get(f"/api/v1/learning/jobs/{job_id}")
         response.raise_for_status()
         return DownstreamJob.model_validate(response.json())
 

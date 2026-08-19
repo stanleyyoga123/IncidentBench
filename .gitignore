@@ -1,5 +1,6 @@
 # Deferred component
 /eda/
+/.results
 
 # Credentials and machine-local configuration
 **/.env

@@ -9,4 +9,5 @@ spec:
         - podSelector: {matchLabels: {app: agent-orchestrator}}
         - podSelector: {matchLabels: {app: rca-agent}}
         - podSelector: {matchLabels: {app: remediator-agent}}
+        - podSelector: {matchLabels: {app: learning-agent}}
         - podSelector: {matchLabels: {app.kubernetes.io/name: anomaly-detector}}

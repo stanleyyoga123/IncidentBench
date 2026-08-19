@@ -12,6 +12,8 @@ CURRENT_TABLES = (
     "agent_workflow",
     "rca_job",
     "remediation_job",
+    "learning_job",
+    "incident_lesson",
     "agent_tool_call",
     "remediation_artifact",
     "agent_execution_slot",
@@ -48,6 +50,7 @@ class PostrunTests(unittest.TestCase):
             "rca_session.sql": "rca_job",
             "remediation_run.sql": "remediation_job",
             "remediation_session.sql": "remediator",
+            "learning_session.sql": "incident_lesson",
             "workflow.sql": "agent_workflow",
         }
         for filename, needle in expected.items():
@@ -55,6 +58,10 @@ class PostrunTests(unittest.TestCase):
             self.assertIn(needle, text)
             self.assertNotIn("in_progress", text)
             self.assertNotIn("detected_anomaly", text)
+        learning = (queries / "learning_session.sql").read_text()
+        self.assertIn("learning_job", learning)
+        self.assertIn("incident_lesson", learning)
+        self.assertIn("ORDER BY i.ordinal", learning)
 
     def test_postrun_writes_session_files_without_logging_dsn(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,6 +97,7 @@ class PostrunTests(unittest.TestCase):
                 "rca_session",
                 "remediation_run",
                 "remediation_session",
+                "learning_session",
                 "workflow",
             ):
                 path = sessions / f"{name}.json"

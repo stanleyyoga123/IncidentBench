@@ -95,7 +95,9 @@ def _analyze_run(
         progress(f"{prefix}: end_score={scores.get('end_score')}")
     else:
         progress(f"{prefix}: starting LLM judge")
-        scores = judge_run(run, metadata, errors, impact, judge)
+        scores = judge_run(
+            run, metadata, errors, impact, judge, checkpoint=destination / "judge.json"
+        )
         raw = scores.pop("raw", {})
         progress(f"{prefix}: end_score={scores.get('end_score')}")
     (destination / "scores.json").write_text(json.dumps(scores, indent=2, default=str))

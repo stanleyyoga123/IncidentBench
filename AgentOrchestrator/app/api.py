@@ -16,6 +16,12 @@ from schema import (
     ExecutionClaimRequest,
     ExecutionRenewRequest,
     IngestionResponse,
+    IncidentLesson,
+    LearningFinishRequest,
+    LearningJob,
+    LearningJobCreateRequest,
+    LessonCollection,
+    LessonStatusRequest,
     RCAFinishRequest,
     RCAJob,
     RCAJobCreateRequest,
@@ -48,13 +54,15 @@ def create_app(
     store: WorkflowStore | None = None,
     rca: AgentClient | None = None,
     remediator: AgentClient | None = None,
+    learning: AgentClient | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     store = store or WorkflowStore(settings.database.dsn)
     rca = rca or AgentClient(**settings.rca.model_dump())
     remediator = remediator or AgentClient(**settings.remediator.model_dump())
+    learning = learning or AgentClient(**settings.learning.model_dump())
     coordinator = WorkflowCoordinator(
-        store, rca, remediator, batch_size=settings.scheduler.batch_size
+        store, rca, remediator, learning, batch_size=settings.scheduler.batch_size
     )
     loops = CoordinatorLoops(
         coordinator,
@@ -71,6 +79,7 @@ def create_app(
             loops.stop()
         rca.close()
         remediator.close()
+        learning.close()
 
     app = FastAPI(
         title="AgentOrchestrator API",
@@ -124,6 +133,10 @@ def create_app(
                 updates["remediation_result"] = remediator.get_remediation(
                     workflow.remediation_job_id
                 ).result
+            if workflow.learning_job_id:
+                updates["learning_result"] = learning.get_learning(
+                    workflow.learning_job_id
+                ).result
         except Exception:
             # Persisted state remains inspectable during a downstream outage.
             pass
@@ -140,6 +153,61 @@ def create_app(
         if workflow is None:
             raise HTTPException(status_code=404, detail="workflow not found")
         return enrich(workflow, include_anomalies=True)
+
+    @app.get(
+        "/api/v1/lessons",
+        response_model=LessonCollection,
+        dependencies=[control_auth],
+        operation_id="list_incident_lessons",
+    )
+    def list_lessons(active: bool | None = None) -> LessonCollection:
+        return LessonCollection(lessons=store.list_lessons(active=active))
+
+    @app.get(
+        "/api/v1/lessons/{lesson_id}",
+        response_model=IncidentLesson,
+        dependencies=[control_auth],
+        operation_id="get_incident_lesson",
+    )
+    def get_lesson(lesson_id: UUID) -> IncidentLesson:
+        lesson = store.get_lesson(lesson_id)
+        if lesson is None:
+            raise HTTPException(status_code=404, detail="lesson not found")
+        return lesson
+
+    def set_lesson_status(
+        lesson_id: UUID, request: LessonStatusRequest, active: bool
+    ) -> IncidentLesson:
+        try:
+            return store.set_lesson_active(
+                lesson_id,
+                active,
+                request.actor,
+                request.reason,
+                request.expected_version,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="lesson not found") from exc
+        except WorkflowConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post(
+        "/api/v1/lessons/{lesson_id}/enable",
+        response_model=IncidentLesson,
+        dependencies=[control_auth],
+        operation_id="enable_incident_lesson",
+    )
+    def enable_lesson(lesson_id: UUID, request: LessonStatusRequest) -> IncidentLesson:
+        return set_lesson_status(lesson_id, request, True)
+
+    @app.post(
+        "/api/v1/lessons/{lesson_id}/disable",
+        response_model=IncidentLesson,
+        dependencies=[control_auth],
+        operation_id="disable_incident_lesson",
+    )
+    def disable_lesson(lesson_id: UUID, request: LessonStatusRequest) -> IncidentLesson:
+        return set_lesson_status(lesson_id, request, False)
 
     def decision(workflow_id: UUID, request: DecisionRequest, value: str) -> Workflow:
         try:
@@ -282,6 +350,33 @@ def create_app(
         return job
 
     @app.post(
+        "/api/v1/internal/learning/jobs",
+        response_model=LearningJob,
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[store_auth],
+        operation_id="create_internal_learning_job",
+    )
+    def create_internal_learning_job(
+        request: LearningJobCreateRequest,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    ) -> LearningJob:
+        return store.create_learning_job(
+            request.model_dump(mode="json"), idempotency_key or str(uuid4())
+        )
+
+    @app.get(
+        "/api/v1/internal/learning/jobs/{job_id}",
+        response_model=LearningJob,
+        dependencies=[store_auth],
+        operation_id="get_internal_learning_job",
+    )
+    def get_internal_learning_job(job_id: UUID) -> LearningJob:
+        job = store.get_learning_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="learning job not found")
+        return job
+
+    @app.post(
         "/api/v1/internal/execution/claim",
         dependencies=[store_auth],
         operation_id="claim_agent_execution",
@@ -350,6 +445,31 @@ def create_app(
         )
         if job is None:
             raise HTTPException(status_code=404, detail="remediation job not found")
+        return job
+
+    @app.post(
+        "/api/v1/internal/learning/jobs/{job_id}/finish",
+        response_model=LearningJob,
+        dependencies=[store_auth],
+        operation_id="finish_internal_learning_job",
+    )
+    def finish_internal_learning_job(
+        job_id: UUID, request: LearningFinishRequest
+    ) -> LearningJob:
+        job = store.finish_learning_job(
+            job_id,
+            request.outcome,
+            result=(
+                request.result.model_dump(mode="json")
+                if request.result is not None
+                else None
+            ),
+            raw_output=request.raw_output,
+            error=request.error,
+            max_attempts=request.max_attempts,
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="learning job not found")
         return job
 
     @app.post(

@@ -12,7 +12,7 @@
 6. RCAAgent acquires the global lease through AgentOrchestrator, gathers
    evidence through investigation MCPTools, persists a structured result and
    audits via the job-store APIs, then releases the lease.
-7. A no-action result completes the workflow. A remediation plan enters
+7. A no-action result enters learning. A remediation plan enters
    `awaiting_approval` briefly; reconcile immediately auto-approves as
    `agent-orchestrator` and submits Remediator. That wait does not consume the
    execution slot.
@@ -32,16 +32,30 @@ cycle, the event can be lost; this is an accepted fail-and-re-detect tradeoff.
    for the shared lease.
 3. It validates current state, writes session artifacts, runs Ansible check mode,
    performs guarded live execution, then verifies directly.
-4. Success completes the workflow. A crash or ambiguous failure after execution
+4. Success enters learning. A crash or ambiguous failure after execution
    begins becomes `needs_review`; only an explicit retry decision can proceed.
 
 Failed RCA or reviewed remediation can be retried with a fresh versioned
 idempotency key.
 
+## Learning and future RCA context
+
+1. After successful no-action RCA or verified remediation, AgentOrchestrator
+   submits a canonical, hashed workflow snapshot to LearningAgent.
+2. LearningAgent claims the shared global slot and returns zero or more
+   evidence-linked atomic lessons. It has no MCP tools or database credentials.
+3. AgentOrchestrator publishes valid lessons and completes the workflow. After
+   three learning failures it completes without lessons and records the error.
+4. For each new RCA workflow, AgentOrchestrator ranks active lessons by exact
+   workload/metric, metric/resource, metric, resource, then recency. It sends at
+   most 40 lessons within 24,000 serialized characters.
+5. RCAAgent places them in the user prompt as untrusted hypotheses and verifies
+   them against current evidence.
+
 ## Evaluation
 
-Evaluation scales/waits for all six deployments, injects workload/faults,
-captures evidence, and finalizes cleanup. Service restart logic remains in
+Evaluation remains unchanged by LearningAgent in this rollout. It injects
+workload/faults, captures evidence, and finalizes cleanup. Service restart logic remains in
 Evaluation. Evaluation also owns its runner Secret, Ansible role/playbook, and
 deploy script. MCPTools owns the network-probe DaemonSets; Infrastructure owns
 only the prerequisite cluster platform and namespaces.

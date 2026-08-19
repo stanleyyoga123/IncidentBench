@@ -24,6 +24,8 @@ AGENT_TABLES = (
     "agent_execution_slot",
     "agent_tool_call",
     "remediation_artifact",
+    "learning_job",
+    "incident_lesson",
 )
 EXPECTED_COLUMNS = {
     "detected_anomaly": {
@@ -109,7 +111,7 @@ class MigrationContractTest(TestCase):
     def test_history_has_one_head(self) -> None:
         result = self._alembic("heads")
 
-        self.assertIn("20260817_0002 (head)", result.stdout)
+        self.assertIn("20260819_0003 (head)", result.stdout)
 
     def test_offline_upgrade_creates_the_complete_schema(self) -> None:
         result = self._alembic("upgrade", "head", "--sql")
@@ -122,6 +124,41 @@ class MigrationContractTest(TestCase):
             self.assertIn(f"create table {table_name}", sql)
         self.assertIn("create table alembic_version", sql)
         self.assertIn("insert into alembic_version", sql)
+
+    def test_learning_schema_contract(self) -> None:
+        sql = self._alembic("upgrade", "head", "--sql").stdout.lower()
+
+        self.assertIn("constraint ck_learning_job_attempts", sql)
+        self.assertIn("constraint ck_incident_lesson_confidence", sql)
+        self.assertIn(
+            "constraint uq_incident_lesson_job_ordinal unique (learning_job_id, ordinal)",
+            sql,
+        )
+        self.assertIn(
+            "foreign key(learning_job_id) references learning_job (id) on delete cascade",
+            sql,
+        )
+        self.assertIn(
+            "foreign key(source_workflow_id) references agent_workflow (id) on delete cascade",
+            sql,
+        )
+        self.assertIn("create index ix_incident_lesson_active_scope", sql)
+        self.assertIn("create index ix_incident_lesson_confidence", sql)
+        self.assertIn(
+            "insert into agent_execution_slot (id) values (1) on conflict (id) do nothing",
+            sql,
+        )
+
+    def test_learning_downgrade_removes_only_additive_schema(self) -> None:
+        result = self._alembic(
+            "downgrade", "20260819_0003:20260817_0002", "--sql"
+        )
+        sql = result.stdout.lower()
+
+        self.assertIn("drop table incident_lesson", sql)
+        self.assertIn("drop table learning_job", sql)
+        self.assertIn("drop column learning_job_id", sql)
+        self.assertNotIn("drop table agent_workflow", sql)
 
     def test_existing_legacy_schema_is_adopted_without_recreation(self) -> None:
         migration = _load_initial_migration()

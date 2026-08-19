@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any
 
@@ -28,10 +29,11 @@ def judge_run(
     errors: dict,
     impact: dict,
     client: JudgeClient,
+    checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     sessions = load_sessions(run_folder)
     context = scenario_context(metadata)
-    raw = _collect_labels(sessions, context, client)
+    raw = _collect_labels(sessions, context, client, checkpoint)
     return score_labeled_run(run_folder, metadata, errors, impact, raw, sessions, context)
 
 
@@ -124,18 +126,32 @@ def score_labeled_run(
     }
 
 
-def _collect_labels(sessions: dict, context: dict, client: JudgeClient) -> dict[str, Any]:
-    raw: dict[str, Any] = {"rca": [], "remediation": [], "holistic": None}
+def _collect_labels(
+    sessions: dict,
+    context: dict,
+    client: JudgeClient,
+    checkpoint: Path | None = None,
+) -> dict[str, Any]:
     rca_jobs = sessions["rca"]
     rem_jobs = sessions["remediation"] or []
+    raw = _load_checkpoint(checkpoint)
     progress(f"judge: {len(rca_jobs)} RCA session(s), {len(rem_jobs)} remediation job(s)")
     for index, job in enumerate(rca_jobs, start=1):
+        existing = _existing_label(raw["rca"], job)
+        if existing is not None:
+            progress(f"judge RCA {index}/{len(rca_jobs)}: {job.get('id')} (cached)")
+            continue
         progress(f"judge RCA {index}/{len(rca_jobs)}: {job.get('id')}")
         labels = client.complete(
             "rca_labels", RCA_LABEL_SCHEMA, rca_messages(_rca_payload(context, job, sessions))
         )
         raw["rca"].append(labels)
+        _save_checkpoint(checkpoint, raw)
     for index, job in enumerate(rem_jobs, start=1):
+        existing = _existing_label(raw["remediation"], job)
+        if existing is not None:
+            progress(f"judge remediation {index}/{len(rem_jobs)}: {job.get('id')} (cached)")
+            continue
         progress(f"judge remediation {index}/{len(rem_jobs)}: {job.get('id')}")
         labels = client.complete(
             "remediation_labels",
@@ -143,19 +159,56 @@ def _collect_labels(sessions: dict, context: dict, client: JudgeClient) -> dict[
             remediation_messages(_remediation_payload(context, job, sessions)),
         )
         raw["remediation"].append(labels)
-    progress("judge: holistic scenario classification")
-    raw["holistic"] = client.complete(
-        "holistic_labels",
-        HOLISTIC_LABEL_SCHEMA,
-        holistic_messages(
-            {
-                "ground_truth": context.get("ground_truth"),
-                "scenario": context,
-                "session_count": {"rca": len(rca_jobs), "remediation": len(rem_jobs)},
-            }
-        ),
-    )
+        _save_checkpoint(checkpoint, raw)
+    if raw.get("holistic"):
+        progress("judge: holistic scenario classification (cached)")
+    else:
+        progress("judge: holistic scenario classification")
+        raw["holistic"] = client.complete(
+            "holistic_labels",
+            HOLISTIC_LABEL_SCHEMA,
+            holistic_messages(
+                {
+                    "ground_truth": context.get("ground_truth"),
+                    "scenario": context,
+                    "session_count": {"rca": len(rca_jobs), "remediation": len(rem_jobs)},
+                }
+            ),
+        )
+        _save_checkpoint(checkpoint, raw)
     return raw
+
+
+def _load_checkpoint(checkpoint: Path | None) -> dict[str, Any]:
+    empty = {"rca": [], "remediation": [], "holistic": None}
+    if checkpoint is None or not checkpoint.is_file():
+        return empty
+    try:
+        payload = json.loads(checkpoint.read_text())
+    except (OSError, json.JSONDecodeError):
+        return empty
+    if not isinstance(payload, dict):
+        return empty
+    return {
+        "rca": list(payload.get("rca") or []),
+        "remediation": list(payload.get("remediation") or []),
+        "holistic": payload.get("holistic"),
+    }
+
+
+def _save_checkpoint(checkpoint: Path | None, raw: dict[str, Any]) -> None:
+    if checkpoint is None:
+        return
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text(json.dumps(raw, indent=2, default=str))
+
+
+def _existing_label(labels_list: list[dict[str, Any]], job: dict[str, Any]) -> dict[str, Any] | None:
+    job_id = str(job.get("id") or "")
+    for item in labels_list:
+        if str(item.get("session_id") or "") == job_id:
+            return item
+    return None
 
 
 def _labels_for_job(labels_list: list[dict[str, Any]], job: dict[str, Any], index: int) -> dict[str, Any]:

@@ -25,7 +25,7 @@ Important modules:
 - `prerun/run.sh` wipes current agent workflow tables and recreates
   `online-boutique` from the central Infrastructure Kustomize.
 - `testbed/` is the experiment executor (formerly `src/`).
-- `postrun/run.sh` dumps anomaly, RCA, remediation, and workflow rows into
+- `postrun/run.sh` dumps anomaly, RCA, remediation, learning, and workflow rows into
   the run `sessions/` folder for later S3 upload.
 - `testbed/chaos/catalog/` parses and validates Schedule YAML collections.
 - `testbed/scenarios/` parses collection-driven scenario JSON.
@@ -68,7 +68,8 @@ Each scenario is `prerun/run.sh`, then `testbed/run.sh`, then
 `postrun/run.sh`. `./run.sh` orchestrates those three programs.
 
 1. Prerun truncates live agent tables (`anomaly_event`, `agent_workflow`,
-   `rca_job`, `remediation_job`, `agent_tool_call`, `remediation_artifact`)
+   `rca_job`, `remediation_job`, `learning_job`, `incident_lesson`,
+   `agent_tool_call`, `remediation_artifact`)
    and clears `agent_execution_slot`, then deletes and recreates
    `online-boutique` from the central Kustomize.
 2. Testbed scales agent deployments down.
@@ -82,7 +83,8 @@ Each scenario is `prerun/run.sh`, then `testbed/run.sh`, then
 8. Collect Prometheus `query_range` metrics using a 15-second step and 1-minute
    rate window.
 9. Postrun writes `sessions/` JSON (anomaly, RCA session, remediation run,
-   remediation session, workflow) into the run output directory.
+   remediation session, learning session with lessons, workflow) into the run
+   output directory.
 
 Placement profiles must cover all 11 application Deployments, retain
 `role: services`, and define one non-empty required

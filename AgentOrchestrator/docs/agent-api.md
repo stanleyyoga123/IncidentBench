@@ -12,15 +12,22 @@ the store token can call only `/internal/...` job-store endpoints.
 | `approve_agent_workflow` | `POST /workflows/{id}/approve` | Optional manual approve; the reconciler auto-approves as `agent-orchestrator` when RCA requires remediation. |
 | `decline_agent_workflow` | `POST /workflows/{id}/decline` | Close without mutation while status is still `awaiting_approval`. |
 | `retry_agent_workflow` | `POST /workflows/{id}/retry` | Explicitly resubmit a failed/reviewed phase. |
+| `list_incident_lessons` | `GET /lessons` | List active/all reusable lessons. |
+| `get_incident_lesson` | `GET /lessons/{id}` | Read one lesson and version. |
+| `enable_incident_lesson` | `POST /lessons/{id}/enable` | Enable a lesson with actor/reason/version. |
+| `disable_incident_lesson` | `POST /lessons/{id}/disable` | Disable a lesson with actor/reason/version. |
 | `get_agent_orchestrator_health` | `GET /health` | Health and global-slot availability. |
 | `create_internal_rca_job` | `POST /internal/rca/jobs` | Persist an RCA job for RCAAgent. |
 | `get_internal_rca_job` | `GET /internal/rca/jobs/{id}` | Read a persisted RCA job. |
 | `create_internal_remediation_job` | `POST /internal/remediation/jobs` | Persist a remediation job. |
 | `get_internal_remediation_job` | `GET /internal/remediation/jobs/{id}` | Read a persisted remediation job. |
+| `create_internal_learning_job` | `POST /internal/learning/jobs` | Persist an idempotent learning job. |
+| `get_internal_learning_job` | `GET /internal/learning/jobs/{id}` | Read a persisted learning job. |
 | `claim_agent_execution` | `POST /internal/execution/claim` | Claim the singleton slot or return 204. |
 | `renew_agent_execution` | `POST /internal/execution/renew` | Extend a held execution lease. |
 | `finish_internal_rca_job` | `POST /internal/rca/jobs/{id}/finish` | Apply RCA retry policy and release the slot. |
 | `finish_internal_remediation_job` | `POST /internal/remediation/jobs/{id}/finish` | Finish as `succeeded` or `needs_review`. |
+| `finish_internal_learning_job` | `POST /internal/learning/jobs/{id}/finish` | Publish valid lessons or apply retry policy. |
 | `record_internal_rca_tool_call` | `POST /internal/rca/jobs/{id}/tool-calls` | Insert an RCA tool-call audit. |
 | `record_internal_remediation_tool_call` | `POST /internal/remediation/jobs/{id}/tool-calls` | Insert a remediator audit; write_file upserts artifacts. |
 | `upsert_internal_remediation_artifact` | `POST /internal/remediation/jobs/{id}/artifacts` | Upsert a named artifact. |
@@ -30,3 +37,6 @@ Treat HTTP 409 as a stale version or invalid transition and re-read before
 deciding. Treat duplicate ingestion as success. When RCA succeeds with
 `remediation_required=true`, AgentOrchestrator auto-approves as
 `agent-orchestrator` and submits remediator with the canonical SHA-256 snapshot.
+Successful no-action RCA and verified remediation then block in learning states.
+Learning success publishes atomic lessons; the third failure completes without
+lessons. New RCA jobs receive at most 40 active relevant lessons.

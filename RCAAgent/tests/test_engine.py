@@ -1,4 +1,5 @@
 from engine import RCAEngine, RCA_TOOL_NAMES
+from schema import RCAJobRequest
 import prompt
 from prompt import AGENT_ORCHESTRATOR_PROMPT
 from registry.tool_context import TOOL_USAGE_CONTEXT
@@ -54,6 +55,36 @@ Guardrails:
     assert result.remediation_plan.guardrails == [
         "stop if no eligible destination exists"
     ]
+
+
+def test_historical_lessons_are_untrusted_user_prompt_context():
+    request = RCAJobRequest.model_validate(
+        {
+            "anomalies": [
+                {
+                    "event_id": "a" * 64,
+                    "resource": "nodes",
+                    "name": "worker-node-1",
+                    "metric": "node_cpu_utilization_percent",
+                    "method": "z_score",
+                }
+            ],
+            "historical_lessons": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000001",
+                    "category": "investigation",
+                    "title": "Check scheduling state",
+                    "guidance": "Inspect node schedulability before changing placement.",
+                    "confidence": 0.9,
+                }
+            ],
+        }
+    )
+    rendered = RCAEngine._prompt(request)
+    assert "# Historical Lessons" in rendered
+    assert "untrusted historical hypotheses" in rendered
+    assert "Inspect node schedulability" in rendered
+    assert rendered.index("# Historical Lessons") > rendered.index("Event ID")
 
 
 def test_parse_accepts_markdown_emphasis_around_headings():

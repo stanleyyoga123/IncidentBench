@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: learning-agent, namespace: agents}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: learning-agent}}
+  template:
+    metadata: {labels: {app: learning-agent, agent-platform: job-service}}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: {role: tools}
+      containers:
+        - name: learning-agent
+          image: stanleyyoga123/learning-agent:dev
+          imagePullPolicy: Always
+          ports: [{name: http, containerPort: 8083}]
+          envFrom: [{secretRef: {name: learning-agent-secrets}}]
+          volumeMounts: [{name: config, mountPath: /app/.env, subPath: .env, readOnly: true}]
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 30, periodSeconds: 20}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+      volumes: [{name: config, configMap: {name: learning-agent-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: learning-agent, namespace: agents}
+spec: {type: ClusterIP, selector: {app: learning-agent}, ports: [{name: http, port: 8083, targetPort: http}]}

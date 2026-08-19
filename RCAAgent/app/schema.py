@@ -5,10 +5,30 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class HistoricalLesson(BaseModel):
+    id: UUID
+    category: Literal[
+        "investigation", "diagnosis", "remediation", "verification", "guardrail"
+    ]
+    title: str
+    guidance: str
+    applies_when: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
+    resource: str | None = None
+    name: str | None = None
+    metric: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    confidence: float = Field(ge=0, le=1)
+
+
 class RCAJobRequest(BaseModel):
     workflow_id: UUID | None = None
     anomalies: list[dict[str, Any]] = Field(min_length=1, max_length=100)
     caller_context: str | None = Field(default=None, max_length=8000)
+    historical_lessons: list[HistoricalLesson] = Field(
+        default_factory=list, max_length=40
+    )
 
 
 class RemediationPlan(BaseModel):

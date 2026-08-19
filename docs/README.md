@@ -3,7 +3,7 @@
 The implemented platform detects Kubernetes anomalies, commits them to a
 durable coordinator, performs evidence-backed RCA, automatically submits
 required remediation with a snapshot hash, remediates through guarded tools,
-and evaluates the outcome.
+evaluates the outcome, and turns successful workflows into reusable lessons.
 
 Read in this order:
 

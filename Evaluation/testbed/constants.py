@@ -8,6 +8,7 @@ DEFAULT_HOST = "http://localhost:8888"
 AGENT_DEPLOYMENTS = (
     "anomaly-detector",
     "agent-orchestrator",
+    "learning-agent",
     "rca-agent",
     "remediator-agent",
     "mcp-tools-investigation",

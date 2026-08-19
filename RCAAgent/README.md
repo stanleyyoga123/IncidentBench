@@ -5,9 +5,9 @@ MCPTools service for evidence. Jobs are durable in AgentOrchestrator and
 serialized with remediation through the shared execution slot. See `/docs` for
 OpenAPI.
 
-RCA session memory stores prior triggering prompts and RCA output as untrusted
-historical context. Remediation execution and remediation prompts belong only
-to RemediatorAgent.
+Validated historical lessons are supplied by AgentOrchestrator as untrusted
+user-prompt context. Remediation execution and prompts belong only to
+RemediatorAgent.
 
 This component owns its ConfigMap, placeholder Secret,
 Deployment/ClusterIP Service, and `deploy.sh`. Copy

@@ -19,4 +19,3 @@ data:
     worker.lease_seconds=1200
     worker.max_attempts=3
     manager.max_rounds=10
-    manager.memory_path=/app/MEMORY.md

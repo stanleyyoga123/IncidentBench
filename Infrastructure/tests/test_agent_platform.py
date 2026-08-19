@@ -15,6 +15,8 @@ MANIFEST_PATHS = [
     WORKSPACE / "RCAAgent/kubernetes/manifest.yaml",
     WORKSPACE / "RemediatorAgent/kubernetes/configmap.yaml",
     WORKSPACE / "RemediatorAgent/kubernetes/manifest.yaml",
+    WORKSPACE / "LearningAgent/kubernetes/configmap.yaml",
+    WORKSPACE / "LearningAgent/kubernetes/manifest.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/configmap.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/network-policy.yaml",
     WORKSPACE / "AgentOrchestrator/kubernetes/manifest.yaml",
@@ -36,6 +38,7 @@ SECRET_CONTRACTS = {
             "AGENT_STORE_TOKEN",
             "RCA_SUBMIT_TOKEN",
             "REMEDIATOR_SUBMIT_TOKEN",
+            "LEARNING_SUBMIT_TOKEN",
         }
     },
     "RCAAgent": {
@@ -55,6 +58,17 @@ SECRET_CONTRACTS = {
             "AGENT_STORE_TOKEN",
             "REMEDIATOR_SUBMIT_TOKEN",
             "MCP_TOKEN",
+            "CLIENT_URL",
+            "CLIENT_TOKEN",
+            "LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_SECRET_KEY",
+            "LANGFUSE_BASE_URL",
+        }
+    },
+    "LearningAgent": {
+        "learning-agent-secrets": {
+            "AGENT_STORE_TOKEN",
+            "LEARNING_SUBMIT_TOKEN",
             "CLIENT_URL",
             "CLIENT_TOKEN",
             "LANGFUSE_PUBLIC_KEY",
@@ -106,6 +120,7 @@ def test_split_deployments_services_pvc_and_probe_ownership():
         "agent-orchestrator",
         "rca-agent",
         "remediator-agent",
+        "learning-agent",
         "mcp-tools-investigation",
         "mcp-tools-remediation",
         "anomaly-detector",
@@ -161,6 +176,7 @@ def test_remediation_pvc_configmap_and_secret_contracts():
         "agent-orchestrator": "agent-orchestrator-config",
         "rca-agent": "rca-agent-config",
         "remediator-agent": "remediator-agent-config",
+        "learning-agent": "learning-agent-config",
         "mcp-tools-investigation": "mcp-tools-investigation-config",
         "mcp-tools-remediation": "mcp-tools-remediation-config",
     }
@@ -205,6 +221,9 @@ def test_pairwise_tokens_are_declared_by_matching_consumers():
     assert "RCA_SUBMIT_TOKEN" in keys_by_component["RCAAgent"]
     assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
     assert "REMEDIATOR_SUBMIT_TOKEN" in keys_by_component["RemediatorAgent"]
+    assert "LEARNING_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "LEARNING_SUBMIT_TOKEN" in keys_by_component["LearningAgent"]
+    assert "AGENT_STORE_TOKEN" in keys_by_component["LearningAgent"]
     assert "DATABASE_DSN" in keys_by_component["AgentOrchestrator"]
     assert "DATABASE_DSN" not in keys_by_component["RCAAgent"]
     assert "DATABASE_DSN" not in keys_by_component["RemediatorAgent"]
@@ -243,6 +262,12 @@ def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
             "configmap.yaml",
             "manifest.yaml",
         },
+        "LearningAgent": {
+            "secret.example.yml",
+            "secret.yml",
+            "configmap.yaml",
+            "manifest.yaml",
+        },
         "MCPTools": {
             "secret.example.yml",
             "secret.yml",
@@ -267,6 +292,7 @@ def test_dev_images_use_docker_hub_and_always_pull():
     expected_images = {
         "anomaly-detector": "stanleyyoga123/anomaly-detector:dev",
         "agent-orchestrator": "stanleyyoga123/agent-orchestrator:dev",
+        "learning-agent": "stanleyyoga123/learning-agent:dev",
         "rca-agent": "stanleyyoga123/rca-agent:dev",
         "remediator-agent": "stanleyyoga123/remediator-agent:dev",
         "mcp-tools-investigation": "stanleyyoga123/mcp-tools:dev",

@@ -5,6 +5,7 @@ readonly NAMESPACE="agents"
 declare -ar DEPLOYMENTS=(
   "mcp-tools-investigation"
   "mcp-tools-remediation"
+  "learning-agent"
   "rca-agent"
   "remediator-agent"
   "agent-orchestrator"

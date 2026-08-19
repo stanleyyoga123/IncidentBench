@@ -24,6 +24,7 @@ def test_owned_secret_manifests_and_deploy_script_contract():
         "AGENT_STORE_TOKEN",
         "RCA_SUBMIT_TOKEN",
         "REMEDIATOR_SUBMIT_TOKEN",
+        "LEARNING_SUBMIT_TOKEN",
     }
     assert all("++++++++" in value for value in secret["stringData"].values())
 

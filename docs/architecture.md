@@ -15,17 +15,22 @@ flowchart LR
   M -->|store token + job APIs| O
   M --> MR[MCPTools remediation]
   MR --> K
+  O --> L[LearningAgent]
+  L -->|store token + job APIs| O
+  O -->|relevant lessons| R
 ```
 
 AgentOrchestrator owns workflow state, decisions, and all application DML.
 RCAAgent owns analysis and sub-agent orchestration. RemediatorAgent owns
-approved execution and verification. Both job services persist through
-Orchestrator HTTP APIs and do not hold PostgreSQL credentials. MCPTools owns
+approved execution and verification. All three job services persist through
+Orchestrator HTTP APIs and do not hold PostgreSQL credentials. LearningAgent
+turns successful workflow evidence into atomic lessons and also persists only
+through Orchestrator. MCPTools owns
 all cluster-facing capabilities and is deployed twice: a read profile with
 read-oriented RBAC, and a remediation profile with a separate token, bounded
 RBAC, one replica, and a PVC.
 
-The singleton `agent_execution_slot` serializes all RCA and remediation jobs,
+The singleton `agent_execution_slot` serializes RCA, remediation, and learning jobs,
 including direct API submissions. Automated `awaiting_approval` does not hold
 the lease; remediator claims it after RCA releases.
 Every HTTP Service is ClusterIP-only. NetworkPolicy, bearer authentication,

@@ -79,7 +79,8 @@ fingerprint before baseline collection.
 
 `postrun/run.sh` is a separate program from the testbed. After the experiment
 exits, it exports `anomaly_event`, `rca_job` plus RCA tool calls,
-`remediation_job`, remediator tool calls and artifacts, and `agent_workflow`
+`remediation_job`, remediator tool calls and artifacts, `learning_job` plus its
+ordered `incident_lesson` rows, and `agent_workflow`
 into `sessions/` under the run output directory.
 
 For each non-idle step,

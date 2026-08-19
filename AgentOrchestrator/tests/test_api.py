@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import hashlib
+import json
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -15,6 +17,10 @@ PUBLIC_OPERATION_IDS = {
     "approve_agent_workflow",
     "decline_agent_workflow",
     "retry_agent_workflow",
+    "list_incident_lessons",
+    "get_incident_lesson",
+    "enable_incident_lesson",
+    "disable_incident_lesson",
 }
 
 INTERNAL_OPERATION_IDS = {
@@ -30,6 +36,9 @@ INTERNAL_OPERATION_IDS = {
     "record_internal_remediation_tool_call",
     "upsert_internal_remediation_artifact",
     "list_internal_remediation_artifacts",
+    "create_internal_learning_job",
+    "get_internal_learning_job",
+    "finish_internal_learning_job",
 }
 
 
@@ -37,6 +46,7 @@ class FakeStore:
     def __init__(self):
         self.ids = {}
         self.rca_jobs = {}
+        self.learning_jobs = {}
         self.claimed = None
         self.tool_calls = []
 
@@ -61,6 +71,12 @@ class FakeStore:
     def list_workflows(self):
         return []
 
+    def list_lessons(self, *, active=None):
+        return []
+
+    def get_lesson(self, lesson_id):
+        return None
+
     def create_rca_job(self, request, idempotency_key):
         now = datetime.now(timezone.utc)
         job = {
@@ -79,6 +95,35 @@ class FakeStore:
 
     def get_rca_job(self, job_id):
         return self.rca_jobs.get(job_id)
+
+    def create_learning_job(self, request, idempotency_key):
+        now = datetime.now(timezone.utc)
+        job = {
+            "id": uuid4(), "workflow_id": request["workflow_id"],
+            "status": "queued", "version": 1, "request": request,
+            "attempts": 0, "created_at": now, "updated_at": now,
+        }
+        self.learning_jobs[job["id"]] = job
+        return job
+
+    def get_learning_job(self, job_id):
+        return self.learning_jobs.get(job_id)
+
+    def finish_learning_job(
+        self, job_id, outcome, *, result, raw_output, error, max_attempts
+    ):
+        job = self.learning_jobs.get(job_id)
+        if job is None:
+            return None
+        job.update(
+            status=outcome,
+            result=result,
+            raw_output=raw_output,
+            error=error,
+            version=job["version"] + 1,
+            updated_at=datetime.now(timezone.utc),
+        )
+        return job
 
     def claim_execution(self, service, owner, lease_seconds, max_attempts):
         self.claimed = (service, owner, lease_seconds, max_attempts)
@@ -104,6 +149,7 @@ def settings():
             },
             "rca": {"base_url": "http://rca", "token": "rca"},
             "remediator": {"base_url": "http://remediator", "token": "remediator"},
+            "learning": {"base_url": "http://learning", "token": "learning"},
         }
     )
 
@@ -132,7 +178,7 @@ def operation_ids(app):
 def test_token_separation_idempotency_and_operation_ids():
     app = create_app(
         settings(), start_loops=False, store=FakeStore(),
-        rca=FakeClient(), remediator=FakeClient(),
+        rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
     )
     with TestClient(app) as client:
         assert client.post("/api/v1/anomalies", json={"anomalies": [event()]}).status_code == 401
@@ -160,6 +206,12 @@ def test_token_separation_idempotency_and_operation_ids():
         assert client.get(
             "/api/v1/workflows", headers={"Authorization": "Bearer control"}
         ).status_code == 200
+        assert client.get(
+            "/api/v1/lessons", headers={"Authorization": "Bearer ingest"}
+        ).status_code == 401
+        assert client.get(
+            "/api/v1/lessons", headers={"Authorization": "Bearer control"}
+        ).json() == {"lessons": []}
         assert client.post(
             "/api/v1/internal/rca/jobs",
             headers={"Authorization": "Bearer ingest"},
@@ -173,14 +225,14 @@ def test_token_separation_idempotency_and_operation_ids():
 
     ids = operation_ids(app)
     assert ids == PUBLIC_OPERATION_IDS | INTERNAL_OPERATION_IDS
-    assert len(ids) == len(set(ids)) == 19
+    assert len(ids) == len(set(ids)) == 26
 
 
 def test_store_token_owns_internal_job_routes():
     store = FakeStore()
     app = create_app(
         settings(), start_loops=False, store=store,
-        rca=FakeClient(), remediator=FakeClient(),
+        rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
     )
     with TestClient(app) as client:
         created = client.post(
@@ -215,3 +267,42 @@ def test_store_token_owns_internal_job_routes():
         )
         assert tool.status_code == 204
         assert store.tool_calls[0][0] == "rca"
+
+        learning_workflow_id = uuid4()
+        source = {
+            "workflow_id": str(learning_workflow_id),
+            "completion_type": "no_action",
+            "anomalies": [{"event_id": "a" * 64}],
+            "rca": {"job_id": str(uuid4()), "result": {"summary": "recovered"}},
+            "remediation": None,
+            "tool_calls": [],
+        }
+        canonical = json.dumps(source, sort_keys=True, separators=(",", ":"))
+        learning = client.post(
+            "/api/v1/internal/learning/jobs",
+            headers={"Authorization": "Bearer store", "Idempotency-Key": "learn-1"},
+            json={
+                "workflow_id": str(learning_workflow_id),
+                "source": source,
+                "source_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+            },
+        )
+        assert learning.status_code == 201
+        assert learning.json()["status"] == "queued"
+        learning_id = learning.json()["id"]
+        malformed = client.post(
+            f"/api/v1/internal/learning/jobs/{learning_id}/finish",
+            headers={"Authorization": "Bearer store"},
+            json={"outcome": "succeeded", "result": {"lessons": []}},
+        )
+        assert malformed.status_code == 422
+        finished = client.post(
+            f"/api/v1/internal/learning/jobs/{learning_id}/finish",
+            headers={"Authorization": "Bearer store"},
+            json={
+                "outcome": "succeeded",
+                "result": {"summary": "No reusable lesson.", "lessons": []},
+            },
+        )
+        assert finished.status_code == 200
+        assert finished.json()["result"]["lessons"] == []

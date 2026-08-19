@@ -236,6 +236,19 @@ class AnalyzerTests(unittest.TestCase):
         self.assertEqual(args.token, "EMPTY")
         self.assertTrue(args.skip_judge)
 
+    def test_json_object_fallback_keeps_system_message_first(self):
+        from analyzer.judge.client import JSON_OBJECT_HINT, with_json_object_hint
+
+        messages = [
+            {"role": "system", "content": "Classify the session."},
+            {"role": "user", "content": "{}"},
+        ]
+        hinted = with_json_object_hint(messages)
+        self.assertEqual(hinted[0]["role"], "system")
+        self.assertIn(JSON_OBJECT_HINT, hinted[0]["content"])
+        self.assertEqual(hinted[1]["role"], "user")
+        self.assertEqual(messages[0]["content"], "Classify the session.")
+
     def test_successful_injection_match_is_not_diluted_by_false_alarms(self):
         true_positive = {
             "session_kind": "true_positive",

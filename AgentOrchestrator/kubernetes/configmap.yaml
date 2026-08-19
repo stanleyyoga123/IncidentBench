@@ -15,6 +15,8 @@ data:
     rca.token=${RCA_SUBMIT_TOKEN}
     remediator.base_url=http://remediator-agent.agents.svc.cluster.local:8082
     remediator.token=${REMEDIATOR_SUBMIT_TOKEN}
+    learning.base_url=http://learning-agent.agents.svc.cluster.local:8083
+    learning.token=${LEARNING_SUBMIT_TOKEN}
     scheduler.intake_interval_seconds=60
     scheduler.reconcile_interval_seconds=5
     scheduler.batch_size=100

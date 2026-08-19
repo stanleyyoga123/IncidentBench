@@ -6,7 +6,7 @@ readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   echo "Usage: $0"
   echo
-  echo "Builds, pushes, and deploys the five agent services using kubectl's"
+  echo "Builds, pushes, and deploys the six agent-platform components using kubectl's"
   echo "current context. Database migrations remain a separate DatabaseJob workflow."
 }
 
@@ -17,6 +17,7 @@ fi
 
 declare -ar COMPONENTS=(
   "MCPTools"
+  "LearningAgent"
   "RCAAgent"
   "RemediatorAgent"
   "AgentOrchestrator"
@@ -85,5 +86,5 @@ for component in "${COMPONENTS[@]}"; do
   }
 done
 
-echo "All five agent dev images were built, pushed, and deployed to context ${context}."
+echo "All six agent-platform dev images were built, pushed, and deployed to context ${context}."
 echo "DatabaseJob was not run; execute migrations separately and explicitly."

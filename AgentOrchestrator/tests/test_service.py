@@ -43,6 +43,9 @@ class MemoryStore:
                 "awaiting_approval",
                 "remediation_queued",
                 "remediation_running",
+                "learning_submitting",
+                "learning_queued",
+                "learning_running",
             }
         ]
 
@@ -53,7 +56,7 @@ class MemoryStore:
         current = self.workflows[workflow_id]
         if status == "succeeded":
             required = (result or {}).get("remediation_required") is True
-            next_status = "awaiting_approval" if required else "completed_no_action"
+            next_status = "awaiting_approval" if required else "learning_submitting"
         else:
             next_status = "failed" if status in {"failed", "needs_review"} else "rca_running"
         self.workflows[workflow_id] = current.model_copy(
@@ -86,6 +89,35 @@ class MemoryStore:
             update={"status": "remediation_queued", "remediation_job_id": job_id}
         )
 
+    def set_remediation_state(self, workflow_id, status, *, error=None):
+        current = self.workflows[workflow_id]
+        next_status = "learning_submitting" if status == "succeeded" else status
+        self.workflows[workflow_id] = current.model_copy(
+            update={"status": next_status, "version": current.version + 1, "error": error}
+        )
+
+    def anomaly_payloads(self, _workflow_id):
+        return [{"event_id": "a" * 64, "resource": "deployments", "name": "checkout", "metric": "latency"}]
+
+    def tool_calls_for_workflow(self, _workflow):
+        return []
+
+    def attach_learning_job(self, workflow_id, job_id):
+        current = self.workflows[workflow_id]
+        self.workflows[workflow_id] = current.model_copy(
+            update={
+                "status": "learning_queued", "learning_job_id": job_id,
+                "learning_status": "queued",
+            }
+        )
+
+    def set_learning_state(self, workflow_id, status, *, error=None):
+        current = self.workflows[workflow_id]
+        final = "completed_remediated" if current.remediation_job_id else "completed_no_action"
+        self.workflows[workflow_id] = current.model_copy(
+            update={"status": final, "learning_status": status, "learning_error": error}
+        )
+
     def mark_submission_failed(self, workflow_id, error):
         current = self.workflows[workflow_id]
         self.failed[workflow_id] = error
@@ -106,6 +138,7 @@ class FakeRemediator:
     def __init__(self, fail: Exception | None = None):
         self.fail = fail
         self.created = []
+        self.jobs = {}
 
     def create_remediation(self, workflow_id, rca_job, approval, attempt=1):
         if self.fail is not None:
@@ -119,11 +152,32 @@ class FakeRemediator:
                 "job": job,
             }
         )
+        self.jobs[job.id] = job
         return job
 
+    def get_remediation(self, job_id):
+        return self.jobs[job_id]
 
-def coordinator(store, rca, remediator):
-    return WorkflowCoordinator(store, rca, remediator, batch_size=100)
+
+class FakeLearning:
+    def __init__(self):
+        self.created = []
+        self.jobs = {}
+
+    def create_learning(self, workflow_id, source, attempt=1):
+        job = DownstreamJob(id=uuid4(), status="queued")
+        self.created.append({"workflow_id": workflow_id, "source": source, "job": job})
+        self.jobs[job.id] = job
+        return job
+
+    def get_learning(self, job_id):
+        return self.jobs[job_id]
+
+
+def coordinator(store, rca, remediator, learning=None):
+    return WorkflowCoordinator(
+        store, rca, remediator, learning or FakeLearning(), batch_size=100
+    )
 
 
 def test_rca_success_with_remediation_required_submits_remediator():
@@ -166,10 +220,77 @@ def test_rca_success_without_remediation_does_not_submit():
         }
     )
     remediator = FakeRemediator()
+    learning = FakeLearning()
 
-    assert coordinator(store, rca, remediator).reconcile_once() == 1
-    assert store.get_workflow(item.id).status == "completed_no_action"
+    assert coordinator(store, rca, remediator, learning).reconcile_once() == 1
+    assert store.get_workflow(item.id).status == "learning_queued"
     assert remediator.created == []
+    assert learning.created[0]["source"]["completion_type"] == "no_action"
+
+
+def test_failed_learning_finalizes_without_lessons():
+    learning_job_id = uuid4()
+    item = workflow(
+        status="learning_running",
+        learning_job_id=learning_job_id,
+        learning_status="running",
+    )
+    store = MemoryStore([item])
+    rca = FakeRca({item.rca_job_id: DownstreamJob(id=item.rca_job_id, status="succeeded")})
+    learning = FakeLearning()
+    learning.jobs[learning_job_id] = DownstreamJob(
+        id=learning_job_id,
+        status="failed",
+        error={"type": "InvalidOutput"},
+    )
+
+    assert coordinator(store, rca, FakeRemediator(), learning).reconcile_once() == 1
+    updated = store.get_workflow(item.id)
+    assert updated.status == "completed_no_action"
+    assert updated.learning_status == "failed"
+
+
+def test_successful_remediation_submits_learning_with_remediation_snapshot():
+    remediation_job_id = uuid4()
+    item = workflow(
+        status="remediation_running",
+        remediation_job_id=remediation_job_id,
+    )
+    store = MemoryStore([item])
+    rca = FakeRca(
+        {item.rca_job_id: DownstreamJob(id=item.rca_job_id, status="succeeded")}
+    )
+    remediator = FakeRemediator()
+    remediator.jobs[remediation_job_id] = DownstreamJob(
+        id=remediation_job_id,
+        status="succeeded",
+        result={"verification": "healthy"},
+    )
+    learning = FakeLearning()
+
+    assert coordinator(store, rca, remediator, learning).reconcile_once() == 1
+    assert store.get_workflow(item.id).status == "learning_queued"
+    source = learning.created[0]["source"]
+    assert source["completion_type"] == "remediated"
+    assert source["remediation"]["result"] == {"verification": "healthy"}
+
+
+def test_learning_tool_audits_are_count_and_size_bounded():
+    calls = [
+        {
+            "id": index,
+            "tool_name": "prometheus.query",
+            "arguments": {"query": "x" * 8_000},
+            "result": {"series": "y" * 8_000},
+        }
+        for index in range(120)
+    ]
+
+    bounded = WorkflowCoordinator._bounded_tool_calls(calls)
+
+    assert len(bounded) == 100
+    assert all(len(str(item)) < 4_000 for item in bounded)
+    assert all(item.get("truncated") is True for item in bounded)
 
 
 def test_existing_awaiting_approval_is_auto_submitted():

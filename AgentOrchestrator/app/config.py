@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     api: ApiSettings
     rca: ServiceClientSettings
     remediator: ServiceClientSettings
+    learning: ServiceClientSettings
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
 
     model_config = SettingsConfigDict(

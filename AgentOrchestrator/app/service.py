@@ -1,4 +1,5 @@
 import logging
+import json
 import threading
 from typing import Any
 from uuid import UUID
@@ -21,12 +22,14 @@ class WorkflowCoordinator:
         store: WorkflowStore,
         rca: AgentClient,
         remediator: AgentClient,
+        learning: AgentClient,
         *,
         batch_size: int,
     ):
         self.store = store
         self.rca = rca
         self.remediator = remediator
+        self.learning = learning
         self.batch_size = batch_size
 
     def intake_once(self) -> int:
@@ -37,7 +40,10 @@ class WorkflowCoordinator:
             return 0
         workflow, anomalies = claimed
         try:
-            job = self.rca.create_rca(workflow.id, anomalies)
+            lessons = self.store.retrieve_lessons(anomalies)
+            job = self.rca.create_rca(
+                workflow.id, anomalies, historical_lessons=lessons
+            )
             self.store.attach_rca_job(workflow.id, job.id)
             return len(anomalies)
         except Exception as exc:
@@ -71,6 +77,38 @@ class WorkflowCoordinator:
         except Exception as exc:
             self.store.mark_submission_failed(workflow.id, self._error(exc))
             raise
+
+    def submit_learning(self, workflow: Workflow) -> Workflow:
+        rca_job = self.rca.get_rca(workflow.rca_job_id)
+        remediation_job = (
+            self.remediator.get_remediation(workflow.remediation_job_id)
+            if workflow.remediation_job_id
+            else None
+        )
+        source = self._json_safe(
+            {
+                "workflow_id": str(workflow.id),
+                "completion_type": (
+                    "remediated" if remediation_job is not None else "no_action"
+                ),
+                "anomalies": self.store.anomaly_payloads(workflow.id),
+                "rca": {
+                    "job_id": str(rca_job.id),
+                    "result": rca_job.result,
+                },
+                "remediation": (
+                    {"job_id": str(remediation_job.id), "result": remediation_job.result}
+                    if remediation_job is not None
+                    else None
+                ),
+                "tool_calls": self._bounded_tool_calls(
+                    self.store.tool_calls_for_workflow(workflow)
+                ),
+            }
+        )
+        job = self.learning.create_learning(workflow.id, source)
+        self.store.attach_learning_job(workflow.id, job.id)
+        return self.store.get_workflow(workflow.id)
 
     def reconcile_once(self) -> int:
         updated = 0
@@ -108,6 +146,10 @@ class WorkflowCoordinator:
                                 AUTO_APPROVAL_REASON,
                                 current.version,
                             )
+                    elif job.status == "succeeded":
+                        current = self.store.get_workflow(workflow.id)
+                        if current is not None:
+                            self.submit_learning(current)
                 elif workflow.status.startswith("remediation_") and workflow.remediation_job_id:
                     job = self.remediator.get_remediation(workflow.remediation_job_id)
                     expected = "remediation_running" if job.status == "running" else "remediation_queued"
@@ -119,6 +161,24 @@ class WorkflowCoordinator:
                         error=job.error,
                     )
                     updated += 1
+                    if job.status == "succeeded":
+                        current = self.store.get_workflow(workflow.id)
+                        if current is not None:
+                            self.submit_learning(current)
+                elif workflow.status == "learning_submitting":
+                    self.submit_learning(workflow)
+                    updated += 1
+                elif workflow.status.startswith("learning_") and workflow.learning_job_id:
+                    job = self.learning.get_learning(workflow.learning_job_id)
+                    expected = (
+                        "learning_running" if job.status == "running" else "learning_queued"
+                    )
+                    if job.status in {"queued", "running"} and workflow.status == expected:
+                        continue
+                    self.store.set_learning_state(
+                        workflow.id, job.status, error=job.error
+                    )
+                    updated += 1
             except (httpx.HTTPError, ValueError, WorkflowConflictError):
                 LOGGER.exception("Failed to reconcile workflow %s", workflow.id)
         return updated
@@ -126,6 +186,35 @@ class WorkflowCoordinator:
     @staticmethod
     def _error(exc: Exception) -> dict[str, Any]:
         return {"type": type(exc).__name__, "message": str(exc)}
+
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        return json.loads(json.dumps(value, default=str))
+
+    @classmethod
+    def _bounded_tool_calls(cls, calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        bounded = []
+        for call in calls[:100]:
+            item = cls._json_safe(call)
+            encoded = json.dumps(item, sort_keys=True, separators=(",", ":"))
+            if len(encoded) > 4_000:
+                item = {
+                    "id": item.get("id"),
+                    "service": item.get("service"),
+                    "job_id": item.get("job_id"),
+                    "tool_name": item.get("tool_name"),
+                    "ok": item.get("ok"),
+                    "created_at": item.get("created_at"),
+                    "arguments_excerpt": json.dumps(
+                        item.get("arguments"), default=str
+                    )[:1_000],
+                    "result_excerpt": json.dumps(
+                        item.get("result"), default=str
+                    )[:2_000],
+                    "truncated": True,
+                }
+            bounded.append(item)
+        return bounded
 
 
 class CoordinatorLoops:
