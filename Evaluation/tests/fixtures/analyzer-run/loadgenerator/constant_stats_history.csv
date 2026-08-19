@@ -1,0 +1,4 @@
+Timestamp,Name,Requests/s,Failures/s,Total Request Count,Total Failure Count,Total Average Response Time
+1699999400,Aggregated,10.0,0.0,100,0,30.0
+1700000000,Aggregated,12.0,0.1,500,2,40.0
+1700000600,Aggregated,11.0,0.0,1000,5,32.0

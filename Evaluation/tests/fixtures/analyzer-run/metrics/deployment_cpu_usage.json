@@ -1,0 +1,15 @@
+{
+  "status": "success",
+  "data": {
+    "result": [
+      {
+        "metric": {"deployment": "checkoutservice"},
+        "values": [
+          [1699999400, "0.20"],
+          [1700000000, "0.80"],
+          [1700000600, "0.82"]
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "wf-1",
+    "status": "awaiting_approval",
+    "rca_job_id": "rca-1",
+    "remediation_job_id": null,
+    "decision": null,
+    "error": null
+  }
+]

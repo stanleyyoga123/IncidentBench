@@ -121,7 +121,10 @@ Schedule definitions, content hashes, per-Schedule command results,
 active-window timestamps, cleanup verification, metrics, and run status. Exact
 inputs are copied to `inputs/scenario.json`, `inputs/chaos/`, and
 `inputs/placement/`. Postrun adds `sessions/` JSON exports of anomaly, RCA,
-remediation, and workflow rows.
+remediation, and workflow rows. `analyzer/` reads those folders offline to
+plot metrics (elapsed minutes, chaos start at 0), extract operational errors,
+and score RCA/remediation sessions. Run-level scores credit the best injection
+match; `--reuse-judge` rescores from existing `judge.json` without calling vLLM.
 
 Reporting supports version 2 only and groups agent/non-agent comparisons by
 scenario, placement reference, observed placement fingerprint, step index, step

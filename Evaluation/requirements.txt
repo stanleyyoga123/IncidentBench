@@ -2,4 +2,6 @@ faker
 awscli
 locust
 pandas
+matplotlib
+openai
 PyYAML>=6.0

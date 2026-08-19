@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "status": "completed",
+  "agents_enabled": true,
+  "started_at": "2023-11-14T22:03:20+00:00",
+  "scenario": {
+    "name": "e2e-node-cpu-worker-1-twenty-minutes",
+    "placement": "canonical-six-node",
+    "steps": [
+      {
+        "name": "01-worker-node-1-cpu-chaos",
+        "chaos": ["node-cpu-worker-1"],
+        "duration": 1200
+      }
+    ]
+  },
+  "placement": {
+    "reference": "canonical-six-node"
+  },
+  "loadgenerator": {
+    "scenario": "constant",
+    "returncode": 1
+  },
+  "chaos_definitions": [
+    {
+      "reference": "node-cpu-worker-1",
+      "child_type": "PhysicalMachineChaos",
+      "action": "stress-cpu"
+    }
+  ],
+  "chaos_steps": [
+    {
+      "index": 1,
+      "name": "01-worker-node-1-cpu-chaos",
+      "chaos": ["node-cpu-worker-1"],
+      "active_started_at": "2023-11-14T22:13:20+00:00",
+      "cleanup_started_at": "2023-11-14T22:33:20+00:00",
+      "status": "completed"
+    }
+  ],
+  "phases": [
+    {"name": "baseline", "status": "completed", "returncode": 0},
+    {"name": "chaos", "status": "completed", "returncode": 0}
+  ],
+  "snapshots": [
+    {
+      "label": "final",
+      "commands": [
+        {"name": "pods-wide", "returncode": 0},
+        {"name": "top-pods", "returncode": 1, "stderr": "metrics API unavailable"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "status": "success",
+  "data": {
+    "result": [
+      {
+        "metric": {"destination_workload": "checkoutservice"},
+        "values": [
+          [1699999400, "40"],
+          [1700000000, "38"],
+          [1700000600, "37"]
+        ]
+      }
+    ]
+  }
+}

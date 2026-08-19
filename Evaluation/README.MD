@@ -118,3 +118,20 @@ every scenario and aborts the remaining batch if the final verification fails.
 
 See [docs/architecture.md](docs/architecture.md) for collection validation,
 execution, cleanup, metadata, and reporting behavior.
+
+Analyze local run artifacts (default `results/`):
+
+```bash
+PYTHONPATH=. python -m analyzer --input results --output analysis
+PYTHONPATH=. python -m analyzer --input results --output analysis --reuse-judge
+```
+
+Plots use elapsed minutes with chaos start at `0`. The judge talks to a vLLM
+OpenAI-compatible server (`JUDGE_URL`, default `http://localhost:8000/v1`;
+`JUDGE_MODEL`, default `Qwen/Qwen3.6-35B-A3B`). Chaos Mesh injections are ground
+truth: RCA that identifies the injected fault is marked correct, and
+`not_applicable` sessions are scored as false alarms. Run-level scores credit
+the best true-positive match instead of averaging every false alarm. Pass
+`--reuse-judge` to rescore from existing `judge.json` without calling vLLM, or
+`--skip-judge` for plots and operational errors only. Output is written to
+gitignored `analysis/`.

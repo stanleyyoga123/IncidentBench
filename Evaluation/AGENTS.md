@@ -36,6 +36,8 @@ Important modules:
   Schedule resources.
 - `testbed/evaluator/` collects Kubernetes snapshots and Prometheus metrics.
 - `testbed/reporting/` aggregates metadata schema version 2 runs.
+- `analyzer/` plots metrics (t=0 at first chaos), extracts operational errors,
+  and scores RCA/remediation with an OpenAI judge plus Python rubrics.
 - The evaluation-runner ServiceAccount, ClusterRoleBinding, and Pod in
   `kubernetes/pod.yaml`, placeholder `kubernetes/secret.yml`, and
   default-current-context `deploy.sh` stay here. Replace required `++++++++`
@@ -112,3 +114,22 @@ snapshots only. Chaos targets and namespaces are defined entirely by the YAML.
 Every Schedule must be absent before the runner advances to the next step.
 `--skip-reset` is not supported because placement must be applied and verified
 for every run.
+
+Analyze copied run folders (gitignored `results/`) after an experiment:
+
+```bash
+PYTHONPATH=. python -m analyzer --input results --output analysis
+PYTHONPATH=. python -m analyzer --input results --output analysis --skip-judge
+PYTHONPATH=. python -m analyzer --input results --output analysis --reuse-judge
+```
+
+`JUDGE_URL` defaults to the local vLLM OpenAI-compatible server
+(`http://localhost:8000/v1`) and `JUDGE_MODEL` defaults to
+`Qwen/Qwen3.6-35B-A3B`. Override with `--base-url`, `--model`, and `--token`.
+The judge uses Chaos Mesh `chaos_definitions` as ground truth. An RCA session
+that names the injected locus and fault is a true positive (`matched_injection=yes`
+forces localization correct). Sessions that chase unrelated detector leads are
+scored as false alarms instead of `not_applicable`. Run-level RCA and
+remediation scores credit the best injection match rather than averaging every
+false alarm. `--reuse-judge` rescores from `analysis/runs/*/judge.json` without
+calling vLLM. Pass `--skip-judge` for plots and operational errors only.
