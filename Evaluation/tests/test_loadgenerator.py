@@ -97,6 +97,40 @@ class LoadGeneratorSeedTests(unittest.TestCase):
         self.assertEqual(burst_users, 304)
         self.assertEqual(sinus_users, 85)
 
+    def test_daily_shape_uses_percentage_stages(self):
+        daily = self.import_shape_module(
+            "testbed.loadgenerator.daily",
+            {"DAILY_BASE_USERS": "600", "RUN_TIME_SECONDS": "0"},
+        )
+        shape = daily.DailyTrafficShape()
+        samples = {
+            0: (120, 2),
+            7 * 3600: (240, 3),
+            10.1 * 3600: (840, 15),
+            12 * 3600: (450, 10),
+            13.1 * 3600: (1080, 20),
+            23 * 3600: (150, 3),
+        }
+        for elapsed, expected in samples.items():
+            with self.subTest(elapsed=elapsed), patch.object(
+                shape, "get_run_time", return_value=elapsed
+            ):
+                self.assertEqual(shape.tick(), expected)
+
+    def test_daily_base_user_env_scales_percentages(self):
+        daily = self.import_shape_module(
+            "testbed.loadgenerator.daily",
+            {"DAILY_BASE_USER": "200", "RUN_TIME_SECONDS": "0"},
+        )
+        shape = daily.DailyTrafficShape()
+        with patch.object(shape, "get_run_time", return_value=60):
+            users, spawn_rate = shape.tick()
+        self.assertEqual(users, 40)
+        self.assertEqual(spawn_rate, 2)
+        with patch.object(shape, "get_run_time", return_value=24 * 3600 + 60):
+            wrapped_users, _ = shape.tick()
+        self.assertEqual(wrapped_users, 40)
+
 
 class ConnectionRecyclingTests(unittest.TestCase):
     def import_common(self, recycle_every):

@@ -20,8 +20,10 @@ the prerequisite namespaces and platform tools.
 ### Workload
 
 Locust load profiles are selected with `--loadgenerator`: currently constant,
-burst, or sinus. The target defaults to a locally forwarded frontend but batch
-runs normally use the in-cluster frontend service.
+burst, sinus, or daily. The `daily` profile follows coded 24-hour stages in
+`testbed/loadgenerator/daily.py`; each stage's `percentage_users` is applied to
+`DAILY_BASE_USERS`. The target defaults to a locally forwarded frontend but
+batch runs normally use the in-cluster frontend service.
 
 ### Placement
 
@@ -42,9 +44,12 @@ stem. Multiple references in one step begin together. The catalog contains the
 node CPU, delay, loss, and pod CPU Schedules used by
 `collections/real-scenario`.
 
-The only scenario collection is `collections/real-scenario`: 19 one-hour
-faults with a 10-minute recovery step, ordered as node incidents then CPU-only
-pod incidents. `collections/chaos` is the Schedule catalog used by that suite.
+The primary scenario collection is `collections/real-scenario`: 16 one-hour
+faults with a 10-minute recovery step, ordered as node delay/loss incidents
+then CPU-only pod incidents. `collections/long-scenario` is one day aligned to
+the `daily` load curve with a one-hour baseline: idle until 02:00, worker-3
+isolation delay, worker-3 loss, productcatalog CPU on all replicas, then
+worker-5 isolation delay. `collections/chaos` is the shared Schedule catalog.
 
 ## Safety model
 

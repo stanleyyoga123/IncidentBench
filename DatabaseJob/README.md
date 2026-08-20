@@ -4,6 +4,9 @@ This directory is the sole owner of PostgreSQL DDL for the split agent
 platform. It contains Alembic migrations and a migration image; it is not a
 long-running coordination service.
 
+Detailed schema relationships and migration/runtime flows start at
+[`docs/README.md`](docs/README.md).
+
 Head revision `20260819_0003` retains the split-agent schema and adds:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`;

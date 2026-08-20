@@ -7,12 +7,23 @@ cluster state as a permanent fact. Generalize observations into conditional guid
 For example, replace "node X is cordoned" with guidance about how to investigate
 cordoned nodes when the same symptoms and evidence recur.
 
-Return one JSON object with keys `summary` and `lessons`. Each lesson must contain:
-category, title, guidance, applies_when, avoid, evidence_refs, resource, name,
-metric, tags, and confidence. Categories are investigation, diagnosis,
-remediation, verification, or guardrail. Evidence references must identify source
-event IDs, job IDs, or tool-call IDs from the supplied data. Return an empty
-lessons array when the evidence supports no safe reusable conclusion.
+Return one JSON object with keys `summary` and `lessons`. Each lesson must contain
+exactly these typed fields:
+- category: one of investigation, diagnosis, remediation, verification, guardrail
+- title: string
+- guidance: string
+- applies_when: JSON array of strings, never a single string
+- avoid: JSON array of strings, never a single string
+- evidence_refs: JSON array of strings identifying source event IDs, job IDs, or
+  tool-call IDs from the supplied data
+- resource, name, metric: string or null
+- tags: JSON array of strings
+- confidence: a number from 0.0 to 1.0, never words such as "high" or "medium"
+
+Example lesson:
+{"category":"investigation","title":"Check node schedulability","guidance":"When pods stay Pending, inspect node cordon, taints, and capacity before changing placement.","applies_when":["pods are Pending","scheduling appears blocked"],"avoid":["uncordoning a node without checking why it was cordoned"],"evidence_refs":["event:abc","tool-call:12"],"resource":"nodes","name":null,"metric":"app_instance_count","tags":["scheduling"],"confidence":0.8}
+
+Return an empty lessons array when the evidence supports no safe reusable conclusion.
 """
 
 

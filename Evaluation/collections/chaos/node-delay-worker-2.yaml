@@ -1,7 +1,7 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
 metadata:
-  name: node-delay-worker-4
+  name: node-delay-worker-2
   namespace: chaos-mesh
 spec:
   schedule: '@every 30s'
@@ -14,7 +14,7 @@ spec:
     selector:
       physicalMachines:
         chaos-mesh:
-        - worker-node-4
+        - worker-node-2
     network-delay:
       device: eth0
       latency: 250ms

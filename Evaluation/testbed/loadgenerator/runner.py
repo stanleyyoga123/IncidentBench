@@ -10,6 +10,7 @@ SCENARIO_MODULES = {
     "constant": "testbed/loadgenerator/constant.py",
     "burst": "testbed/loadgenerator/burst.py",
     "sinus": "testbed/loadgenerator/sinus.py",
+    "daily": "testbed/loadgenerator/daily.py",
 }
 
 

@@ -12,8 +12,9 @@ the platform and namespaces first, but does not install this runner.
 
 ```text
 collections/
-├── chaos/          # Complete Schedule YAML resources used by real-scenario
-└── real-scenario/  # Relocatable, user-impacting production analogues
+├── chaos/          # Complete Schedule YAML resources used by scenario suites
+├── real-scenario/  # Relocatable, user-impacting production analogues
+└── long-scenario/  # One 24-hour multi-fault day
 ```
 
 Every scenario must select a placement profile from
@@ -33,7 +34,7 @@ Run one scenario:
 
 ```bash
 ./run.sh --loadgenerator burst \
-  --scenario ./collections/real-scenario/01-node-cpu-worker-1.json \
+  --scenario ./collections/real-scenario/01-node-delay-worker-3.json \
   --baseline-minutes 5 \
   --prometheus-url http://localhost:9090
 ```
@@ -52,6 +53,20 @@ Run the curated real-world suite once with agents and constant load:
 
 The real-world suite is ordered with node-level incidents first, followed by
 CPU-only pod incidents.
+
+Run the 24-hour compounding-incident day with the daily traffic curve:
+
+```bash
+./run.sh --loadgenerator daily --scenario ./collections/long-scenario/01-multi-fault-one-day.json --baseline-minutes 60
+```
+
+Times in that scenario are on the daily load clock (locust start = 00:00). A
+60-minute baseline therefore idles until 01:00; the first chaos window is
+02:00–04:00.
+
+Edit the stage table in `testbed/loadgenerator/daily.py`. Each stage's
+`percentage_users` is a percent of `DAILY_BASE_USERS` (or `DAILY_BASE_USER`);
+20 with a base of 600 is 120 users.
 
 To upload every completed run directory to Amazon S3, install and authenticate
 the AWS CLI, then set `S3_RESULTS_URI` in `.env` (or export it in the shell):

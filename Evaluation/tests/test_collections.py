@@ -75,7 +75,7 @@ class CollectionValidationTests(unittest.TestCase):
             for path in sorted((root / "collections" / "real-scenario").glob("*.json"))
         ]
         self.assertEqual(len(catalog.schedules), 22)
-        self.assertEqual(len(scenarios), 19)
+        self.assertEqual(len(scenarios), 16)
         self.assertEqual(placements.references, ("canonical-six-node",))
         placement = PlacementRenderer(CommandRunner(), root).render(
             "canonical-six-node",
@@ -88,7 +88,34 @@ class CollectionValidationTests(unittest.TestCase):
             for step in scenario.steps
             for reference in step.chaos
         }
-        self.assertEqual(referenced, {schedule.reference for schedule in catalog.schedules})
+        catalog_refs = {schedule.reference for schedule in catalog.schedules}
+        self.assertTrue(referenced <= catalog_refs)
+        self.assertEqual(
+            referenced,
+            {
+                "node-delay-worker-2",
+                "node-delay-peers-to-worker-2",
+                "node-delay-worker-3",
+                "node-delay-peers-to-worker-3",
+                "node-delay-worker-5",
+                "node-delay-peers-to-worker-5",
+                "node-loss-worker-1",
+                "node-loss-worker-2",
+                "node-loss-worker-3",
+                "single-cartservice-cpu",
+                "single-cartservice-cpu-worker-1",
+                "single-checkoutservice-cpu",
+                "single-checkoutservice-cpu-worker-2",
+                "single-recommendationservice-cpu",
+                "single-recommendationservice-cpu-worker-1",
+                "single-productcatalogservice-cpu",
+                "single-productcatalogservice-cpu-worker-3",
+                "single-paymentservice-cpu",
+                "single-paymentservice-cpu-worker-5",
+            },
+        )
+        self.assertNotIn("node-delay-worker-4", catalog_refs)
+        self.assertNotIn("node-delay-peers-to-worker-4", catalog_refs)
         for schedule in catalog.schedules:
             child = schedule.manifest["spec"][schedule.child_key]
             selector = child["selector"]
@@ -129,6 +156,40 @@ class CollectionValidationTests(unittest.TestCase):
             self.assertTrue(recovery_step.idle)
             self.assertEqual(recovery_step.duration, 600)
             self.assertTrue(recovery_step.name.endswith("recovery") or recovery_step.name == "02-recovery")
+
+    def test_long_scenario_collection_is_a_one_day_multi_fault(self):
+        root = Path(__file__).resolve().parents[1]
+        catalog = ChaosCatalog(root / "collections" / "chaos")
+        placements = PlacementCatalog(
+            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+        )
+        paths = sorted((root / "collections" / "long-scenario").glob("*.json"))
+        self.assertEqual([path.name for path in paths], ["01-multi-fault-one-day.json"])
+        scenario = ScenarioLoader(root, catalog, placements).load(paths[0])
+        self.assertEqual(scenario.name, "long-multi-fault-one-day")
+        self.assertEqual(scenario.placement, "canonical-six-node")
+        self.assertEqual(sum(step.duration for step in scenario.steps), 82800)
+        chaos_steps = [step for step in scenario.steps if not step.idle]
+        recovery_steps = [step for step in scenario.steps if step.idle]
+        self.assertEqual(len(chaos_steps), 4)
+        self.assertEqual(len(recovery_steps), 5)
+        self.assertTrue(scenario.steps[0].idle)
+        self.assertEqual(scenario.steps[0].duration, 3600)
+        self.assertTrue(scenario.steps[-1].idle)
+        self.assertEqual(
+            [(step.duration, step.chaos) for step in scenario.steps],
+            [
+                (3600, ()),
+                (7200, ("node-delay-worker-3", "node-delay-peers-to-worker-3")),
+                (10800, ()),
+                (1800, ("node-loss-worker-3",)),
+                (23400, ()),
+                (3600, ("single-productcatalogservice-cpu",)),
+                (18000, ()),
+                (7200, ("node-delay-worker-5", "node-delay-peers-to-worker-5")),
+                (7200, ()),
+            ],
+        )
 
     def test_scenario_supports_multiple_schedules_and_idle(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,20 +4,20 @@ Agent against Online Boutique microservices.
 The runner is collection-driven:
 
 - `collections/chaos/` contains complete Chaos Mesh `Schedule` YAML files used
-  by the real-scenario suite.
+  by the real-scenario and long-scenario suites.
 - `../Infrastructure/kubernetes/online-boutique/kustomize/overlays/` contains
   pre-authored Kustomize placement profiles.
 - `collections/real-scenario/` contains JSON scenarios referencing YAML
   filename stems and one required placement profile.
+- `collections/long-scenario/` contains one 24-hour multi-fault scenario.
 - `chaos: []` represents an idle recovery step.
 - Multiple references in one step are applied together.
 
 Example commands:
 
 ```bash
-./run.sh --loadgenerator constant --scenario ./collections/real-scenario/01-node-cpu-worker-1.json --baseline-minutes 5 --prometheus-url http://localhost:9090
-./run.sh --loadgenerator burst --scenario ./collections/real-scenario/10-pod-cartservice-cpu-all.json --duration 300
-./run_tc.sh ./collections/real-scenario
+./run.sh --loadgenerator constant --scenario ./collections/real-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
+./run.sh --loadgenerator daily --scenario ./collections/long-scenario/01-multi-fault-one-day.json
 ```
 
 Important modules:
@@ -49,12 +49,12 @@ Scenario format:
 
 ```json
 {
-  "name": "real-node-cpu-worker-1-one-hour",
+  "name": "real-node-delay-worker-3-one-hour",
   "placement": "canonical-six-node",
   "steps": [
     {
-      "name": "01-worker-node-1-cpu-chaos",
-      "chaos": ["node-cpu-worker-1"],
+      "name": "01-worker-node-3-remote-location-chaos",
+      "chaos": ["node-delay-worker-3", "node-delay-peers-to-worker-3"],
       "duration": 3600
     },
     {"name": "02-recovery", "chaos": [], "duration": 600}

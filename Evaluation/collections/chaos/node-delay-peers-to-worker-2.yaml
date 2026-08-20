@@ -1,7 +1,7 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
 metadata:
-  name: node-delay-peers-to-worker-4
+  name: node-delay-peers-to-worker-2
   namespace: chaos-mesh
 spec:
   schedule: '@every 30s'
@@ -15,13 +15,13 @@ spec:
       physicalMachines:
         chaos-mesh:
         - worker-node-1
-        - worker-node-2
         - worker-node-3
+        - worker-node-4
         - worker-node-5
         - worker-node-6
     network-delay:
       device: eth0
-      ip-address: 172.26.134.161
+      ip-address: 172.26.135.166
       ip-protocol: all
       latency: 250ms
       jitter: 50ms

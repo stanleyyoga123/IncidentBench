@@ -1,12 +1,12 @@
 {
-  "name": "real-node-delay-worker-4-one-hour",
+  "name": "real-node-delay-worker-2-one-hour",
   "placement": "canonical-six-node",
   "steps": [
     {
-      "name": "01-worker-node-4-remote-location-chaos",
+      "name": "01-worker-node-2-remote-location-chaos",
       "chaos": [
-        "node-delay-worker-4",
-        "node-delay-peers-to-worker-4"
+        "node-delay-worker-2",
+        "node-delay-peers-to-worker-2"
       ],
       "duration": 3600
     },

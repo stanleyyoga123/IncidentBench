@@ -6,6 +6,9 @@ Streamable HTTP at `/mcp`. The same image runs as `investigation` and
 service accounts. The remediation profile stores session files on its mounted
 PVC and never writes workflow data directly to PostgreSQL.
 
+Detailed transport, profile, tool, RBAC, network-probe, and remediation-session
+documentation starts at [`docs/README.md`](docs/README.md).
+
 `kubernetes/` owns both profile Deployments and Services, their RBAC, the
 remediation PVC, overlay/underlay probe DaemonSets, and the two placeholder
 Secrets. Copy `kubernetes/secret.example.yml` to ignored

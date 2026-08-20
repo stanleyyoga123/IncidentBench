@@ -1,8 +1,8 @@
 # Collection-Driven Evaluation Architecture
 
-The runner consumes scenario JSON from `collections/real-scenario`, complete
-Chaos Mesh `Schedule` resources from `collections/chaos`, and pre-authored
-Kustomize placement profiles from
+The runner consumes scenario JSON from `collections/real-scenario` or
+`collections/long-scenario`, complete Chaos Mesh `Schedule` resources from
+`collections/chaos`, and pre-authored Kustomize placement profiles from
 `../../Infrastructure/kubernetes/online-boutique/kustomize/overlays`. It never
 renders a chaos resource or monitors recurrence children in Python.
 
@@ -13,12 +13,12 @@ exact profile-directory name:
 
 ```json
 {
-  "name": "real-node-cpu-worker-1-one-hour",
+  "name": "real-node-delay-worker-3-one-hour",
   "placement": "canonical-six-node",
   "steps": [
     {
-      "name": "01-worker-node-1-cpu-chaos",
-      "chaos": ["node-cpu-worker-1"],
+      "name": "01-worker-node-3-remote-location-chaos",
+      "chaos": ["node-delay-worker-3", "node-delay-peers-to-worker-3"],
       "duration": 3600
     },
     {"name": "02-recovery", "chaos": [], "duration": 600}
@@ -140,9 +140,14 @@ scenario-selected placement.
 
 ```bash
 ./run.sh --loadgenerator burst \
-  --scenario ./collections/real-scenario/01-node-cpu-worker-1.json \
+  --scenario ./collections/real-scenario/01-node-delay-worker-3.json \
   --baseline-minutes 5 \
   --prometheus-url http://localhost:9090
 
 ./run_tc.sh ./collections/real-scenario
+
+./run_single.sh ./collections/long-scenario
+
+./run.sh --loadgenerator daily \
+  --scenario ./collections/long-scenario/01-multi-fault-one-day.json
 ```
