@@ -2,7 +2,8 @@ import argparse
 import os
 from pathlib import Path
 
-from .judge.client import VLLMJudge
+from .ground_truth import DEFAULT_GROUND_TRUTH_DIR
+from .judge.client import DEFAULT_TIMEOUT_SECONDS, VLLMJudge
 from .log import configure_logging, progress
 from .pipeline import analyze
 
@@ -30,7 +31,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.environ.get("JUDGE_TOKEN", "EMPTY"),
         help="Bearer token for the vLLM endpoint; defaults to EMPTY",
     )
+    parser.add_argument(
+        "--judge-timeout-seconds",
+        type=float,
+        default=float(
+            os.environ.get("JUDGE_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
+        ),
+        help="timeout for each judge request (default: 600 seconds)",
+    )
     parser.add_argument("--skip-judge", action="store_true")
+    parser.add_argument(
+        "--ground-truth",
+        type=Path,
+        default=DEFAULT_GROUND_TRUTH_DIR,
+        help="directory containing one Markdown answer key per scenario",
+    )
     parser.add_argument(
         "--reuse-judge",
         action="store_true",
@@ -49,7 +64,12 @@ def main(argv: list[str] | None = None) -> int:
         progress("judge: reusing existing judge.json labels")
     elif not args.skip_judge:
         progress(f"judge: vLLM {args.model} at {args.base_url}")
-        judge = VLLMJudge(args.model, args.base_url, args.token)
+        judge = VLLMJudge(
+            args.model,
+            args.base_url,
+            args.token,
+            timeout_seconds=args.judge_timeout_seconds,
+        )
     else:
         progress("judge: skipped")
     records = analyze(
@@ -58,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         judge=judge,
         skip_judge=args.skip_judge,
         reuse_judge=args.reuse_judge,
+        ground_truth_file=args.ground_truth,
     )
     progress(f"done: analyzed {len(records)} run(s) into {args.output}")
     return 0

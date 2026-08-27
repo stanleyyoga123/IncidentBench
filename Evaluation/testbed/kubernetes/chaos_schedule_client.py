@@ -60,10 +60,10 @@ class ChaosScheduleClient:
                 "-f",
                 str(self._path(schedule)),
                 "--ignore-not-found",
-                "--cascade=foreground",
+                "--cascade=background",
                 "--wait=true",
             ],
-            timeout=120,
+            timeout=240,
         )
 
     def get(self, schedule: ChaosSchedule) -> CommandResult:
@@ -82,6 +82,22 @@ class ChaosScheduleClient:
             timeout=30,
         )
 
+    def get_children(self, schedule: ChaosSchedule) -> CommandResult:
+        return self._run(
+            [
+                "kubectl",
+                "get",
+                schedule.child_type,
+                "-n",
+                schedule.namespace,
+                f"--selector=managed-by={schedule.name}",
+                "-o",
+                "name",
+                "--ignore-not-found",
+            ],
+            timeout=30,
+        )
+
     def delete_all_experiments(self) -> dict[str, CommandResult]:
         return {
             resource: self._run(
@@ -93,9 +109,9 @@ class ChaosScheduleClient:
                     "--all-namespaces",
                     "--ignore-not-found",
                     "--wait=true",
-                    "--timeout=120s",
+                    "--timeout=240s",
                 ],
-                timeout=150,
+                timeout=300,
             )
             for resource in self.EXPERIMENT_RESOURCES
         }

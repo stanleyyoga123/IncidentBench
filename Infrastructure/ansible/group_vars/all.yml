@@ -6,6 +6,17 @@ k3s_version: "v1.34.6+k3s1"
 k3s_server_url: "https://{{ hostvars[groups['control_plane'][0]].ansible_host }}:6443"
 k3s_kubeconfig_local: "{{ ansible_config_file | dirname }}/../generated/kubeconfig.yaml"
 
+# Keep eviction storms from leaving thousands of terminal Pod objects in the
+# API. Kubernetes defaults this to 12,500, which is too high for this cluster.
+terminated_pod_gc_threshold: 500
+
+# Platform storage uses local-path volumes on the tools node. The requested
+# PVC size is not a filesystem quota, so preserve enough real root-disk
+# headroom for containerd, Loki WAL recovery, and rolling restarts.
+# A nominal 30 GB cloud disk formats to roughly 29 GiB.
+tools_node_min_root_disk_gb: 28
+tools_node_min_root_free_gb: 8
+
 # Tested chart versions currently running in the research cluster. Upgrade
 # these deliberately after validating the complete observability pipeline.
 chaos_mesh_chart_version: "2.8.3"

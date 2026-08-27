@@ -14,7 +14,7 @@ class ScheduleCleaner:
         logger: CommandLogger,
         physical_machine_cleaner: PhysicalMachineStateCleaner | None = None,
         *,
-        timeout_seconds: int = 120,
+        timeout_seconds: int = 240,
         poll_seconds: int = 5,
         monotonic=time.monotonic,
         sleep=time.sleep,
@@ -56,7 +56,14 @@ class ScheduleCleaner:
                 )
         deadline = self.monotonic() + self.timeout_seconds
         attempts = []
+        child_attempts = []
         absent = False
+        schedule_absent = False
+        children_absent = False
+        periodic_finalizer_recovery = []
+        next_recovery = self.monotonic() + max(
+            30.0, schedule.child_duration_seconds + 5.0
+        )
         while True:
             verification = self.client.get(schedule)
             attempt = self.logger.write(
@@ -65,10 +72,44 @@ class ScheduleCleaner:
                 f"{prefix}-verify-{len(attempts) + 1:03d}",
             )
             attempts.append(attempt)
-            if verification.returncode == 0 and not verification.stdout.strip():
+            child_verification = self.client.get_children(schedule)
+            child_attempt = self.logger.write(
+                child_verification,
+                output_dir,
+                f"{prefix}-children-verify-{len(child_attempts) + 1:03d}",
+            )
+            child_attempts.append(child_attempt)
+            schedule_absent = (
+                verification.returncode == 0 and not verification.stdout.strip()
+            )
+            children_absent = (
+                child_verification.returncode == 0
+                and not child_verification.stdout.strip()
+            )
+            if schedule_absent and children_absent:
                 absent = True
                 break
-            remaining = deadline - self.monotonic()
+            now = self.monotonic()
+            if now >= next_recovery:
+                recovery_results = (
+                    self.client.recover_destroyed_experiment_finalizers()
+                )
+                recovery_index = len(periodic_finalizer_recovery) + 1
+                periodic_finalizer_recovery.append(
+                    {
+                        identity: self.logger.write(
+                            result,
+                            output_dir,
+                            (
+                                f"{prefix}-periodic-finalizer-{recovery_index:03d}-"
+                                f"{identity.replace('/', '-').replace('.', '-')}"
+                            ),
+                        )
+                        for identity, result in recovery_results.items()
+                    }
+                )
+                next_recovery = now + 30.0
+            remaining = deadline - now
             if remaining <= 0:
                 break
             self.sleep(min(self.poll_seconds, remaining))
@@ -89,7 +130,11 @@ class ScheduleCleaner:
             "delete": delete_metadata,
             "delete_retry": delete_retry_metadata,
             "finalizer_recovery": finalizer_recovery,
+            "periodic_finalizer_recovery": periodic_finalizer_recovery,
             "verification": attempts,
+            "child_verification": child_attempts,
+            "schedule_absent": schedule_absent,
+            "children_absent": children_absent,
             "absent": absent,
             "physical_machine": physical_machine,
         }

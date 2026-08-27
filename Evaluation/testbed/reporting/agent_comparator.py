@@ -28,7 +28,7 @@ class AgentComparator:
         keys = [
             "scenario",
             "placement",
-            "placement_fingerprint",
+            "placement_definition_fingerprint",
             "step_index",
             "step_name",
             "chaos",
@@ -36,8 +36,8 @@ class AgentComparator:
         working = summary.copy()
         if "placement" not in working:
             working["placement"] = "unmanaged"
-        if "placement_fingerprint" not in working:
-            working["placement_fingerprint"] = "unknown"
+        if "placement_definition_fingerprint" not in working:
+            working["placement_definition_fingerprint"] = "unknown"
         presence = working.assign(_present=1).pivot_table(
             index=keys,
             columns="mode",

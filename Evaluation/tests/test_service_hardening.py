@@ -79,10 +79,10 @@ class ServiceHardeningTests(unittest.TestCase):
                     self.assertGreaterEqual(cpu_request, 250)
                     self.assertGreaterEqual(cpu_limit, 500)
 
-    def test_recommendationservice_uses_observed_stable_floor(self):
+    def test_recommendationservice_uses_canonical_two_replica_floor(self):
         deployment = self.deployments["recommendationservice"]
         container = deployment["spec"]["template"]["spec"]["containers"][0]
-        self.assertEqual(deployment["spec"]["replicas"], 3)
+        self.assertEqual(deployment["spec"]["replicas"], 2)
         self.assertEqual(
             container["resources"],
             {
@@ -98,7 +98,7 @@ class ServiceHardeningTests(unittest.TestCase):
             if document
         }
         self.assertEqual(
-            hpas["recommendationservice-hpa"]["spec"]["minReplicas"], 3
+            hpas["recommendationservice-hpa"]["spec"]["minReplicas"], 2
         )
         self.assertEqual(hpas["frontend-hpa"]["spec"]["minReplicas"], 6)
 

@@ -38,7 +38,10 @@ if [[ -n "$SSH_KNOWN_HOSTS" ]]; then
   ssh_base+=(-o "UserKnownHostsFile=$SSH_KNOWN_HOSTS")
 fi
 
-mapfile -t WORKERS < <(
+WORKERS=()
+while IFS= read -r worker; do
+  [[ -n "$worker" ]] && WORKERS+=("$worker")
+done < <(
   awk '
     /^\[/ { section=$0; next }
     section == "[service_nodes]" && $1 !~ /^#/ && NF {
@@ -61,7 +64,10 @@ if [[ ${#WORKERS[@]} -eq 0 ]]; then
 fi
 
 echo "Deleting Chaos Mesh experiment, Schedule, and Workflow resources"
-mapfile -t KINDS < <(kubectl api-resources --api-group=chaos-mesh.org -o name)
+KINDS=()
+while IFS= read -r kind; do
+  [[ -n "$kind" ]] && KINDS+=("$kind")
+done < <(kubectl api-resources --api-group=chaos-mesh.org -o name)
 for kind in "${KINDS[@]}"; do
   case "$kind" in
     physicalmachines.chaos-mesh.org|remoteclusters.chaos-mesh.org)

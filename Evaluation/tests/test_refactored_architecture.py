@@ -110,13 +110,31 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(comparison.iloc[0]["avg_response_ms_improvement_pct"], 50)
         self.assertEqual(comparison.iloc[0]["avg_rps_improvement_pct"], 25)
 
-    def test_agent_comparator_rejects_different_observed_placements(self):
+    def test_agent_comparator_accepts_different_soft_spread_outcomes(self):
         rows = []
         for mode, fingerprint in (("agent", "placement-a"), ("non-agent", "placement-b")):
             row = {
                 "scenario": "scenario-a",
                 "placement": "canonical-six-node",
                 "placement_fingerprint": fingerprint,
+                "placement_definition_fingerprint": "same-definition",
+                "step_index": 1,
+                "step_name": "network",
+                "chaos": "node-loss",
+                "mode": mode,
+            }
+            row.update({metric: 1.0 for metric in AgentComparator.METRICS})
+            rows.append(row)
+        comparison = AgentComparator().compare(pd.DataFrame(rows))
+        self.assertEqual(len(comparison), 1)
+
+    def test_agent_comparator_rejects_different_placement_definitions(self):
+        rows = []
+        for mode, fingerprint in (("agent", "definition-a"), ("non-agent", "definition-b")):
+            row = {
+                "scenario": "scenario-a",
+                "placement": "canonical-six-node",
+                "placement_definition_fingerprint": fingerprint,
                 "step_index": 1,
                 "step_name": "network",
                 "chaos": "node-loss",

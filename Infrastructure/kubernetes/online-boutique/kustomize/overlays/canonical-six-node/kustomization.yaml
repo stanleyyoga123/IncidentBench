@@ -1,10 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: online-boutique
-# Capacity-weighted placement for:
-# worker-node-1: 8 CPU / 32 GiB
-# worker-node-2, worker-node-3, worker-node-6: 4 CPU / 16 GiB
-# worker-node-4, worker-node-5: 2 CPU / 8 GiB
+# All application Deployments may use any node labelled role=services. Replica
+# distribution is preferred across hostnames without making scheduling fail
+# when an even spread is temporarily impossible.
 resources:
   - ../../base
   - hpa.yaml
@@ -17,71 +16,91 @@ patches:
       version: v1
       kind: Deployment
       name: adservice
-    patch: &worker1 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-1]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: adservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: cartservice
-    patch: *worker1
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: cartservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: checkoutservice
-    patch: &worker2 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-2, worker-node-4]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: checkoutservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: currencyservice
-    patch: &worker3 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-3, worker-node-5]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: currencyservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: emailservice
-    patch: &worker4 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-2, worker-node-4]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: emailservice
   - target:
       group: apps
       version: v1
@@ -92,62 +111,101 @@ patches:
         path: /spec/replicas
         value: 6
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-1, worker-node-2, worker-node-6]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: frontend
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: paymentservice
-    patch: &worker5 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-3, worker-node-5]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: paymentservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: productcatalogservice
-    patch: *worker3
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: productcatalogservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: recommendationservice
-    patch: *worker1
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: recommendationservice
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: redis-cart
-    patch: &worker6 |-
+    patch: |-
       - op: add
-        path: /spec/template/spec/affinity
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
         value:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: kubernetes.io/hostname
-                      operator: In
-                      values: [worker-node-4, worker-node-6]
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: redis-cart
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: shippingservice
-    patch: *worker6
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: shippingservice

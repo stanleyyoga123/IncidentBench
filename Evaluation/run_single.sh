@@ -2,11 +2,11 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 [scenario-folder]" >&2
-    echo "Default: $0 ./collections/real-scenario" >&2
+    echo "Usage: $0 [scenario-folder] [loadgenerator]" >&2
+    echo "Default: $0 ./collections/real-scenario constant" >&2
 }
 
-if [[ $# -gt 1 ]]; then
+if [[ $# -gt 2 ]]; then
     usage
     exit 2
 fi
@@ -14,6 +14,7 @@ fi
 CALLER_DIR="$PWD"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCENARIO_DIR="${1:-$SCRIPT_DIR/collections/real-scenario}"
+LOADGENERATOR_ARGUMENT="${2:-}"
 
 if [[ "$SCENARIO_DIR" != /* ]]; then
     SCENARIO_DIR="$CALLER_DIR/$SCENARIO_DIR"
@@ -33,7 +34,7 @@ if [[ -f .env ]]; then
     set +a
 fi
 
-LOADGENERATOR="constant"
+LOADGENERATOR="${LOADGENERATOR_ARGUMENT:-${LOADGENERATOR:-constant}}"
 BASELINE_MINUTES="${BASELINE_MINUTES:-60}"
 TARGET_HOST="${TARGET_HOST:-http://frontend.online-boutique.svc.cluster.local}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://prometheus-server.monitoring.svc.cluster.local}"
@@ -41,6 +42,14 @@ POSTGRES_DSN="${POSTGRES_DSN:-postgresql://anomaly_detector:anomaly_detector@pos
 S3_RESULTS_URI="${S3_RESULTS_URI:-}"
 INTER_RUN_DELAY_SECONDS="${INTER_RUN_DELAY_SECONDS:-60}"
 LAST_RUN_CLEANUP_FAILED=false
+
+case "$LOADGENERATOR" in
+    constant|burst|sinus|daily) ;;
+    *)
+        echo "Unsupported load generator: $LOADGENERATOR" >&2
+        exit 2
+        ;;
+esac
 
 if [[ ! "$INTER_RUN_DELAY_SECONDS" =~ ^[0-9]+$ ]]; then
     echo "INTER_RUN_DELAY_SECONDS must be a non-negative integer" >&2
@@ -84,7 +93,7 @@ run_scenario() {
     output_dir="$SCRIPT_DIR/results/$run_id"
 
     echo
-    echo "Running $(basename "$scenario") [agents, constant load]"
+    echo "Running $(basename "$scenario") [agents, $LOADGENERATOR load]"
     ./run.sh \
         --loadgenerator "$LOADGENERATOR" \
         --scenario "$scenario" \
@@ -123,7 +132,7 @@ run_scenario() {
 }
 
 echo "Found ${#SCENARIOS[@]} scenario(s) in $SCENARIO_DIR"
-echo "Each scenario will run once with agents enabled and constant load."
+echo "Each scenario will run once with agents enabled and $LOADGENERATOR load."
 if [[ -n "$S3_RESULTS_URI" ]]; then
     echo "Completed run artifacts will be uploaded to ${S3_RESULTS_URI%/}/<run-id>/"
 else
@@ -135,7 +144,7 @@ COMPLETED_RUNS=0
 
 for scenario in "${SCENARIOS[@]}"; do
     if run_scenario "$scenario"; then
-        echo "Completed $(basename "$scenario") [agents, constant load]"
+        echo "Completed $(basename "$scenario") [agents, $LOADGENERATOR load]"
     else
         returncode=$?
         FAILED_RUNS+=("$(basename "$scenario") (exit $returncode)")
@@ -155,7 +164,7 @@ done
 
 echo
 if [[ ${#FAILED_RUNS[@]} -eq 0 ]]; then
-    echo "Completed all ${#SCENARIOS[@]} scenario(s) with agents and constant load."
+    echo "Completed all ${#SCENARIOS[@]} scenario(s) with agents and $LOADGENERATOR load."
     exit 0
 fi
 

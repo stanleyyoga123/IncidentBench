@@ -6,6 +6,7 @@ from testbed.reporting.metadata_reader import MetadataReader
 from testbed.reporting.run_discovery import RunDiscovery
 
 from .errors import collect_errors
+from .ground_truth import DEFAULT_GROUND_TRUTH_DIR, load_ground_truth, scenario_ground_truth
 from .impact import metric_impact
 from .judge.client import JudgeClient
 from .judge.run import judge_run, score_labeled_run
@@ -22,6 +23,7 @@ def analyze(
     judge: JudgeClient | None,
     skip_judge: bool = False,
     reuse_judge: bool = False,
+    ground_truth_file: Path = DEFAULT_GROUND_TRUTH_DIR,
 ) -> list[dict[str, Any]]:
     if skip_judge and reuse_judge:
         raise ValueError("skip_judge and reuse_judge cannot be combined")
@@ -30,6 +32,7 @@ def analyze(
         raise FileNotFoundError(f"no metadata.json runs under {input_dir}")
     progress(f"discovered {len(runs)} run(s) under {input_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
+    answer_key = load_ground_truth(ground_truth_file) if not skip_judge else {}
     records = []
     for index, run in enumerate(runs, start=1):
         progress(f"run {index}/{len(runs)}: {run.name}")
@@ -40,6 +43,7 @@ def analyze(
                 judge,
                 skip_judge,
                 reuse_judge,
+                answer_key,
                 run_label=f"{index}/{len(runs)}",
             )
         )
@@ -54,12 +58,18 @@ def _analyze_run(
     judge: JudgeClient | None,
     skip_judge: bool,
     reuse_judge: bool = False,
+    answer_key: dict[str, dict[str, str]] | None = None,
     run_label: str = "1/1",
 ) -> dict[str, Any]:
     destination.mkdir(parents=True, exist_ok=True)
     prefix = f"run {run_label} {run.name}"
     progress(f"{prefix}: reading metadata")
     metadata = MetadataReader().read(run)
+    reference_answer = None
+    if not skip_judge:
+        reference_answer = scenario_ground_truth(
+            answer_key or {}, (metadata.get("scenario") or {}).get("name")
+        )
     origin = chaos_t0(metadata)
     plots = []
     if origin is not None:
@@ -90,13 +100,21 @@ def _analyze_run(
             )
         progress(f"{prefix}: rescoring from existing judge.json")
         raw = json.loads(judge_path.read_text())
-        scores = score_labeled_run(run, metadata, errors, impact, raw)
+        scores = score_labeled_run(
+            run, metadata, errors, impact, raw, reference_answer=reference_answer
+        )
         raw = scores.pop("raw", raw)
         progress(f"{prefix}: end_score={scores.get('end_score')}")
     else:
         progress(f"{prefix}: starting LLM judge")
         scores = judge_run(
-            run, metadata, errors, impact, judge, checkpoint=destination / "judge.json"
+            run,
+            metadata,
+            errors,
+            impact,
+            judge,
+            checkpoint=destination / "judge.json",
+            reference_answer=reference_answer,
         )
         raw = scores.pop("raw", {})
         progress(f"{prefix}: end_score={scores.get('end_score')}")

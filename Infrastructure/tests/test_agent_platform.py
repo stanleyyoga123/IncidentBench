@@ -385,3 +385,36 @@ def test_cluster_and_observability_versions_are_explicitly_pinned():
         "loki_chart_version": "18.9.0",
         "alloy_chart_version": "1.11.1",
     }
+
+
+def test_platform_storage_and_terminal_pod_growth_are_bounded():
+    variables = yaml.safe_load(
+        (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
+    )
+    cluster = (INFRASTRUCTURE / "ansible/playbooks/cluster.yml").read_text()
+    platform = (INFRASTRUCTURE / "ansible/playbooks/platform.yml").read_text()
+    prometheus = yaml.safe_load(
+        (INFRASTRUCTURE / "values/prometheus/values.yaml").read_text()
+    )
+    loki = yaml.safe_load((INFRASTRUCTURE / "values/loki/values.yaml").read_text())
+    alloy = (INFRASTRUCTURE / "values/alloy/values.yaml").read_text()
+    rules = yaml.safe_load(
+        (INFRASTRUCTURE / "values/prometheus/recording-rules.values.yaml").read_text()
+    )
+
+    assert variables["terminated_pod_gc_threshold"] == 500
+    assert "terminated-pod-gc-threshold={{ terminated_pod_gc_threshold }}" in cluster
+    assert "tools_node_min_root_free_gb" in platform
+    assert prometheus["server"]["retentionSize"] == "4GB"
+    assert loki["loki"]["ingester"]["wal"] == {
+        "checkpoint_duration": "1m",
+        "flush_on_shutdown": True,
+    }
+    assert loki["loki"]["limits_config"]["ingestion_rate_mb"] == 2
+    assert '__meta_kubernetes_pod_phase' in alloy
+    alerts = rules["serverFiles"]["alerting_rules.yml"]["groups"][0]["rules"]
+    assert {rule["alert"] for rule in alerts} == {
+        "ToolsNodeRootDiskLow",
+        "ToolsNodeDiskPressure",
+        "TerminalPodBacklog",
+    }

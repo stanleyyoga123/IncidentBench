@@ -18,7 +18,7 @@ from testbed.orchestration.application_reset_phase import ApplicationResetPhase
 from testbed.placement import PlacementRenderer
 
 
-def deployment(name: str, nodes=("worker-node-1",)) -> dict:
+def deployment(name: str) -> dict:
     return {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
@@ -27,23 +27,14 @@ def deployment(name: str, nodes=("worker-node-1",)) -> dict:
             "template": {
                 "spec": {
                     "nodeSelector": {"role": "services"},
-                    "affinity": {
-                        "nodeAffinity": {
-                            "requiredDuringSchedulingIgnoredDuringExecution": {
-                                "nodeSelectorTerms": [
-                                    {
-                                        "matchExpressions": [
-                                            {
-                                                "key": "kubernetes.io/hostname",
-                                                "operator": "In",
-                                                "values": list(nodes),
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
+                    "topologySpreadConstraints": [
+                        {
+                            "maxSkew": 1,
+                            "topologyKey": "kubernetes.io/hostname",
+                            "whenUnsatisfiable": "ScheduleAnyway",
+                            "labelSelector": {"matchLabels": {"app": name}},
                         }
-                    },
+                    ],
                 }
             }
         },
@@ -90,14 +81,17 @@ def node(
     }
 
 
-def profile(source: Path) -> PlacementProfile:
+def profile(
+    source: Path,
+    nodes: tuple[str, ...] = ("worker-node-1",),
+) -> PlacementProfile:
     rendered = "rendered\n"
     return PlacementProfile(
         reference="test-placement",
         source_dir=source,
         rendered_manifest=rendered,
         rendered_sha256=hashlib.sha256(rendered.encode()).hexdigest(),
-        allowed_nodes={name: ("worker-node-1",) for name in APPLICATION_DEPLOYMENTS},
+        allowed_nodes={name: nodes for name in APPLICATION_DEPLOYMENTS},
         tolerations={name: () for name in APPLICATION_DEPLOYMENTS},
     )
 
@@ -205,30 +199,32 @@ class PlacementManifestValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly the application Deployments"):
             self.render(documents)
 
-    def test_renderer_rejects_missing_empty_and_conflicting_constraints(self):
-        def missing_affinity(value):
-            del value["spec"]["template"]["spec"]["affinity"]
+    def test_renderer_rejects_missing_invalid_and_conflicting_constraints(self):
+        def missing_spread(value):
+            del value["spec"]["template"]["spec"]["topologySpreadConstraints"]
 
-        def empty_nodes(value):
-            value["spec"]["template"]["spec"]["affinity"]["nodeAffinity"][
-                "requiredDuringSchedulingIgnoredDuringExecution"
-            ]["nodeSelectorTerms"][0]["matchExpressions"][0]["values"] = []
+        def hard_affinity(value):
+            value["spec"]["template"]["spec"]["affinity"] = {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": []
+                    }
+                }
+            }
 
         def conflicting_selector(value):
             value["spec"]["template"]["spec"]["nodeSelector"]["zone"] = "other"
 
-        def insufficient_cpu(value):
-            value["spec"]["template"]["spec"]["affinity"]["nodeAffinity"][
-                "requiredDuringSchedulingIgnoredDuringExecution"
-            ]["nodeSelectorTerms"][0]["matchExpressions"][0]["values"] = [
-                "worker-node-4"
-            ]
+        def hard_spread(value):
+            value["spec"]["template"]["spec"]["topologySpreadConstraints"][0][
+                "whenUnsatisfiable"
+            ] = "DoNotSchedule"
 
         for mutate, message in (
-            (missing_affinity, "required node affinity"),
-            (empty_nodes, "non-empty"),
+            (missing_spread, "topology spread constraint"),
+            (hard_affinity, "must not contain required node affinity"),
             (conflicting_selector, "conflicting node selectors"),
-            (insufficient_cpu, "at least 6 CPU"),
+            (hard_spread, "softly spread"),
         ):
             with self.subTest(message=message):
                 documents = [deployment(name) for name in APPLICATION_DEPLOYMENTS]
@@ -264,7 +260,10 @@ class PlacementRuntimeVerificationTests(unittest.TestCase):
                     (0, json.dumps({"items": pods}), ""),
                 ],
             )
-            result = controller.verify_placement(profile(source), "online-boutique")
+            result = controller.verify_placement(
+                profile(source, tuple(f"worker-node-{index}" for index in range(1, 7))),
+                "online-boutique",
+            )
         self.assertEqual(result["returncode"], 0)
         self.assertEqual(result["errors"], [])
         self.assertEqual(len(result["observed_placement_fingerprint"]), 64)
@@ -278,7 +277,7 @@ class PlacementRuntimeVerificationTests(unittest.TestCase):
             (
                 [deployment(name) for name in APPLICATION_DEPLOYMENTS],
                 [
-                    pod(name, node="worker-node-2" if name == "frontend" else "worker-node-1")
+                    pod(name, node="worker-node-7" if name == "frontend" else "worker-node-1")
                     for name in APPLICATION_DEPLOYMENTS
                 ],
                 "disallowed node",
@@ -295,13 +294,23 @@ class PlacementRuntimeVerificationTests(unittest.TestCase):
             ),
             (
                 [
-                    deployment(name, ("worker-node-2",))
-                    if name == "frontend"
-                    else deployment(name)
+                    {
+                        **deployment(name),
+                        "spec": {
+                            **deployment(name)["spec"],
+                            "template": {
+                                "spec": {
+                                    **deployment(name)["spec"]["template"]["spec"],
+                                    "topologySpreadConstraints": [],
+                                }
+                            },
+                        },
+                    }
+                    if name == "frontend" else deployment(name)
                     for name in APPLICATION_DEPLOYMENTS
                 ],
                 [pod(name) for name in APPLICATION_DEPLOYMENTS],
-                "differs from archived profile",
+                "topology spread constraint",
             ),
         ]
         for deployments, pods, message in cases:
@@ -317,7 +326,11 @@ class PlacementRuntimeVerificationTests(unittest.TestCase):
                     ],
                 )
                 result = controller.verify_placement(
-                    profile(source), "online-boutique"
+                    profile(
+                        source,
+                        tuple(f"worker-node-{index}" for index in range(1, 7)),
+                    ),
+                    "online-boutique",
                 )
                 self.assertNotEqual(result["returncode"], 0)
                 self.assertIn(message, " ".join(result["errors"]))

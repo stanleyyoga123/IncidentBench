@@ -18,4 +18,4 @@ spec:
     stress-cpu:
       workers: 4
       load: 95
-    duration: 29s
+    duration: 25s

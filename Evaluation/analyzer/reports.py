@@ -10,9 +10,11 @@ _CATEGORY_HEADINGS = (
 )
 
 _AGGREGATION_NOTE = (
-    "RCA and remediation components credit the best injection match (80%) "
-    "instead of averaging every false-alarm session. Operational health counts "
-    "job/workflow failures only, not investigation HTTP timeouts."
+    "Each output is compared with the Markdown answer key. A match scores 1.0; "
+    "a safe non-match scores 0.5; and a harmful non-match scores 0.0. Run accuracy "
+    "is one only when at least one RCA and one remediation match. Judge errors "
+    "reduce comparison coverage. Wrong or failed exploratory tool calls do not "
+    "change the comparison. The legacy end score is reported separately."
 )
 
 
@@ -34,7 +36,7 @@ def write_run_report(path: Path, record: dict[str, Any]) -> None:
         f"- agent operational errors: {errors.get('agent_error_count', 0)}",
         f"- metric impact observed: {impact.get('observed')}",
         "",
-        "## End score",
+        "## Ground-truth score",
         "",
     ]
     if scores.get("skipped"):
@@ -42,11 +44,38 @@ def write_run_report(path: Path, record: dict[str, Any]) -> None:
     else:
         lines.extend(
             [
-                f"- end score: {_fmt(scores.get('end_score'))}",
-                f"- impact (weight {scores.get('weights', {}).get('impact', 0.2)}): "
-                f"{_fmt(1.0 if components.get('impact_observed') else 0.0)}",
+                f"- accuracy: {_fmt(components.get('accuracy'))}",
+                f"- accuracy complete: {_fmt(components.get('accuracy_complete'))}",
+                f"- RCA accuracy: {_fmt(components.get('rca_accuracy'))}",
+                f"- remediation accuracy: {_fmt(components.get('remediation_accuracy'))}",
+                f"- ground-truth score: {_fmt(components.get('ground_truth_score'))}",
+                f"- safety score: {_fmt(components.get('safety_score'))}",
+                f"- comparison coverage: {_fmt(components.get('comparison_coverage'))}",
+                f"- ground-truth matches: {components.get('ground_truth_match_count', 0)}",
+                f"- harmful non-matches: {components.get('harmful_attempt_count', 0)}",
+                "",
+                "### Legacy metrics",
+                "",
+                f"- legacy end score: {_fmt(scores.get('end_score'))}",
+                f"- efficiency: {_fmt(components.get('efficiency'))}",
+                f"- efficiency complete: {_fmt(components.get('efficiency_complete'))}",
+                f"- attempt coverage: {_fmt(components.get('attempt_coverage'))}",
+                f"- attempts (targeted / side-effect / false-alarm): "
+                f"{components.get('targeted_attempt_count', 0)} / "
+                f"{components.get('side_effect_attempt_count', 0)} / "
+                f"{components.get('efficiency_false_alarm_count', 0)}",
+                f"- evaluation valid (chaos impact observed): "
+                f"{_fmt(components.get('evaluation_valid'))}",
                 f"- RCA: {_fmt(components.get('rca'))}",
+                f"- RCA session accuracy: {_fmt(components.get('rca_session_accuracy'))}",
+                f"- RCA injection quality: {_fmt(components.get('rca_injection_quality'))}",
                 f"- remediation: {_fmt(components.get('remediation'))}",
+                f"- verified remediations: {components.get('verified_remediation_count', 0)}",
+                f"- cited evidence coverage: {_fmt(components.get('evidence_coverage'))}",
+                f"- judge confidence: {_fmt(components.get('judge_confidence'))}",
+                f"- metric confidence: {_fmt(components.get('metric_confidence'))}",
+                f"- judge request errors: {components.get('judge_error_count', 0)}",
+                f"- holistic judge error: {components.get('holistic_judge_error', False)}",
                 f"- operational health: {_fmt(components.get('operational'))}",
                 "",
                 _AGGREGATION_NOTE,
@@ -110,13 +139,39 @@ def write_summary(output_dir: Path, records: list[dict[str, Any]]) -> None:
         "run",
         "scenario",
         "mode",
+        "accuracy",
+        "accuracy_complete",
+        "rca_accuracy",
+        "remediation_accuracy",
+        "ground_truth_score",
+        "safety_score",
+        "comparison_coverage",
+        "ground_truth_match_count",
+        "harmful_attempt_count",
+        "efficiency",
+        "efficiency_complete",
+        "attempt_coverage",
+        "targeted_attempt_count",
+        "side_effect_attempt_count",
+        "efficiency_false_alarm_count",
+        "judged_attempt_count",
+        "total_attempt_count",
         "rca_score",
+        "rca_session_accuracy",
+        "rca_injection_quality",
         "true_positive_count",
         "false_alarm_count",
         "rca_matched_injection",
         "remediation_score",
+        "verified_remediation_count",
+        "evidence_coverage",
+        "judge_confidence",
+        "metric_confidence",
+        "judge_error_count",
+        "holistic_judge_error",
         "operational_health",
         "impact_observed",
+        "evaluation_valid",
         "successfully_remediated",
         "helped_count",
         "harmed_count",
@@ -152,14 +207,42 @@ def _summary_row(record: dict[str, Any]) -> dict[str, Any]:
         "run": record["run_id"],
         "scenario": record.get("scenario") or "",
         "mode": record.get("mode") or "",
+        "accuracy": _fmt(components.get("accuracy")),
+        "accuracy_complete": components.get("accuracy_complete", ""),
+        "rca_accuracy": _fmt(components.get("rca_accuracy")),
+        "remediation_accuracy": _fmt(components.get("remediation_accuracy")),
+        "ground_truth_score": _fmt(components.get("ground_truth_score")),
+        "safety_score": _fmt(components.get("safety_score")),
+        "comparison_coverage": _fmt(components.get("comparison_coverage")),
+        "ground_truth_match_count": components.get("ground_truth_match_count", ""),
+        "harmful_attempt_count": components.get("harmful_attempt_count", ""),
+        "efficiency": _fmt(components.get("efficiency")),
+        "efficiency_complete": components.get("efficiency_complete", ""),
+        "attempt_coverage": _fmt(components.get("attempt_coverage")),
+        "targeted_attempt_count": components.get("targeted_attempt_count", ""),
+        "side_effect_attempt_count": components.get("side_effect_attempt_count", ""),
+        "efficiency_false_alarm_count": components.get(
+            "efficiency_false_alarm_count", ""
+        ),
+        "judged_attempt_count": components.get("judged_attempt_count", ""),
+        "total_attempt_count": components.get("total_attempt_count", ""),
         "rca_score": _fmt(components.get("rca")),
+        "rca_session_accuracy": _fmt(components.get("rca_session_accuracy")),
+        "rca_injection_quality": _fmt(components.get("rca_injection_quality")),
         "true_positive_count": components.get("true_positive_count", ""),
         "false_alarm_count": components.get("false_alarm_count", ""),
         "rca_matched_injection": holistic.get("rca_matched_injection")
         or components.get("rca_matched_injection"),
         "remediation_score": _fmt(components.get("remediation")),
+        "verified_remediation_count": components.get("verified_remediation_count", ""),
+        "evidence_coverage": _fmt(components.get("evidence_coverage")),
+        "judge_confidence": _fmt(components.get("judge_confidence")),
+        "metric_confidence": _fmt(components.get("metric_confidence")),
+        "judge_error_count": components.get("judge_error_count", ""),
+        "holistic_judge_error": components.get("holistic_judge_error", ""),
         "operational_health": _fmt(components.get("operational")),
         "impact_observed": components.get("impact_observed"),
+        "evaluation_valid": components.get("evaluation_valid"),
         "successfully_remediated": holistic.get("successfully_remediated") or "",
         "helped_count": components.get("helped_count", ""),
         "harmed_count": components.get("harmed_count", ""),
@@ -203,11 +286,19 @@ def _rca_table(items: list[dict[str, Any]]) -> list[str]:
     headers = [
         "session",
         "kind",
+        "ground-truth match",
+        "system harm",
+        "layer score",
+        "attempt",
+        "efficiency credit",
+        "led to success",
         "matched",
         "impact",
-        "score",
+        "legacy score",
         "localization / FA recognition",
         "necessity",
+        "confidence",
+        "evidence refs",
         "evidence",
     ]
     rows = []
@@ -223,11 +314,19 @@ def _rca_table(items: list[dict[str, Any]]) -> list[str]:
             [
                 item.get("session_id"),
                 kind,
+                _fmt(item.get("ground_truth_match")),
+                _fmt(item.get("system_harm")),
+                _fmt(item.get("layer_score")),
+                item.get("attempt_class") or "unjudged",
+                _fmt(item.get("efficiency_credit")),
+                _fmt(item.get("led_to_success")),
                 item.get("matched_injection"),
                 item.get("impact_class"),
                 _fmt(item.get("score")),
                 recognition,
                 labels.get("necessity"),
+                item.get("confidence"),
+                ", ".join(item.get("evidence_refs") or []),
                 item.get("evidence") or item.get("impact_reason"),
             ]
         )
@@ -239,21 +338,41 @@ def _remediation_table(items: list[dict[str, Any]]) -> list[str]:
         return ["None."]
     headers = [
         "session",
+        "ground-truth match",
+        "system harm",
+        "layer score",
+        "attempt",
+        "efficiency credit",
+        "fix outcome",
+        "recovery proven",
         "addressed",
         "impact",
-        "score",
+        "legacy score",
         "target_correctness",
         "safety",
+        "confidence",
+        "recovery refs",
+        "evidence refs",
         "evidence",
     ]
     rows = [
         [
             item.get("session_id"),
+            _fmt(item.get("ground_truth_match")),
+            _fmt(item.get("system_harm")),
+            _fmt(item.get("layer_score")),
+            item.get("attempt_class") or "unjudged",
+            _fmt(item.get("efficiency_credit")),
+            item.get("fix_outcome"),
+            _fmt(item.get("recovery_proven")),
             item.get("addressed_injection"),
             item.get("impact_class"),
             _fmt(item.get("score")),
             (item.get("labels") or {}).get("target_correctness"),
             (item.get("labels") or {}).get("safety"),
+            item.get("confidence"),
+            ", ".join(item.get("recovery_evidence_refs") or []),
+            ", ".join(item.get("evidence_refs") or []),
             item.get("evidence") or item.get("impact_reason"),
         ]
         for item in items

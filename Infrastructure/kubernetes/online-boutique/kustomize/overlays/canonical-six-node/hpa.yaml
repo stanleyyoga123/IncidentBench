@@ -8,8 +8,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: adservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -29,8 +29,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: cartservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -50,8 +50,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: checkoutservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -70,8 +70,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: currencyservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -90,8 +90,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: emailservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -111,7 +111,7 @@ spec:
     kind: Deployment
     name: frontend
   minReplicas: 6
-  maxReplicas: 80
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -130,8 +130,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: paymentservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -150,8 +150,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: productcatalogservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -170,8 +170,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: recommendationservice
-  minReplicas: 3
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -190,8 +190,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: redis-cart
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -210,8 +210,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: shippingservice
-  minReplicas: 1
-  maxReplicas: 80
+  minReplicas: 2
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:

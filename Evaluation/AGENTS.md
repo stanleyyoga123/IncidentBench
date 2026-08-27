@@ -18,7 +18,13 @@ Example commands:
 ```bash
 ./run.sh --loadgenerator constant --scenario ./collections/real-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
 ./run.sh --loadgenerator daily --scenario ./collections/long-scenario/01-multi-fault-one-day.json
+./run_all.sh
 ```
+
+`run_all.sh` runs the complete real-scenario collection through `run_single.sh`
+with constant load, followed by the long-scenario collection with daily load.
+It stops if either batch fails. `run_single.sh` accepts an optional explicit
+load-generator argument after the scenario folder.
 
 Important modules:
 
@@ -87,18 +93,22 @@ Each scenario is `prerun/run.sh`, then `testbed/run.sh`, then
    output directory.
 
 Placement profiles must cover all 11 application Deployments, retain
-`role: services`, and define one non-empty required
-`kubernetes.io/hostname In (...)` affinity expression per Deployment. The
-allowed nodes for every Deployment must provide at least 6 CPU in aggregate.
+`role: services`, contain no required node affinity, and define exactly one
+soft `kubernetes.io/hostname` topology-spread constraint per Deployment with
+`maxSkew: 1`, `whenUnsatisfiable: ScheduleAnyway`, and an app-specific label
+selector. The canonical profile starts every Deployment at two replicas except
+`frontend`, which starts at six. Matching HPA minima are 2 and 6, and every HPA
+maximum is 30.
 The runner explicitly uncordons referenced nodes to clear scheduling state left
 by earlier remediation, but does not modify labels, taints, tolerations,
 replica counts, or HPAs. After prerun recreates the namespace, a referenced
 node that is absent, NotReady, unschedulable, incorrectly labelled, or blocked
 by an untolerated taint fails the run before baseline collection.
 
-Every pod-targeted chaos Schedule must have an `app In (...)` expression whose
-values exactly equal all Deployments eligible for its selected node in the
-scenario placement profile. Bootstrap rejects stale or partial selectors.
+Every pod-targeted chaos Schedule must have one non-empty, unique `app In (...)`
+expression and must omit `selector.nodes`. Pod CPU experiments target every
+Running replica of the selected service so they remain valid under soft
+placement.
 
 Schedule requirements:
 

@@ -32,36 +32,32 @@ def extract_deployment_placement(deployment: dict) -> tuple[tuple[str, ...], tup
             f"Deployment {name} must retain nodeSelector "
             f"{SERVICES_LABEL}={SERVICES_LABEL_VALUE}"
         )
-    affinity = pod_spec.get("affinity", {}).get("nodeAffinity", {})
-    required = affinity.get("requiredDuringSchedulingIgnoredDuringExecution", {})
-    terms = required.get("nodeSelectorTerms")
-    if not isinstance(terms, list) or len(terms) != 1:
+    required_affinity = (
+        pod_spec.get("affinity", {})
+        .get("nodeAffinity", {})
+        .get("requiredDuringSchedulingIgnoredDuringExecution")
+    )
+    if required_affinity:
         raise ValueError(
-            f"Deployment {name} must contain exactly one required node affinity term"
+            f"Deployment {name} must not contain required node affinity"
         )
-    expressions = terms[0].get("matchExpressions", [])
-    if terms[0].get("matchFields"):
-        raise ValueError(f"Deployment {name} must not contain required matchFields")
-    hostname_expressions = [
-        expression
-        for expression in expressions
-        if expression.get("key") == HOSTNAME_LABEL
-    ]
-    if len(expressions) != 1 or len(hostname_expressions) != 1:
+    constraints = pod_spec.get("topologySpreadConstraints")
+    if not isinstance(constraints, list) or len(constraints) != 1:
         raise ValueError(
-            f"Deployment {name} must contain exactly one {HOSTNAME_LABEL} expression"
+            f"Deployment {name} must contain exactly one topology spread constraint"
         )
-    expression = hostname_expressions[0]
-    values = expression.get("values")
-    if expression.get("operator") != "In" or not isinstance(values, list) or not values:
+    constraint = constraints[0]
+    expected_selector = {"matchLabels": {"app": name}}
+    if (
+        constraint.get("maxSkew") != 1
+        or constraint.get("topologyKey") != HOSTNAME_LABEL
+        or constraint.get("whenUnsatisfiable") != "ScheduleAnyway"
+        or constraint.get("labelSelector") != expected_selector
+    ):
         raise ValueError(
-            f"Deployment {name} must use a non-empty {HOSTNAME_LABEL} In expression"
+            f"Deployment {name} must softly spread app={name} across {HOSTNAME_LABEL}"
         )
-    if any(not isinstance(value, str) or not value for value in values):
-        raise ValueError(f"Deployment {name} contains an invalid hostname value")
-    nodes = tuple(sorted(set(values)))
-    if len(nodes) != len(values):
-        raise ValueError(f"Deployment {name} contains duplicate hostname values")
+    nodes = tuple(sorted(NODE_CPU_CAPACITY))
     tolerations = pod_spec.get("tolerations", [])
     if not isinstance(tolerations, list) or any(
         not isinstance(toleration, dict) for toleration in tolerations

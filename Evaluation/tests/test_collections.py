@@ -17,6 +17,7 @@ from testbed.chaos.execution.scheduled_step_executor import ScheduledStepExecuto
 from testbed.command import CommandLogger
 from testbed.command.command_runner import CommandRunner
 from testbed.domain import CommandResult, ScenarioStep
+from testbed.domain.placement import APPLICATION_DEPLOYMENTS
 from testbed.kubernetes import ChaosScheduleClient
 from testbed.orchestration.chaos_phase import ChaosPhase
 from testbed.placement import (
@@ -74,8 +75,8 @@ class CollectionValidationTests(unittest.TestCase):
             ScenarioLoader(root, catalog, placements).load(path)
             for path in sorted((root / "collections" / "real-scenario").glob("*.json"))
         ]
-        self.assertEqual(len(catalog.schedules), 22)
-        self.assertEqual(len(scenarios), 16)
+        self.assertEqual(len(catalog.schedules), 17)
+        self.assertEqual(len(scenarios), 11)
         self.assertEqual(placements.references, ("canonical-six-node",))
         placement = PlacementRenderer(CommandRunner(), root).render(
             "canonical-six-node",
@@ -103,21 +104,19 @@ class CollectionValidationTests(unittest.TestCase):
                 "node-loss-worker-2",
                 "node-loss-worker-3",
                 "single-cartservice-cpu",
-                "single-cartservice-cpu-worker-1",
                 "single-checkoutservice-cpu",
-                "single-checkoutservice-cpu-worker-2",
                 "single-recommendationservice-cpu",
-                "single-recommendationservice-cpu-worker-1",
                 "single-productcatalogservice-cpu",
-                "single-productcatalogservice-cpu-worker-3",
                 "single-paymentservice-cpu",
-                "single-paymentservice-cpu-worker-5",
             },
         )
         self.assertNotIn("node-delay-worker-4", catalog_refs)
         self.assertNotIn("node-delay-peers-to-worker-4", catalog_refs)
         for schedule in catalog.schedules:
             child = schedule.manifest["spec"][schedule.child_key]
+            if "cpu" in schedule.reference:
+                self.assertEqual(schedule.interval_seconds, 30)
+                self.assertEqual(schedule.child_duration_seconds, 25)
             selector = child["selector"]
             if schedule.reference.startswith("node-"):
                 nodes = selector["physicalMachines"]["chaos-mesh"]
@@ -133,20 +132,15 @@ class CollectionValidationTests(unittest.TestCase):
                 else:
                     self.assertEqual(len(nodes), 1)
             else:
+                self.assertEqual(child["mode"], "all")
                 self.assertEqual(selector["namespaces"], ["online-boutique"])
+                self.assertNotIn("nodes", selector)
                 expressions = selector["expressionSelectors"]
                 self.assertEqual(expressions[0]["key"], "app")
                 self.assertEqual(expressions[0]["operator"], "In")
                 self.assertTrue(schedule.reference.startswith("single-"))
                 self.assertEqual(len(expressions[0]["values"]), 1)
                 self.assertNotIn("frontend", expressions[0]["values"])
-                if "nodes" in selector:
-                    known_nodes = {
-                        node
-                        for nodes in placement.allowed_nodes.values()
-                        for node in nodes
-                    }
-                    self.assertTrue(set(selector["nodes"]) <= known_nodes)
         for scenario in scenarios:
             self.assertEqual(scenario.placement, "canonical-six-node")
             self.assertEqual(len(scenario.steps), 2)
@@ -287,19 +281,40 @@ class CollectionValidationTests(unittest.TestCase):
         self.assertEqual(
             profile.allowed_nodes,
             {
-                "adservice": ("worker-node-1",),
-                "cartservice": ("worker-node-1",),
-                "checkoutservice": ("worker-node-2", "worker-node-4"),
-                "currencyservice": ("worker-node-3", "worker-node-5"),
-                "emailservice": ("worker-node-2", "worker-node-4"),
-                "frontend": ("worker-node-1", "worker-node-2", "worker-node-6"),
-                "paymentservice": ("worker-node-3", "worker-node-5"),
-                "productcatalogservice": ("worker-node-3", "worker-node-5"),
-                "recommendationservice": ("worker-node-1",),
-                "redis-cart": ("worker-node-4", "worker-node-6"),
-                "shippingservice": ("worker-node-4", "worker-node-6"),
+                deployment: tuple(f"worker-node-{index}" for index in range(1, 7))
+                for deployment in APPLICATION_DEPLOYMENTS
             },
         )
+        documents = list(yaml.safe_load_all(profile.rendered_manifest))
+        deployments = {
+            document["metadata"]["name"]: document
+            for document in documents
+            if document and document.get("kind") == "Deployment"
+        }
+        hpas = {
+            document["metadata"]["name"]: document
+            for document in documents
+            if document and document.get("kind") == "HorizontalPodAutoscaler"
+        }
+        for name, deployment in deployments.items():
+            expected_replicas = 6 if name == "frontend" else 2
+            self.assertEqual(deployment["spec"]["replicas"], expected_replicas)
+            pod_spec = deployment["spec"]["template"]["spec"]
+            self.assertNotIn("affinity", pod_spec)
+            self.assertEqual(
+                pod_spec["topologySpreadConstraints"],
+                [
+                    {
+                        "maxSkew": 1,
+                        "topologyKey": "kubernetes.io/hostname",
+                        "whenUnsatisfiable": "ScheduleAnyway",
+                        "labelSelector": {"matchLabels": {"app": name}},
+                    }
+                ],
+            )
+            hpa = hpas[f"{name}-hpa"]
+            self.assertEqual(hpa["spec"]["minReplicas"], expected_replicas)
+            self.assertEqual(hpa["spec"]["maxReplicas"], 30)
 
     def test_schedule_validation_rejects_contract_violations(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -461,9 +476,11 @@ class ScheduleClientTests(unittest.TestCase):
         class Runner:
             def __init__(self):
                 self.commands = []
+                self.timeouts = []
 
             def run(self, command, **kwargs):
                 self.commands.append(command)
+                self.timeouts.append(kwargs.get("timeout"))
                 return CommandResult(tuple(command), 0)
 
         runner = Runner()
@@ -480,14 +497,18 @@ class ScheduleClientTests(unittest.TestCase):
             self.assertIn("--all", command)
             self.assertIn("--all-namespaces", command)
             self.assertIn("--wait=true", command)
+            self.assertIn("--timeout=240s", command)
+        self.assertEqual(set(runner.timeouts), {300})
 
-    def test_delete_uses_foreground_cascading_and_get_checks_absence(self):
+    def test_delete_uses_background_cascading_and_get_checks_absence(self):
         class Runner:
             def __init__(self):
                 self.commands = []
+                self.timeouts = []
 
             def run(self, command, **kwargs):
                 self.commands.append(command)
+                self.timeouts.append(kwargs.get("timeout"))
                 return CommandResult(tuple(command), 0)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -500,9 +521,15 @@ class ScheduleClientTests(unittest.TestCase):
             client = ChaosScheduleClient(runner, root)
             client.delete(schedule)
             client.get(schedule)
-        self.assertIn("--cascade=foreground", runner.commands[0])
+            client.get_children(schedule)
+        self.assertIn("--cascade=background", runner.commands[0])
         self.assertIn("--wait=true", runner.commands[0])
+        self.assertEqual(runner.timeouts[0], 240)
         self.assertEqual(runner.commands[1][1:3], ["get", "schedule"])
+        self.assertEqual(runner.timeouts[1], 30)
+        self.assertEqual(runner.commands[2][1:3], ["get", schedule.child_type])
+        self.assertIn("--selector=managed-by=a", runner.commands[2])
+        self.assertEqual(runner.timeouts[2], 30)
 
     def test_recovery_releases_only_confirmed_destroyed_records_finalizer(self):
         class Runner:
@@ -604,6 +631,9 @@ class ScheduleClientTests(unittest.TestCase):
             def get(self, schedule):
                 return CommandResult(("kubectl", "get"), 0)
 
+            def get_children(self, schedule):
+                return CommandResult(("kubectl", "get"), 0)
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             client = Client()
@@ -660,6 +690,9 @@ class ScheduleClientTests(unittest.TestCase):
                     stdout="schedule/a" if self.gets == 1 else "",
                 )
 
+            def get_children(self, schedule):
+                return CommandResult(("kubectl", "get"), 0)
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             schedule = ScheduleLoader().load(write_schedule(root, "a"))
@@ -673,6 +706,43 @@ class ScheduleClientTests(unittest.TestCase):
             result = cleaner.clean(schedule, root / "logs", "cleanup")
         self.assertEqual(result["returncode"], 0)
         self.assertTrue(result["absent"])
+        self.assertTrue(result["schedule_absent"])
+        self.assertTrue(result["children_absent"])
+        self.assertEqual(sleeps, [5])
+
+    def test_cleaner_waits_for_managed_children_after_schedule_is_absent(self):
+        class Client:
+            def __init__(self):
+                self.child_gets = 0
+
+            def delete(self, schedule):
+                return CommandResult(("kubectl", "delete"), 0)
+
+            def get(self, schedule):
+                return CommandResult(("kubectl", "get"), 0)
+
+            def get_children(self, schedule):
+                self.child_gets += 1
+                return CommandResult(
+                    ("kubectl", "get"),
+                    0,
+                    stdout="stresschaos/a-x" if self.child_gets == 1 else "",
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schedule = ScheduleLoader().load(write_schedule(root, "a"))
+            sleeps = []
+            result = ScheduleCleaner(
+                Client(),
+                CommandLogger(),
+                monotonic=lambda: 0,
+                sleep=sleeps.append,
+            ).clean(schedule, root / "logs", "cleanup")
+
+        self.assertEqual(result["returncode"], 0)
+        self.assertTrue(result["absent"])
+        self.assertEqual(len(result["child_verification"]), 2)
         self.assertEqual(sleeps, [5])
 
     def test_physical_machine_cleaner_targets_inventory_hosts(self):
@@ -725,6 +795,9 @@ class ScheduleClientTests(unittest.TestCase):
                 return CommandResult(("kubectl", "delete"), 0)
 
             def get(self, schedule):
+                return CommandResult(("kubectl", "get"), 0)
+
+            def get_children(self, schedule):
                 return CommandResult(("kubectl", "get"), 0)
 
         class HostCleaner:

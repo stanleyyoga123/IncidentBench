@@ -25,4 +25,4 @@ spec:
         workers: 1
         # 45% of one CPU approximates the 500m limit minus 50m.
         load: 45
-    duration: 29s
+    duration: 25s

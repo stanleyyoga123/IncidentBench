@@ -19,9 +19,38 @@ _SERVICE_NAMES = (
 )
 
 _ACTION_ALIASES = {
-    "stress-cpu": ("stress-cpu", "cpu stress", "stress cpu", "cpu hog", "cpu burn", "node cpu"),
-    "delay": ("delay", "latency", "network delay"),
-    "loss": ("packet loss", "packet-loss", "loss"),
+    "stress-cpu": (
+        "stress-cpu",
+        "stresschaos",
+        "cpu stress",
+        "stress cpu",
+        "cpu hog",
+        "cpu burn",
+        "injected cpu",
+    ),
+    "delay": (
+        "network delay",
+        "network latency",
+        "network degradation",
+        "network path degradation",
+        "network-induced performance degradation",
+        "overlay network latency",
+        "inter-node rtt",
+        "elevated rtt",
+        "netem delay",
+        "delay fault",
+        "delayed node",
+        "delayed service",
+        "injected delay",
+    ),
+    "loss": (
+        "packet loss",
+        "packet-loss",
+        "network loss",
+        "netem loss",
+        "loss fault",
+        "injected loss",
+    ),
     "bandwidth": ("bandwidth", "rate limit", "netem", "throttle"),
     "corrupt": ("corrupt", "corruption"),
     "duplicate": ("duplicate",),
@@ -41,13 +70,39 @@ def load_json_list(path: Path) -> list[Any]:
 
 def load_sessions(run_folder: Path) -> dict[str, list[Any]]:
     folder = Path(run_folder) / "sessions"
+    remediation = load_json_list(folder / "remediation_run.json")
+    remediation_sessions = load_json_list(folder / "remediation_session.json")
+    details = {
+        str(item.get("remediation_job_id")): item
+        for item in remediation_sessions
+        if isinstance(item, dict) and item.get("remediation_job_id")
+    }
+    remediation = [
+        _merge_remediation_session(item, details.get(str(item.get("id"))))
+        if isinstance(item, dict)
+        else item
+        for item in remediation
+    ]
     return {
         "anomaly": load_json_list(folder / "anomaly.json"),
         "rca": load_json_list(folder / "rca_session.json"),
-        "remediation": load_json_list(folder / "remediation_run.json"),
-        "remediation_session": load_json_list(folder / "remediation_session.json"),
+        "remediation": remediation,
+        "remediation_session": remediation_sessions,
         "workflow": load_json_list(folder / "workflow.json"),
     }
+
+
+def _merge_remediation_session(
+    job: dict[str, Any], details: dict[str, Any] | None
+) -> dict[str, Any]:
+    if not details:
+        return job
+    merged = dict(job)
+    if not merged.get("tool_calls"):
+        merged["tool_calls"] = details.get("tool_calls") or []
+    if not merged.get("artifacts"):
+        merged["artifacts"] = details.get("artifacts") or []
+    return merged
 
 
 def scenario_context(metadata: dict) -> dict[str, Any]:
@@ -113,11 +168,18 @@ def inferred_target(reference: str) -> str | None:
     return None
 
 
-def match_injected_fault(job: dict[str, Any], ground_truth: dict[str, Any] | None) -> str:
+def match_injected_fault(
+    job: dict[str, Any],
+    ground_truth: dict[str, Any] | None,
+    *,
+    remediation: bool = False,
+) -> str:
     faults = (ground_truth or {}).get("injected_faults") or []
     if not faults:
         return "no"
-    haystack = _job_haystack(job)
+    haystack = (
+        _remediation_haystack(job) if remediation else _rca_conclusion_haystack(job)
+    )
     best = "no"
     for fault in faults:
         target_hit = _target_mentioned(haystack, fault)
@@ -134,6 +196,36 @@ def compact_result(value: Any, limit: int = 8000) -> Any:
     if len(encoded) <= limit:
         return value
     return encoded[:limit] + "..."
+
+
+def tool_call_evidence(
+    calls: list[Any],
+    *,
+    max_calls: int = 4,
+    argument_limit: int = 500,
+    result_limit: int = 1000,
+) -> list[dict[str, Any]]:
+    """Return bounded, citable tool evidence rather than success flags alone."""
+    calls = list(calls or [])
+    if len(calls) > max_calls:
+        head = max_calls // 2
+        tail = max_calls - head
+        selected = [
+            *enumerate(calls[:head]),
+            *enumerate(calls[-tail:], len(calls) - tail),
+        ]
+    else:
+        selected = list(enumerate(calls))
+    return [
+        {
+            "source_id": f"tool-{index + 1:03d}",
+            "tool_name": call.get("tool_name"),
+            "arguments": compact_result(call.get("arguments"), argument_limit),
+            "result": compact_result(call.get("result"), result_limit),
+        }
+        for index, call in selected
+        if isinstance(call, dict)
+    ]
 
 
 def tool_call_summaries(calls: list[Any]) -> list[dict[str, Any]]:
@@ -153,20 +245,32 @@ def tool_call_summaries(calls: list[Any]) -> list[dict[str, Any]]:
     return summaries
 
 
-def _job_haystack(job: dict[str, Any]) -> str:
+def _rca_conclusion_haystack(job: dict[str, Any]) -> str:
     result = job.get("result") or {}
-    plan = result.get("remediation_plan") or {}
     parts = [
-        job.get("error"),
         result.get("summary"),
         result.get("root_cause"),
-        result.get("incident_state"),
         result.get("hypothesis"),
-        json.dumps(result.get("evidence") or [], default=str),
-        json.dumps(plan, default=str),
-        json.dumps(plan.get("targets") or [], default=str),
-        plan.get("action"),
     ]
+    return " ".join(str(part).lower() for part in parts if part)
+
+
+def _remediation_haystack(job: dict[str, Any]) -> str:
+    result = job.get("result") or {}
+    parts = [
+        result.get("summary"),
+        json.dumps(result.get("changes") or [], default=str),
+        json.dumps(result.get("verification") or [], default=str),
+    ]
+    for call in job.get("tool_calls") or []:
+        if not isinstance(call, dict):
+            continue
+        parts.extend(
+            [
+                call.get("tool_name"),
+                json.dumps(call.get("arguments") or {}, default=str),
+            ]
+        )
     return " ".join(str(part).lower() for part in parts if part)
 
 
@@ -192,20 +296,27 @@ def _target_mentioned(haystack: str, fault: dict[str, Any]) -> bool:
 
 def _kind_mentioned(haystack: str, fault: dict[str, Any]) -> bool:
     action = str(fault.get("action") or "").lower()
-    child = str(fault.get("child_type") or "").lower()
     reference = str(fault.get("reference") or "").lower()
-    tokens = list(_ACTION_ALIASES.get(action, ()))
+    if not action:
+        if "cpu" in reference:
+            action = "stress-cpu"
+        elif "delay" in reference:
+            action = "delay"
+        elif "loss" in reference:
+            action = "loss"
+    alias_key = action
+    if "delay" in action:
+        alias_key = "delay"
+    elif "loss" in action:
+        alias_key = "loss"
+    elif "bandwidth" in action or "rate" in action:
+        alias_key = "bandwidth"
+    elif "cpu" in action or "stress" in action:
+        alias_key = "stress-cpu"
+    tokens = list(_ACTION_ALIASES.get(alias_key, ()))
     if action:
         tokens.append(action.replace("-", " "))
         tokens.append(action)
-    if child:
-        tokens.append(child.lower())
-    if "cpu" in reference or action == "stress-cpu":
-        tokens.extend(("cpu", "stress"))
-    if "delay" in reference:
-        tokens.append("delay")
-    if "loss" in reference:
-        tokens.append("loss")
     return any(token and token in haystack for token in tokens)
 
 

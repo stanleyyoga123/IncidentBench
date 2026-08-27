@@ -4,6 +4,9 @@ server:
   global:
     scrape_interval: 15s
   retention: 3d
+  # Time retention alone allowed the TSDB to consume most of the local-path
+  # volume during high-cardinality experiments. Keep a hard size ceiling too.
+  retentionSize: 4GB
   resources:
     requests:
       cpu: 500m
@@ -22,4 +25,3 @@ prometheus-node-exporter:
 
 prometheus-pushgateway:
   enabled: false
-

@@ -1,4 +1,24 @@
 ---
+- name: Validate tools-node platform storage
+  hosts: tool_nodes
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Locate the root filesystem
+      ansible.builtin.set_fact:
+        tools_root_mount: >-
+          {{ (ansible_mounts | selectattr('mount', 'equalto', '/') | list | first) }}
+
+    - name: Require tools-node disk capacity and recovery headroom
+      ansible.builtin.assert:
+        that:
+          - tools_root_mount.size_total >= (tools_node_min_root_disk_gb | int * 1024 ** 3)
+          - tools_root_mount.size_available >= (tools_node_min_root_free_gb | int * 1024 ** 3)
+        fail_msg: >-
+          The tools node root filesystem must have at least
+          {{ tools_node_min_root_disk_gb }} GiB total and
+          {{ tools_node_min_root_free_gb }} GiB free before installing platform services.
+
 - name: Install Kubernetes platform services
   hosts: localhost
   connection: local

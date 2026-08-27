@@ -3,7 +3,32 @@
   hosts: control_plane
   become: true
   gather_facts: true
+  handlers:
+    - name: Restart k3s server
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
+        daemon_reload: true
   tasks:
+    - name: Create the k3s configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Bound terminated Pod retention
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          kube-controller-manager-arg:
+            - terminated-pod-gc-threshold={{ terminated_pod_gc_threshold }}
+      notify: Restart k3s server
+
     - name: Download the official k3s installer
       ansible.builtin.get_url:
         url: https://get.k3s.io
@@ -53,6 +78,9 @@
       delegate_to: localhost
       become: false
       no_log: true
+
+    - name: Apply pending k3s configuration changes before joining agents
+      ansible.builtin.meta: flush_handlers
 
 - name: Join tool and service nodes to k3s
   hosts: tool_nodes:service_nodes

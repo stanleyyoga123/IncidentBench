@@ -33,31 +33,26 @@ than the interval.
 
 The scenario's required `placement` value is an exact placement-directory name.
 Each profile renders the full Online Boutique configuration and must cover all
-11 application Deployments. Each Deployment retains `role: services` and adds
-exactly one required `kubernetes.io/hostname` affinity expression. Profiles do
-not change HPAs or replica counts.
+11 application Deployments. Each Deployment retains `role: services`, has no
+required node affinity, and adds exactly one soft
+`kubernetes.io/hostname` topology-spread constraint with `maxSkew: 1` and
+`ScheduleAnyway`.
 
-The bundled `canonical-six-node` profile weights independently scaling services
-by node capacity. Node 1 has 8 CPU/32 GiB; nodes 2, 3, and 6 have 4 CPU/16 GiB;
-and nodes 4 and 5 have 2 CPU/8 GiB. It uses this map:
+The bundled `canonical-six-node` profile permits every service on all six nodes
+labelled `role=services`. It controls distribution instead of node identity:
 
-| Deployment | Allowed nodes |
-| --- | --- |
-| frontend | worker-node-1, worker-node-2 |
-| adservice, cartservice, recommendationservice | worker-node-1 |
-| checkoutservice, emailservice | worker-node-2, worker-node-4 |
-| currencyservice, productcatalogservice, paymentservice | worker-node-3, worker-node-5 |
-| redis-cart, shippingservice | worker-node-4, worker-node-6 |
+| Deployment | Baseline replicas | HPA min/max | Scheduling |
+| --- | ---: | ---: | --- |
+| frontend | 6 | 6 / 30 | soft spread across service nodes |
+| all other application Deployments | 2 | 2 / 30 | soft spread across service nodes |
 
-Every Deployment's allowed-node set represents at least 6 CPU in aggregate.
-The singleton node-1 assignments provide 8 CPU; all other assignments combine
-a 4-CPU node with a 2-CPU node. The `role: services` node selector and required
-hostname affinity are both present and are evaluated together by Kubernetes.
+The `role: services` selector defines eligibility. The spread rule asks the
+scheduler to balance matching replicas across hostnames but deliberately does
+not leave a pod Pending solely because perfect balance is unavailable.
 
-Pod-targeted chaos Schedules combine a node selector with an `app In (...)`
-expression. Bootstrap derives the complete eligible service set for that node
-from the rendered placement and rejects the collection if the expression is
-missing, partial, duplicated, or contains an ineligible service.
+Pod-targeted chaos Schedules use an `app In (...)` expression, omit node
+selectors, and target every Running replica of the selected service. This keeps
+the five pod CPU scenarios independent of soft scheduler placement.
 
 ## Runtime flow
 
@@ -73,9 +68,12 @@ every referenced node to clear persistent scheduling state left by an earlier
 remediation. It logs every command and then verifies that each node exists, is
 Ready and schedulable, carries the expected services and hostname labels, and
 has no untolerated blocking taint. Labels and taints are never changed. After
-waiting for rollouts, the phase verifies live Deployment constraints and Ready
+waiting for rollouts, the phase verifies live spread constraints and Ready
 pod placement. It records a canonical per-Deployment node-count map and
 fingerprint before baseline collection.
+Agent/control comparison requires the same rendered placement SHA-256, not the
+same observed pod-to-node fingerprint; the latter remains diagnostic evidence
+because soft spreading permits multiple valid placements.
 
 `postrun/run.sh` is a separate program from the testbed. After the experiment
 exits, it exports `anomaly_event`, `rca_job` plus RCA tool calls,
@@ -85,9 +83,11 @@ into `sessions/` under the run output directory.
 
 For each non-idle step,
 `ScheduledStepExecutor` removes stale copies, applies all referenced Schedules,
-starts the deadline after the last successful apply, and foreground-deletes all
-Schedules in reverse order. Cleanup verifies every Schedule is absent and a
-failure prevents later steps from starting.
+starts the deadline after the last successful apply, and background-deletes all
+Schedules in reverse order so a terminating Schedule cannot continue launching
+new recurrence children. Cleanup independently verifies both the Schedule and
+all child experiments carrying its `managed-by` label are absent; a failure
+prevents later steps from starting.
 
 `cleanup_chaos_state.sh` is the authoritative whole-cluster cleanup. Bootstrap
 runs it before every setup and finalization runs it after load generation stops,
@@ -124,8 +124,17 @@ inputs are copied to `inputs/scenario.json`, `inputs/chaos/`, and
 `inputs/placement/`. Postrun adds `sessions/` JSON exports of anomaly, RCA,
 remediation, and workflow rows. `analyzer/` reads those folders offline to
 plot metrics (elapsed minutes, chaos start at 0), extract operational errors,
-and score RCA/remediation sessions. Run-level scores credit the best injection
-match; `--reuse-judge` rescores from existing `judge.json` without calling vLLM.
+and score RCA/remediation sessions. RCA scoring balances conservative injected-
+fault matching with quality across all sessions. Remediation scoring averages
+all attempts and only reports verified success when cited post-action evidence
+supports it. Chaos impact is a run-validity signal rather than free score;
+`--reuse-judge` rescores from existing `judge.json` without calling vLLM.
+Primary scoring compares outputs with the scenario-named Markdown file in
+`analyzer/ground_truth/`. RCA and remediation are compared independently.
+A match scores 1.0, a safe non-match scores 0.5, and a harmful non-match scores
+0.0. Run accuracy is one only when at least one RCA and one remediation match;
+judge failures make the comparison incomplete. The legacy end score is retained
+separately for compatibility.
 
 Reporting supports version 2 only and groups agent/non-agent comparisons by
 scenario, placement reference, observed placement fingerprint, step index, step
@@ -147,6 +156,8 @@ scenario-selected placement.
 ./run_tc.sh ./collections/real-scenario
 
 ./run_single.sh ./collections/long-scenario
+
+./run_all.sh
 
 ./run.sh --loadgenerator daily \
   --scenario ./collections/long-scenario/01-multi-fault-one-day.json

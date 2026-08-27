@@ -30,8 +30,10 @@ batch runs normally use the in-cluster frontend service.
 Each scenario names an overlay under
 `Infrastructure/kubernetes/online-boutique/kustomize/overlays`. The profile
 must cover all 11 application Deployments, preserve `role=services`, and define
-one non-empty required hostname-affinity expression per Deployment. Each
-Deployment's eligible nodes must provide at least six aggregate CPU cores.
+one soft hostname topology-spread constraint per Deployment. Required hostname
+affinity is forbidden. The canonical profile uses `maxSkew: 1` and
+`ScheduleAnyway`, starts every service at two replicas except `frontend` at
+six, and configures matching HPA minima with a maximum of 30.
 
 The runner renders the selected overlay and the default Kustomization and
 requires identical SHA-256 output before mutating the cluster. It then verifies
@@ -44,9 +46,11 @@ stem. Multiple references in one step begin together. The catalog contains the
 node CPU, delay, loss, and pod CPU Schedules used by
 `collections/real-scenario`.
 
-The primary scenario collection is `collections/real-scenario`: 16 one-hour
-faults with a 10-minute recovery step, ordered as node delay/loss incidents
-then CPU-only pod incidents. `collections/long-scenario` is one day aligned to
+The primary scenario collection is `collections/real-scenario`: 11 one-hour
+faults with a 10-minute recovery step, ordered as six node delay/loss incidents
+then five service-wide CPU pod incidents. Pod CPU selectors intentionally omit
+node names and target every Running replica of the selected service.
+`collections/long-scenario` is one day aligned to
 the `daily` load curve with a one-hour baseline: idle until 02:00, worker-3
 isolation delay, worker-3 loss, productcatalog CPU on all replicas, then
 worker-5 isolation delay. `collections/chaos` is the shared Schedule catalog.
@@ -56,7 +60,8 @@ worker-5 isolation delay. `collections/chaos` is the shared Schedule catalog.
 - Full cluster/host chaos cleanup occurs before setup and in finalization.
 - `prerun/run.sh` recreates `online-boutique` and wipes agent workflow tables.
 - Application reset uncordons only placement-referenced nodes; it does not
-  change labels, taints, tolerations, replica counts, or HPAs.
+  change labels, taints, or tolerations. Prerun namespace recreation reapplies
+  the canonical replica counts and HPAs.
 - Missing, NotReady, unschedulable, incorrectly labeled, or blocked nodes fail
   after prerun recreates the namespace and before baseline collection.
 - Every Schedule must be absent before the next step.
@@ -76,7 +81,13 @@ Example:
 ```bash
 cd Evaluation
 ./run_tc.sh ./collections/real-scenario
+./run_all.sh
 ```
+
+`run_all.sh` runs each real scenario once with agents and constant load, then
+runs each long scenario once with agents and the daily load generator. It uses
+the same cleanup, result upload, baseline, and inter-run settings as
+`run_single.sh`, and stops before the next batch if a failure is reported.
 
 Key options for one run:
 
@@ -118,5 +129,7 @@ At minimum, assess:
 - difference from the matching no-agent control.
 
 An experiment is invalid for causal comparison when cleanup failed, exact inputs
-cannot be recovered, placement fingerprints differ, or the load/application
-window is incomplete.
+cannot be recovered, canonical placement-definition fingerprints differ,
+baseline invariants fail, or the load/application window is incomplete. Exact
+observed pod-to-node fingerprints remain diagnostic evidence and may differ
+under soft topology spreading.

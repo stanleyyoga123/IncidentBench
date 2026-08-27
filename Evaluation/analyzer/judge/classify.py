@@ -45,7 +45,9 @@ def classify_rca(
     ground_truth: dict[str, Any] | None,
 ) -> tuple[str, str]:
     python_class, reason = _classify_rca_python(labels, job, ground_truth)
-    return _maybe_llm(labels, python_class, reason, job, ground_truth)
+    return _maybe_llm(
+        labels, python_class, reason, job, ground_truth, remediation=False
+    )
 
 
 def classify_remediation(
@@ -54,7 +56,9 @@ def classify_remediation(
     ground_truth: dict[str, Any] | None,
 ) -> tuple[str, str]:
     python_class, reason = _classify_remediation_python(labels, job, ground_truth)
-    return _maybe_llm(labels, python_class, reason, job, ground_truth)
+    return _maybe_llm(
+        labels, python_class, reason, job, ground_truth, remediation=True
+    )
 
 
 def session_highlights(
@@ -126,23 +130,37 @@ def _maybe_llm(
     reason: str,
     job: dict[str, Any],
     ground_truth: dict[str, Any] | None,
+    *,
+    remediation: bool,
 ) -> tuple[str, str]:
     llm_class = labels.get("impact_class")
-    if _injected_node_action_override(job, ground_truth):
+    if _injected_node_action_override(job, ground_truth, remediation=remediation):
         return python_class, reason
     if llm_class in IMPACT_CLASSES:
-        return str(llm_class), reason or str(labels.get("evidence") or "")
+        llm_class = str(llm_class)
+        if "harmed" in {python_class, llm_class}:
+            return "harmed", reason or str(labels.get("evidence") or "")
+        if python_class == llm_class == "helped":
+            return "helped", reason or str(labels.get("evidence") or "")
+        return "no_impact", reason or str(labels.get("evidence") or "")
     return python_class, reason
 
 
 def _injected_node_action_override(
     job: dict[str, Any],
     ground_truth: dict[str, Any] | None,
+    *,
+    remediation: bool,
 ) -> bool:
     injected = injected_targets(ground_truth)
     if not injected:
         return False
-    for action, node in _node_actions(_classification_haystack(job)):
+    haystack = (
+        _remediation_classification_haystack(job)
+        if remediation
+        else _rca_classification_haystack(job)
+    )
+    for action, node in _node_actions(haystack):
         if node in injected and action in {"uncordon", "cordon", "drain"}:
             return True
     return False
@@ -154,7 +172,7 @@ def _classify_rca_python(
     ground_truth: dict[str, Any] | None,
 ) -> tuple[str, str]:
     injected = injected_targets(ground_truth)
-    actions = _node_actions(_classification_haystack(job))
+    actions = _node_actions(_rca_classification_haystack(job))
     matched = labels.get("matched_injection") == "yes" or labels.get("session_kind") == "true_positive"
     for action, node in actions:
         if action == "uncordon" and node in injected:
@@ -181,7 +199,7 @@ def _classify_remediation_python(
     ground_truth: dict[str, Any] | None,
 ) -> tuple[str, str]:
     injected = injected_targets(ground_truth)
-    haystack = _classification_haystack(job)
+    haystack = _remediation_classification_haystack(job)
     actions = _node_actions(haystack)
     executed = _executed(job)
     for action, node in actions:
@@ -261,7 +279,7 @@ def _normalize_worker(token: str | None) -> str | None:
     return f"worker-node-{match.group(1)}"
 
 
-def _classification_haystack(job: dict[str, Any]) -> str:
+def _rca_classification_haystack(job: dict[str, Any]) -> str:
     result = job.get("result") or {}
     plan = result.get("remediation_plan") or {}
     parts = [
@@ -271,8 +289,35 @@ def _classification_haystack(job: dict[str, Any]) -> str:
         result.get("root_cause"),
         result.get("hypothesis"),
         result.get("action"),
-        json.dumps(result, default=str),
-        json.dumps(plan, default=str),
-        json.dumps(job.get("tool_calls") or [], default=str),
+        plan.get("action") if isinstance(plan, dict) else None,
+        json.dumps(plan.get("targets") or [], default=str)
+        if isinstance(plan, dict)
+        else None,
     ]
+    return " ".join(str(part).lower() for part in parts if part)
+
+
+def _remediation_classification_haystack(job: dict[str, Any]) -> str:
+    result = job.get("result") or {}
+    plan = result.get("remediation_plan") or {}
+    parts = [
+        job.get("error"),
+        job.get("status"),
+        result.get("summary"),
+        result.get("action"),
+        json.dumps(result.get("changes") or [], default=str),
+        plan.get("action") if isinstance(plan, dict) else None,
+        json.dumps(plan.get("targets") or [], default=str)
+        if isinstance(plan, dict)
+        else None,
+    ]
+    for call in job.get("tool_calls") or []:
+        if not isinstance(call, dict):
+            continue
+        parts.extend(
+            [
+                call.get("tool_name"),
+                json.dumps(call.get("arguments") or {}, default=str),
+            ]
+        )
     return " ".join(str(part).lower() for part in parts if part)

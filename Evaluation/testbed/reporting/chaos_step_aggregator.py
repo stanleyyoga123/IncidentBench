@@ -44,6 +44,10 @@ class ChaosStepAggregator:
                 "observed_placement_fingerprint", "unknown"
             )
             or "unknown",
+            "placement_definition_fingerprint": metadata.get("placement", {}).get(
+                "rendered_sha256", "unknown"
+            )
+            or "unknown",
             "mode": "agent" if metadata.get("agents_enabled") else "non-agent",
             "step_index": window.step_index,
             "step_name": window.step_name,
