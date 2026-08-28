@@ -134,42 +134,27 @@ every scenario and aborts the remaining batch if the final verification fails.
 See [docs/architecture.md](docs/architecture.md) for collection validation,
 execution, cleanup, metadata, and reporting behavior.
 
-Analyze local run artifacts (default `results/`):
+Grade local run artifacts (default `results/`):
 
 ```bash
-PYTHONPATH=. python -m analyzer --input results --output analysis
-PYTHONPATH=. python -m analyzer --input results --output analysis --reuse-judge
+PYTHONPATH=. python -m grader --input results --output grades
 ```
 
-Plots use elapsed minutes with chaos start at `0`. The judge talks to a vLLM
-OpenAI-compatible server (`JUDGE_URL`, default `http://localhost:8000/v1`;
-`JUDGE_MODEL`, default `Qwen/Qwen3.6-35B-A3B`). Chaos Mesh injections are ground
-truth: RCA that identifies the injected fault is marked correct, and
-`not_applicable` is scored conservatively instead of being removed from rubric
-denominators. RCA combines injection-match quality with accuracy across every
-session; remediation averages every attempted job and requires cited tool
-evidence for verified success. Chaos impact validates a run but adds no score,
-and exploratory tool failures are reported without lowering scores. Judge
-reports use the human-editable per-scenario answer keys in
-[`analyzer/ground_truth/`](analyzer/ground_truth/). Each filename must equal the
-scenario name from `metadata.json`; each file contains `## RCA` and
-`## Recommended remediation` sections. Each RCA output is
-compared with the scenario's expected RCA and each remediation with the
-recommended action. A semantic match scores `1.0`; a safe non-match scores
-`0.5`; and a harmful non-match, such as uncordoning a faulty node, scores `0.0`.
-Run `accuracy` is `1` only when at least one RCA and one remediation match their
-respective references. Judge gaps produce incomplete metrics instead of hidden
-failures. Override the answer-key directory with `--ground-truth PATH`. The existing
-weighted end score remains available as a legacy metric.
-Judge
-checkpoints include an input/model hash so normal reruns do not silently reuse
-stale labels. Each request has a 600-second timeout; override it with
-`--judge-timeout-seconds` or `JUDGE_TIMEOUT_SECONDS`. A timed-out request is
-recorded as a zero-credit, low-confidence, retryable judge error, allowing the
-remaining analysis to finish and a normal rerun to retry that entry. Reports
-expose evidence coverage, judge confidence, and their
-conservative product as metric confidence; this is a diagnostic reliability
-indicator, not a statistical confidence interval. Pass
-`--reuse-judge` to rescore from existing `judge.json` without calling vLLM, or
-`--skip-judge` for plots and operational errors only. Output is written to
-gitignored `analysis/`.
+The grader uses the manually maintained scenario answer keys in
+[`grader/ground_truth/`](grader/ground_truth/) and the exact Chaos Mesh
+manifests archived with each run. It grades final RCA and remediation results,
+applies the configured rubric and remediation penalties, and compares the
+five-minute Prometheus windows around completed remediation jobs. See
+[`grader/README.md`](grader/README.md) for judge configuration, scoring rules,
+cache behavior, and generated artifacts.
+
+Visualize metrics and lifecycle events without contacting the cluster or an
+LLM:
+
+```bash
+PYTHONPATH=. python -m visualizer --input results/result-3 --output visualizations
+```
+
+The visualizer produces separate metric-only, metric-with-timeline, and
+timeline-only folders. See [`visualizer/README.md`](visualizer/README.md) for
+configuration and output details.

@@ -122,19 +122,36 @@ Schedule definitions, content hashes, per-Schedule command results,
 active-window timestamps, cleanup verification, metrics, and run status. Exact
 inputs are copied to `inputs/scenario.json`, `inputs/chaos/`, and
 `inputs/placement/`. Postrun adds `sessions/` JSON exports of anomaly, RCA,
-remediation, and workflow rows. `analyzer/` reads those folders offline to
-plot metrics (elapsed minutes, chaos start at 0), extract operational errors,
-and score RCA/remediation sessions. RCA scoring balances conservative injected-
-fault matching with quality across all sessions. Remediation scoring averages
-all attempts and only reports verified success when cited post-action evidence
-supports it. Chaos impact is a run-validity signal rather than free score;
-`--reuse-judge` rescores from existing `judge.json` without calling vLLM.
-Primary scoring compares outputs with the scenario-named Markdown file in
-`analyzer/ground_truth/`. RCA and remediation are compared independently.
-A match scores 1.0, a safe non-match scores 0.5, and a harmful non-match scores
-0.0. Run accuracy is one only when at least one RCA and one remediation match;
-judge failures make the comparison incomplete. The legacy end score is retained
-separately for compatibility.
+remediation, and workflow rows.
+
+`grader/` compares each succeeded `rca_job.result` and
+`remediation_job.result` independently with the manually maintained
+scenario-named Markdown ground truth and the exact manifests archived under
+`inputs/chaos/`. `grader/rubric.json` supplies the criterion ids, class labels,
+scores, and weights. The judge returns only classifications; Python converts
+those classes into 0–1 scores and a weighted overall score. Alignment for the
+metric gate is derived from the correctness criterion score. For remediation
+only, scenario JSON arrays under `grader/penalties/` list harmful actions; the
+judge marks which apply and Python subtracts those amounts from the overall
+score, floored at 0. It does not read
+requests, raw output, tool calls, reasoning, anomalies, or learning records.
+For each completed remediation, it also reports
+per-series and family medians for all 13 Prometheus files over the specified
+five-minute before and after windows anchored at `completed_at`, applies the
+configured 15% direction policy and core-health gate, and writes per-run JSON,
+Markdown, judge checkpoints, a flat summary CSV, per-kind rubric score CSVs,
+and an aggregate report under `grades/`. Missing archived inputs make only the
+affected run `ungraded`.
+
+`visualizer/` is another standalone, read-only reporting path. It reads every
+Prometheus query-range family and normalizes timestamps from `metadata.json`
+and the anomaly, RCA, remediation, and remediation-tool session exports. Each
+run gets three distinct output folders: one line plot per metric, one aligned
+metric-plus-timeline figure per metric, and the timeline alone. The timeline
+folder also contains a CSV of the exact normalized events used in the plot.
+Elapsed minute zero is `metadata.started_at`; a missing start falls back to the
+earliest timestamp and is recorded as a warning. The visualizer performs no
+semantic grading, service calls, or cluster operations.
 
 Reporting supports version 2 only and groups agent/non-agent comparisons by
 scenario, placement reference, observed placement fingerprint, step index, step

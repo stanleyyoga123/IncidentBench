@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "kinds": {
+    "rca": {
+      "criteria": [
+        {
+          "id": "root_cause_correctness",
+          "symbol": "RC",
+          "name": "Root Cause Correctness",
+          "weight": 0.3,
+          "definition": "Measures whether the agent correctly identifies the actual underlying cause of the incident relative to the known ground-truth fault.",
+          "evaluation_note": "",
+          "classes": [
+            {
+              "id": "INCORRECT",
+              "score": 0.0,
+              "rubric": "The identified root cause is unrelated to or contradicts the ground-truth root cause."
+            },
+            {
+              "id": "MOSTLY_INCORRECT",
+              "score": 0.25,
+              "rubric": "The agent identifies a related symptom, component, or general problem area, but attributes the incident to the wrong underlying cause."
+            },
+            {
+              "id": "PARTIALLY_CORRECT",
+              "score": 0.5,
+              "rubric": "The agent identifies the correct general fault category or causal mechanism but misses important aspects of the actual root cause."
+            },
+            {
+              "id": "MOSTLY_CORRECT",
+              "score": 0.75,
+              "rubric": "The agent identifies the correct root cause with only minor inaccuracies, ambiguity, or missing specificity."
+            },
+            {
+              "id": "CORRECT",
+              "score": 1.0,
+              "rubric": "The agent correctly identifies the underlying root cause and relevant affected component at the level supported by the available evidence."
+            }
+          ]
+        },
+        {
+          "id": "causal_reasoning_quality",
+          "symbol": "CR",
+          "name": "Causal Reasoning Quality",
+          "weight": 0.25,
+          "definition": "Measures whether the agent provides a technically plausible and coherent causal explanation connecting the identified root cause to the observed symptoms.",
+          "evaluation_note": "A correct root-cause conclusion should not automatically receive a high causal-reasoning score. The reasoning itself must establish the causal relationship.",
+          "classes": [
+            {
+              "id": "NO_CAUSAL_REASONING",
+              "score": 0.0,
+              "rubric": "No meaningful causal explanation is provided, or the proposed reasoning contradicts the supplied evidence."
+            },
+            {
+              "id": "WEAK",
+              "score": 0.25,
+              "rubric": "The explanation mainly reports correlations or makes causal assertions without explaining how the proposed root cause produces the observed symptoms."
+            },
+            {
+              "id": "PLAUSIBLE",
+              "score": 0.5,
+              "rubric": "The agent provides a reasonable causal mechanism, but important steps in the causal chain are missing or insufficiently justified."
+            },
+            {
+              "id": "STRONG",
+              "score": 0.75,
+              "rubric": "The agent provides a coherent and technically plausible causal chain connecting the proposed root cause to the important observed symptoms."
+            },
+            {
+              "id": "COMPELLING",
+              "score": 1.0,
+              "rubric": "The agent provides a clear, technically sound, and well-supported causal chain explaining how the root cause produced the important observed symptoms."
+            }
+          ]
+        },
+        {
+          "id": "evidence_grounding",
+          "symbol": "EG",
+          "name": "Evidence Grounding",
+          "weight": 0.2,
+          "definition": "Measures the extent to which the agent's diagnosis and supporting claims are grounded in the telemetry, observations, logs, metrics, traces, or other evidence available during the incident.",
+          "evaluation_note": "Technical plausibility alone does not constitute evidence grounding. A claim must be supported by evidence actually available to the agent. Judge only claims inside AGENT_RESULT against GROUND_TRUTH and CHAOS_MANIFESTS; tool traces are not supplied.",
+          "classes": [
+            {
+              "id": "UNGROUNDED",
+              "score": 0.0,
+              "rubric": "Key claims are fabricated, contradicted by the supplied evidence, or have no meaningful evidential support."
+            },
+            {
+              "id": "WEAKLY_GROUNDED",
+              "score": 0.25,
+              "rubric": "The agent references limited relevant evidence but relies substantially on unsupported assumptions."
+            },
+            {
+              "id": "PARTIALLY_GROUNDED",
+              "score": 0.5,
+              "rubric": "Relevant evidence supports the general diagnosis, but some important claims or causal conclusions remain unsupported."
+            },
+            {
+              "id": "WELL_GROUNDED",
+              "score": 0.75,
+              "rubric": "Most important claims and conclusions are explicitly supported by relevant evidence, with only minor unsupported assumptions."
+            },
+            {
+              "id": "FULLY_GROUNDED",
+              "score": 1.0,
+              "rubric": "The diagnosis and causal explanation are consistently supported by the supplied evidence, with no material fabricated, contradictory, or unsupported claims."
+            }
+          ]
+        },
+        {
+          "id": "localization_accuracy",
+          "symbol": "LA",
+          "name": "Localization Accuracy",
+          "weight": 0.15,
+          "definition": "Measures how accurately and precisely the agent identifies the location of the originating fault within the system, such as the affected node, service, deployment, pod, or resource.",
+          "evaluation_note": "The agent should not be penalized for failing to identify a more granular component when that level of specificity cannot reasonably be inferred from the available evidence.",
+          "classes": [
+            {
+              "id": "WRONG",
+              "score": 0.0,
+              "rubric": "The agent localizes the fault to an unrelated or incorrect component."
+            },
+            {
+              "id": "BROADLY_WRONG",
+              "score": 0.25,
+              "rubric": "The agent identifies only a broad or partially related subsystem but fails to identify the actual affected area."
+            },
+            {
+              "id": "PARTIAL",
+              "score": 0.5,
+              "rubric": "The agent identifies the correct general component or system layer but does not sufficiently localize the originating fault."
+            },
+            {
+              "id": "MOSTLY_PRECISE",
+              "score": 0.75,
+              "rubric": "The agent identifies the correct affected component with only minor ambiguity or missing specificity."
+            },
+            {
+              "id": "PRECISE",
+              "score": 1.0,
+              "rubric": "The agent correctly identifies the originating fault location at the level of specificity justified by the available evidence and ground truth."
+            }
+          ]
+        },
+        {
+          "id": "diagnostic_completeness",
+          "symbol": "DC",
+          "name": "Diagnostic Completeness",
+          "weight": 0.1,
+          "definition": "Measures whether the RCA sufficiently explains the important symptoms and observations associated with the incident and connects them to the identified root cause.",
+          "evaluation_note": "Completeness does not require the agent to discuss every available metric. The evaluation should focus on whether the important evidence necessary to explain the incident has been addressed.",
+          "classes": [
+            {
+              "id": "INCOMPLETE",
+              "score": 0.0,
+              "rubric": "The RCA fails to explain the major observed symptoms or substantially contradicts the observations."
+            },
+            {
+              "id": "LIMITED",
+              "score": 0.25,
+              "rubric": "The RCA explains only a small portion of the incident and leaves most important observations unexplained."
+            },
+            {
+              "id": "PARTIAL",
+              "score": 0.5,
+              "rubric": "The RCA explains the primary symptom or root cause but leaves important observations or relationships unexplained."
+            },
+            {
+              "id": "MOSTLY_COMPLETE",
+              "score": 0.75,
+              "rubric": "The RCA explains most important observations and their relationship to the root cause, with only minor gaps."
+            },
+            {
+              "id": "COMPLETE",
+              "score": 1.0,
+              "rubric": "The RCA provides a coherent explanation covering the important observed symptoms and their relationship to the identified root cause, without material omissions or contradictions."
+            }
+          ]
+        }
+      ]
+    },
+    "remediation": {
+      "criteria": [
+        {
+          "id": "remediation_correctness",
+          "symbol": "RC",
+          "name": "Remediation Correctness",
+          "weight": 0.3,
+          "definition": "Measures whether the proposed remediation appropriately addresses the identified or ground-truth root cause and is expected to mitigate or resolve the incident.",
+          "evaluation_note": "A remediation that only treats an observed symptom should not receive the highest classification when a feasible action addressing the underlying cause is available.",
+          "classes": [
+            {
+              "id": "INCORRECT",
+              "score": 0.0,
+              "rubric": "The proposed remediation does not address the root cause, addresses an unrelated problem, or is likely to worsen the incident."
+            },
+            {
+              "id": "MOSTLY_INCORRECT",
+              "score": 0.25,
+              "rubric": "The remediation targets a related symptom or component but does not meaningfully address the underlying root cause."
+            },
+            {
+              "id": "PARTIALLY_CORRECT",
+              "score": 0.5,
+              "rubric": "The remediation addresses the root cause to some extent and may improve the incident, but does not fully resolve the underlying problem or misses an important action."
+            },
+            {
+              "id": "MOSTLY_CORRECT",
+              "score": 0.75,
+              "rubric": "The remediation appropriately addresses the root cause and is likely to resolve or substantially mitigate the incident, with only minor shortcomings."
+            },
+            {
+              "id": "CORRECT",
+              "score": 1.0,
+              "rubric": "The remediation directly and appropriately addresses the root cause and represents a technically appropriate action for resolving or mitigating the incident."
+            }
+          ]
+        },
+        {
+          "id": "technical_feasibility",
+          "symbol": "TF",
+          "name": "Technical Feasibility",
+          "weight": 0.2,
+          "definition": "Measures whether the proposed remediation can realistically be executed in the given Kubernetes/cloud-native environment using the available system capabilities and operational mechanisms.",
+          "evaluation_note": "Evaluate feasibility independently from correctness. A remediation may be executable but still be the wrong action for the incident.",
+          "classes": [
+            {
+              "id": "INFEASIBLE",
+              "score": 0.0,
+              "rubric": "The remediation cannot realistically be executed in the described environment or relies on nonexistent, invalid, or fundamentally incompatible mechanisms."
+            },
+            {
+              "id": "MOSTLY_INFEASIBLE",
+              "score": 0.25,
+              "rubric": "The general idea may be technically possible, but the proposed execution contains major technical problems or requires capabilities that are not available."
+            },
+            {
+              "id": "PARTIALLY_FEASIBLE",
+              "score": 0.5,
+              "rubric": "The remediation is technically possible but requires significant modification, additional steps, or unresolved prerequisites before it can be safely executed."
+            },
+            {
+              "id": "MOSTLY_FEASIBLE",
+              "score": 0.75,
+              "rubric": "The remediation is technically executable with only minor adjustments, assumptions, or implementation details missing."
+            },
+            {
+              "id": "FEASIBLE",
+              "score": 1.0,
+              "rubric": "The remediation is technically valid and executable in the given environment using the available operational capabilities."
+            }
+          ]
+        },
+        {
+          "id": "risk_and_safety",
+          "symbol": "RS",
+          "name": "Risk and Safety",
+          "weight": 0.2,
+          "definition": "Measures whether the remediation minimizes unnecessary operational risk, limits potential blast radius, and avoids actions that could introduce additional service disruption.",
+          "evaluation_note": "Risk should be evaluated relative to the incident. A disruptive action is not automatically incorrect when the severity of the incident justifies it.",
+          "classes": [
+            {
+              "id": "HIGH_RISK",
+              "score": 0.0,
+              "rubric": "The remediation introduces severe or unjustified operational risk, has an excessive blast radius, or could significantly worsen service availability or data integrity."
+            },
+            {
+              "id": "RISKY",
+              "score": 0.25,
+              "rubric": "The remediation introduces substantial avoidable risk or disruption relative to the severity and scope of the incident."
+            },
+            {
+              "id": "MODERATE_RISK",
+              "score": 0.5,
+              "rubric": "The remediation has meaningful operational risk, but the risk may be justified by the incident or can be controlled with additional safeguards."
+            },
+            {
+              "id": "LOW_RISK",
+              "score": 0.75,
+              "rubric": "The remediation has limited and proportionate operational risk, with only minor safety concerns or missing safeguards."
+            },
+            {
+              "id": "SAFE",
+              "score": 1.0,
+              "rubric": "The remediation minimizes unnecessary disruption, has an appropriately limited blast radius, and includes or inherently provides suitable operational safeguards."
+            }
+          ]
+        },
+        {
+          "id": "evidence_alignment",
+          "symbol": "EA",
+          "name": "Evidence Alignment",
+          "weight": 0.15,
+          "definition": "Measures whether the selected remediation logically follows from the observed evidence and diagnosed root cause rather than relying on unsupported assumptions.",
+          "evaluation_note": "A remediation may be a generally valid Kubernetes operation but should not receive a high evidence-alignment score unless the incident evidence provides a reason for selecting that particular action.",
+          "classes": [
+            {
+              "id": "UNALIGNED",
+              "score": 0.0,
+              "rubric": "The remediation has no meaningful relationship to the supplied evidence or diagnosed root cause, or directly contradicts them."
+            },
+            {
+              "id": "WEAKLY_ALIGNED",
+              "score": 0.25,
+              "rubric": "The remediation has a limited connection to the evidence but depends heavily on unsupported assumptions."
+            },
+            {
+              "id": "PARTIALLY_ALIGNED",
+              "score": 0.5,
+              "rubric": "The evidence provides reasonable support for the remediation, but important assumptions or justification gaps remain."
+            },
+            {
+              "id": "WELL_ALIGNED",
+              "score": 0.75,
+              "rubric": "The remediation follows logically from the diagnosis and is supported by the important available evidence, with only minor gaps."
+            },
+            {
+              "id": "FULLY_ALIGNED",
+              "score": 1.0,
+              "rubric": "The remediation is clearly justified by the supplied evidence and diagnosed root cause, without material unsupported assumptions."
+            }
+          ]
+        },
+        {
+          "id": "remediation_completeness",
+          "symbol": "CM",
+          "name": "Remediation Completeness",
+          "weight": 0.15,
+          "definition": "Measures whether the proposed remediation provides a sufficiently complete response to the incident, including the actions necessary to mitigate or resolve the problem and, when appropriate, verification of recovery.",
+          "evaluation_note": "Completeness should be evaluated relative to the complexity of the incident. A simple incident may require only a single corrective action followed by verification.",
+          "classes": [
+            {
+              "id": "INCOMPLETE",
+              "score": 0.0,
+              "rubric": "The proposed response omits the critical action required to mitigate or resolve the incident."
+            },
+            {
+              "id": "LIMITED",
+              "score": 0.25,
+              "rubric": "The remediation contains a relevant action but leaves major steps or important aspects of the incident unaddressed."
+            },
+            {
+              "id": "PARTIAL",
+              "score": 0.5,
+              "rubric": "The remediation includes the primary corrective action but lacks important supporting actions, validation, or recovery considerations."
+            },
+            {
+              "id": "MOSTLY_COMPLETE",
+              "score": 0.75,
+              "rubric": "The remediation includes the important corrective actions and addresses most operational considerations, with only minor omissions."
+            },
+            {
+              "id": "COMPLETE",
+              "score": 1.0,
+              "rubric": "The remediation provides a coherent corrective response and includes appropriate validation that the system has recovered or the incident has been mitigated."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

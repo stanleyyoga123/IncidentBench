@@ -220,4 +220,5 @@ __marimo__/
 # Evaluation run artifacts
 results/
 analysis/
-analyze.sh
+grades/
+visualizations/

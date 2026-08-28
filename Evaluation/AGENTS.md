@@ -42,8 +42,18 @@ Important modules:
   Schedule resources.
 - `testbed/evaluator/` collects Kubernetes snapshots and Prometheus metrics.
 - `testbed/reporting/` aggregates metadata schema version 2 runs.
-- `analyzer/` plots metrics (t=0 at first chaos), extracts operational errors,
-  and scores RCA/remediation with an OpenAI judge plus Python rubrics.
+- `grader/` judges only final RCA and
+  remediation result objects against manually maintained Markdown plus exact
+  archived chaos manifests, then compares all Prometheus families around each
+  completed remediation. The LLM classifies each criterion from
+  `grader/rubric.json`; Python converts those classes into 0–1 scores and a
+  weighted overall score. Remediation may then subtract scenario penalties from
+  `grader/penalties/<scenario>.json`.
+- `visualizer/` is the read-only metrics and lifecycle timeline path. It writes
+  separate metric-only, metric-with-timeline, and timeline-only folders using
+  elapsed time from the archived run start. Timeline lanes cover chaos-active
+  windows, anomalies, RCA/remediation boundaries, and check/live
+  `remediator.run_ansible` calls.
 - The evaluation-runner ServiceAccount, ClusterRoleBinding, and Pod in
   `kubernetes/pod.yaml`, placeholder `kubernetes/secret.yml`, and
   default-current-context `deploy.sh` stay here. Replace required `++++++++`
@@ -127,21 +137,28 @@ Every Schedule must be absent before the runner advances to the next step.
 `--skip-reset` is not supported because placement must be applied and verified
 for every run.
 
-Analyze copied run folders (gitignored `results/`) after an experiment:
+Grade copied run folders (gitignored `results/`) with the output-and-metrics
+grader:
 
 ```bash
-PYTHONPATH=. python -m analyzer --input results --output analysis
-PYTHONPATH=. python -m analyzer --input results --output analysis --skip-judge
-PYTHONPATH=. python -m analyzer --input results --output analysis --reuse-judge
+PYTHONPATH=. python -m grader --input results --output grades
 ```
 
-`JUDGE_URL` defaults to the local vLLM OpenAI-compatible server
-(`http://localhost:8000/v1`) and `JUDGE_MODEL` defaults to
-`Qwen/Qwen3.6-35B-A3B`. Override with `--base-url`, `--model`, and `--token`.
-The judge uses Chaos Mesh `chaos_definitions` as ground truth. An RCA session
-that names the injected locus and fault is a true positive (`matched_injection=yes`
-forces localization correct). Sessions that chase unrelated detector leads are
-scored as false alarms instead of `not_applicable`. Run-level RCA and
-remediation scores credit the best injection match rather than averaging every
-false alarm. `--reuse-judge` rescores from `analysis/runs/*/judge.json` without
-calling vLLM. Pass `--skip-judge` for plots and operational errors only.
+The grader requires archived `inputs/scenario.json` and every referenced
+`inputs/chaos/*.yaml`, and uses the matching manual file under
+`grader/ground_truth/`. It reads only `rca_session.json` and
+`remediation_run.json` final result fields for semantic grading. Criterion
+ids, class labels, scores, and weights come from `grader/rubric.json`.
+Remediation penalties come from `grader/penalties/`. See
+`grader/README.md` for the 15% metric policies, core-health gate, judge cache,
+artifact schemas, `rca_rubric_score.csv` / `remediation_rubric_score.csv`,
+persistent `grades/grader.log`, and `--verbose` console mode.
+
+Render run timelines without contacting the cluster or an LLM:
+
+```bash
+PYTHONPATH=. python -m visualizer --input results/result-3 --output visualizations
+```
+
+The input may be one run or a directory of runs. Use `--view` to render all
+three plot groups or only one. See `visualizer/README.md` for output files.
