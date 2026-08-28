@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-productcatalogservice-bandwidth-all-one-hour",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-productcatalogservice-per-pod-bandwidth-saturation",
+      "chaos": ["single-productcatalogservice-bandwidth"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

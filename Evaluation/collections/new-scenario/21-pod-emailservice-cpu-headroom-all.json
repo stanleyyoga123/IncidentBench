@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-emailservice-cpu-headroom-all-one-hour",
+  "placement": "cpu-constrained-six-node",
+  "steps": [
+    {
+      "name": "01-emailservice-cpu-headroom-exhaustion-all",
+      "chaos": ["single-emailservice-cpu"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

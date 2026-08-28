@@ -14,6 +14,7 @@ the platform and namespaces first, but does not install this runner.
 collections/
 ├── chaos/          # Complete Schedule YAML resources used by scenario suites
 ├── real-scenario/  # Relocatable, user-impacting production analogues
+├── new-scenario/   # Kubectl-remediable resource and capacity incidents
 └── long-scenario/  # One 24-hour multi-fault day
 ```
 
@@ -52,7 +53,21 @@ Run the curated real-world suite once with agents and constant load:
 ```
 
 The real-world suite is ordered with node-level incidents first, followed by
-CPU-only pod incidents.
+the original service CPU incidents.
+
+Run the kubectl-remediable resource and capacity suite separately:
+
+```bash
+./run_single.sh ./collections/new-scenario constant
+```
+
+Every `new-scenario` primary remediation is an ordinary Kubernetes mutation:
+node cordon/drain, vertical resource sizing, or bounded HPA scaling. The suite
+does not require restart, rollback, or image version changes as solutions.
+The email, checkout, and product-catalog CPU-headroom cases use the
+`cpu-constrained-six-node` Infrastructure overlay, which preserves canonical
+placement while setting every application CPU limit equal to its request. Each
+scenario right-sizes only its affected Deployment's CPU request and limit.
 
 Run the 24-hour compounding-incident day with the daily traffic curve:
 

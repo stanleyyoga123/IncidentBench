@@ -1,0 +1,26 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: single-checkoutservice-capacity-loss
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PodChaos
+  podChaos:
+    action: pod-failure
+    # One unavailable replica models a routine zonal, runtime, or host-local loss.
+    # Additional healthy replicas can absorb it; the whole service is not disabled.
+    mode: one
+    selector:
+      namespaces:
+      - online-boutique
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - checkoutservice
+    duration: 25s

@@ -4,11 +4,14 @@ Agent against Online Boutique microservices.
 The runner is collection-driven:
 
 - `collections/chaos/` contains complete Chaos Mesh `Schedule` YAML files used
-  by the real-scenario and long-scenario suites.
+  by the real-scenario, new-scenario, and long-scenario suites.
 - `../Infrastructure/kubernetes/online-boutique/kustomize/overlays/` contains
   pre-authored Kustomize placement profiles.
 - `collections/real-scenario/` contains JSON scenarios referencing YAML
   filename stems and one required placement profile.
+- `collections/new-scenario/` contains production-style resource and capacity
+  incidents whose accepted remediations are ordinary kubectl mutations rather
+  than restart, rollback, or version changes.
 - `collections/long-scenario/` contains one 24-hour multi-fault scenario.
 - `chaos: []` represents an idle recovery step.
 - Multiple references in one step are applied together.

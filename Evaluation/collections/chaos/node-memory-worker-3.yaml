@@ -1,0 +1,20 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: node-memory-worker-3
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PhysicalMachineChaos
+  physicalmachineChaos:
+    action: stress-mem
+    mode: one
+    selector:
+      physicalMachines:
+        chaos-mesh:
+        - worker-node-3
+    stress-mem:
+      size: 75%
+    duration: 25s

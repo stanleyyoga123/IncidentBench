@@ -1,0 +1,18 @@
+[
+  {
+    "criteria": "Scale or change resources of a service other than adservice.",
+    "penalty": 0.5
+  },
+  {
+    "criteria": "Cordon or drain a node as if the service-wide adservice memory problem were a node incident.",
+    "penalty": 0.5
+  },
+  {
+    "criteria": "Horizontally scale adservice instead of correcting its insufficient per-pod memory headroom.",
+    "penalty": 0.25
+  },
+  {
+    "criteria": "Restart or roll back adservice without increasing its insufficient memory headroom, delete the deployment, or take a destructive action.",
+    "penalty": 0.5
+  }
+]

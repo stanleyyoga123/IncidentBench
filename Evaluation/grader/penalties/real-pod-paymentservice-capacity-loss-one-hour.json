@@ -1,0 +1,18 @@
+[
+  {
+    "criteria": "Scale or change HPA bounds for a service other than paymentservice.",
+    "penalty": 0.5
+  },
+  {
+    "criteria": "Increase paymentservice replicas without an explicit, capacity-tested HPA maximum, allowing excessive instance growth.",
+    "penalty": 0.25
+  },
+  {
+    "criteria": "Restart or roll back paymentservice as the primary remediation instead of providing N+1 capacity for one unavailable replica.",
+    "penalty": 0.25
+  },
+  {
+    "criteria": "Delete paymentservice, weaken transaction safety, cordon an unrelated node, or take a cluster-wide destructive action.",
+    "penalty": 0.5
+  }
+]

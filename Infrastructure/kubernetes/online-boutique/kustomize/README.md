@@ -67,6 +67,14 @@ You need to have a Kubernetes cluster where you will deploy the Online Boutique'
 
 ## Deploy Online Boutique variations with Kustomize
 
+The evaluation overlays under `overlays/` include:
+
+- `canonical-six-node`, which provides the standard six-node scheduling,
+  replicas, topology spread, and HPA baseline;
+- `cpu-constrained-six-node`, which inherits that baseline and sets every
+  application CPU limit equal to its request to model a no-burst-headroom
+  resource policy for remediation evaluation.
+
 Here is the list of the variations available as Kustomize components that you could leverage:
 
 - [**Change to the Cymbal Shops Branding**](components/cymbal-branding)

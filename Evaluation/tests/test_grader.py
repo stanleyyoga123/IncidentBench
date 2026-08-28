@@ -220,10 +220,21 @@ def _write_metrics(run: Path) -> None:
 
 def test_all_current_primary_scenarios_have_valid_ground_truth() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
-    scenarios = []
-    for path in sorted((EVALUATION_ROOT / "collections" / "real-scenario").glob("*.json")):
-        scenarios.append(json.loads(path.read_text(encoding="utf-8"))["name"])
-    assert len(scenarios) == 11
+    real_scenarios = [
+        json.loads(path.read_text(encoding="utf-8"))["name"]
+        for path in sorted(
+            (EVALUATION_ROOT / "collections" / "real-scenario").glob("*.json")
+        )
+    ]
+    new_scenarios = [
+        json.loads(path.read_text(encoding="utf-8"))["name"]
+        for path in sorted(
+            (EVALUATION_ROOT / "collections" / "new-scenario").glob("*.json")
+        )
+    ]
+    scenarios = real_scenarios + new_scenarios
+    assert len(real_scenarios) == 11
+    assert len(new_scenarios) == 12
     assert set(scenarios).issubset(truth)
     assert all(truth[name]["rca"] and truth[name]["remediation"] for name in scenarios)
 

@@ -1,8 +1,8 @@
 # Collection-Driven Evaluation Architecture
 
-The runner consumes scenario JSON from `collections/real-scenario` or
-`collections/long-scenario`, complete Chaos Mesh `Schedule` resources from
-`collections/chaos`, and pre-authored Kustomize placement profiles from
+The runner consumes scenario JSON from `collections/real-scenario`,
+`collections/new-scenario`, or `collections/long-scenario`, complete Chaos Mesh
+`Schedule` resources from `collections/chaos`, and pre-authored Kustomize placement profiles from
 `../../Infrastructure/kubernetes/online-boutique/kustomize/overlays`. It never
 renders a chaos resource or monitors recurrence children in Python.
 
@@ -50,9 +50,19 @@ The `role: services` selector defines eligibility. The spread rule asks the
 scheduler to balance matching replicas across hostnames but deliberately does
 not leave a pod Pending solely because perfect balance is unavailable.
 
-Pod-targeted chaos Schedules use an `app In (...)` expression, omit node
-selectors, and target every Running replica of the selected service. This keeps
-the five pod CPU scenarios independent of soft scheduler placement.
+The `cpu-constrained-six-node` profile inherits the complete canonical profile
+and changes only application CPU limits. For all 11 Deployments, the rendered
+CPU limit equals the existing request. This models a restrictive resource
+policy with no burst headroom while retaining identical replicas, HPA targets,
+node eligibility, and topology spreading. The email, checkout, and
+product-catalog CPU-headroom scenarios use this profile and each expects one
+scoped Deployment resource correction.
+
+Pod-targeted chaos Schedules use an `app In (...)` expression and omit node
+selectors. Resource-saturation scenarios follow every Running replica so
+vertical or bounded horizontal scaling can be evaluated independently of soft
+scheduler placement. The checkout capacity-loss scenario deliberately affects
+one replica at a time so a bounded N+1 HPA policy can absorb the loss.
 
 ## Runtime flow
 

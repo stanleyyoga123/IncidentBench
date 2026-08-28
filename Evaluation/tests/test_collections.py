@@ -65,19 +65,32 @@ def write_placement_collection(root: Path, reference="placement") -> PlacementCa
 
 
 class CollectionValidationTests(unittest.TestCase):
-    def test_real_scenario_collection_and_chaos_catalog_are_valid(self):
+    def test_primary_scenario_collections_and_chaos_catalog_are_valid(self):
         root = Path(__file__).resolve().parents[1]
         catalog = ChaosCatalog(root / "collections" / "chaos")
         placements = PlacementCatalog(
             root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
         )
-        scenarios = [
+        real_scenarios = [
             ScenarioLoader(root, catalog, placements).load(path)
             for path in sorted((root / "collections" / "real-scenario").glob("*.json"))
         ]
-        self.assertEqual(len(catalog.schedules), 17)
-        self.assertEqual(len(scenarios), 11)
-        self.assertEqual(placements.references, ("canonical-six-node",))
+        new_scenarios = [
+            ScenarioLoader(root, catalog, placements).load(path)
+            for path in sorted((root / "collections" / "new-scenario").glob("*.json"))
+        ]
+        scenarios = real_scenarios + new_scenarios
+        self.assertEqual(len(catalog.schedules), 26)
+        self.assertEqual(len(real_scenarios), 11)
+        self.assertEqual(len(new_scenarios), 12)
+        self.assertEqual(
+            len({scenario.name for scenario in scenarios}),
+            len(scenarios),
+        )
+        self.assertEqual(
+            placements.references,
+            ("canonical-six-node", "cpu-constrained-six-node"),
+        )
         placement = PlacementRenderer(CommandRunner(), root).render(
             "canonical-six-node",
             placements.resolve("canonical-six-node"),
@@ -103,11 +116,21 @@ class CollectionValidationTests(unittest.TestCase):
                 "node-loss-worker-1",
                 "node-loss-worker-2",
                 "node-loss-worker-3",
+                "node-cpu-worker-2",
+                "node-memory-worker-3",
                 "single-cartservice-cpu",
                 "single-checkoutservice-cpu",
                 "single-recommendationservice-cpu",
                 "single-productcatalogservice-cpu",
                 "single-paymentservice-cpu",
+                "single-adservice-memory",
+                "single-checkoutservice-capacity-loss",
+                "single-productcatalogservice-bandwidth",
+                "single-redis-cart-memory",
+                "single-currencyservice-memory",
+                "single-shippingservice-bandwidth",
+                "single-paymentservice-capacity-loss",
+                "single-emailservice-cpu",
             },
         )
         self.assertNotIn("node-delay-worker-4", catalog_refs)
@@ -132,7 +155,16 @@ class CollectionValidationTests(unittest.TestCase):
                 else:
                     self.assertEqual(len(nodes), 1)
             else:
-                self.assertEqual(child["mode"], "all")
+                expected_mode = (
+                    "one"
+                    if schedule.reference
+                    in {
+                        "single-checkoutservice-capacity-loss",
+                        "single-paymentservice-capacity-loss",
+                    }
+                    else "all"
+                )
+                self.assertEqual(child["mode"], expected_mode)
                 self.assertEqual(selector["namespaces"], ["online-boutique"])
                 self.assertNotIn("nodes", selector)
                 expressions = selector["expressionSelectors"]
@@ -141,8 +173,74 @@ class CollectionValidationTests(unittest.TestCase):
                 self.assertTrue(schedule.reference.startswith("single-"))
                 self.assertEqual(len(expressions[0]["values"]), 1)
                 self.assertNotIn("frontend", expressions[0]["values"])
+        schedules_by_reference = {
+            schedule.reference: schedule for schedule in catalog.schedules
+        }
+        expected_new_faults = {
+            "node-cpu-worker-2": ("PhysicalMachineChaos", "stress-cpu"),
+            "node-memory-worker-3": ("PhysicalMachineChaos", "stress-mem"),
+            "single-adservice-memory": ("StressChaos", None),
+            "single-checkoutservice-capacity-loss": ("PodChaos", "pod-failure"),
+            "single-productcatalogservice-bandwidth": (
+                "NetworkChaos",
+                "bandwidth",
+            ),
+            "single-redis-cart-memory": ("StressChaos", None),
+            "single-currencyservice-memory": ("StressChaos", None),
+            "single-shippingservice-bandwidth": ("NetworkChaos", "bandwidth"),
+            "single-paymentservice-capacity-loss": ("PodChaos", "pod-failure"),
+            "single-emailservice-cpu": ("StressChaos", None),
+        }
+        for reference, (child_type, action) in expected_new_faults.items():
+            with self.subTest(reference=reference):
+                schedule = schedules_by_reference[reference]
+                self.assertEqual(schedule.child_type, child_type)
+                self.assertEqual(schedule.action, action)
+        node_memory = schedules_by_reference["node-memory-worker-3"].manifest[
+            "spec"
+        ]["physicalmachineChaos"]
+        self.assertEqual(node_memory["stress-mem"], {"size": "75%"})
+        checkout_capacity = schedules_by_reference[
+            "single-checkoutservice-capacity-loss"
+        ].manifest["spec"]["podChaos"]
+        self.assertEqual(checkout_capacity["mode"], "one")
+        catalog_bandwidth = schedules_by_reference[
+            "single-productcatalogservice-bandwidth"
+        ].manifest["spec"]["networkChaos"]
+        self.assertEqual(
+            catalog_bandwidth["bandwidth"],
+            {"rate": "1mbps", "limit": 2097152, "buffer": 10000},
+        )
+        redis_memory = schedules_by_reference[
+            "single-redis-cart-memory"
+        ].manifest["spec"]["stressChaos"]
+        self.assertEqual(
+            redis_memory["stressors"]["memory"],
+            {"workers": 1, "size": "400MB"},
+        )
+        payment_capacity = schedules_by_reference[
+            "single-paymentservice-capacity-loss"
+        ].manifest["spec"]["podChaos"]
+        self.assertEqual(payment_capacity["mode"], "one")
+        shipping_bandwidth = schedules_by_reference[
+            "single-shippingservice-bandwidth"
+        ].manifest["spec"]["networkChaos"]
+        self.assertEqual(
+            shipping_bandwidth["bandwidth"],
+            {"rate": "1mbps", "limit": 2097152, "buffer": 10000},
+        )
         for scenario in scenarios:
-            self.assertEqual(scenario.placement, "canonical-six-node")
+            constrained_scenarios = {
+                "real-pod-emailservice-cpu-headroom-all-one-hour",
+                "real-pod-checkoutservice-cpu-headroom-all-one-hour",
+                "real-pod-productcatalogservice-cpu-headroom-all-one-hour",
+            }
+            expected_placement = (
+                "cpu-constrained-six-node"
+                if scenario.name in constrained_scenarios
+                else "canonical-six-node"
+            )
+            self.assertEqual(scenario.placement, expected_placement)
             self.assertEqual(len(scenario.steps), 2)
             chaos_step, recovery_step = scenario.steps
             self.assertFalse(chaos_step.idle)
@@ -315,6 +413,57 @@ class CollectionValidationTests(unittest.TestCase):
             hpa = hpas[f"{name}-hpa"]
             self.assertEqual(hpa["spec"]["minReplicas"], expected_replicas)
             self.assertEqual(hpa["spec"]["maxReplicas"], 30)
+
+    def test_cpu_constrained_placement_preserves_topology_and_removes_headroom(self):
+        root = Path(__file__).resolve().parents[1]
+        catalog = PlacementCatalog(
+            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+        )
+        profile = PlacementRenderer(CommandRunner(), root).render(
+            "cpu-constrained-six-node",
+            catalog.resolve("cpu-constrained-six-node"),
+        )
+        self.assertEqual(
+            profile.allowed_nodes,
+            {
+                deployment: tuple(f"worker-node-{index}" for index in range(1, 7))
+                for deployment in APPLICATION_DEPLOYMENTS
+            },
+        )
+        documents = list(yaml.safe_load_all(profile.rendered_manifest))
+        deployments = {
+            document["metadata"]["name"]: document
+            for document in documents
+            if document and document.get("kind") == "Deployment"
+        }
+        hpas = {
+            document["metadata"]["name"]: document
+            for document in documents
+            if document and document.get("kind") == "HorizontalPodAutoscaler"
+        }
+        self.assertEqual(set(deployments), set(APPLICATION_DEPLOYMENTS))
+        for name, deployment in deployments.items():
+            container = deployment["spec"]["template"]["spec"]["containers"][0]
+            resources = container["resources"]
+            self.assertEqual(
+                resources["limits"]["cpu"],
+                resources["requests"]["cpu"],
+                name,
+            )
+            pod_spec = deployment["spec"]["template"]["spec"]
+            self.assertEqual(pod_spec["nodeSelector"], {"role": "services"})
+            self.assertEqual(
+                pod_spec["topologySpreadConstraints"][0]["topologyKey"],
+                "kubernetes.io/hostname",
+            )
+            hpa = hpas[f"{name}-hpa"]
+            self.assertEqual(hpa["spec"]["maxReplicas"], 30)
+            self.assertEqual(
+                hpa["spec"]["metrics"][0]["resource"]["target"][
+                    "averageUtilization"
+                ],
+                70,
+            )
 
     def test_schedule_validation_rejects_contract_violations(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,0 +1,16 @@
+{
+  "name": "real-pod-currencyservice-memory-all-one-hour",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-currencyservice-memory-pressure-all",
+      "chaos": ["single-currencyservice-memory"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}
