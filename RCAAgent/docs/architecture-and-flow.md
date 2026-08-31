@@ -90,7 +90,7 @@ cluster knowledge. The user prompt begins with detector anomaly details, one
 section per event:
 
 - event ID and detection timestamp;
-- resource, name, metric, and detector method;
+- namespace (or cluster scope), resource, name, metric, and detector method;
 - detector detail containing observed/baseline statistics and provenance.
 
 Detector data is explicitly a lead, not proof. Event IDs must be preserved in
@@ -111,11 +111,14 @@ The top-level RCA model receives only two direct tools:
 - `cluster.profile_baseline`;
 - `agent_spawner`.
 
-Its first call must be `cluster.profile_baseline`. The profiler inventories all
-deployments in `online-boutique` and cluster nodes, then correlates Kubernetes
-state with bounded Prometheus metrics, Loki samples, network-probe coverage,
-and an overlay/underlay latency matrix. When the detector timestamp is known it
-is passed as `evaluation_time` to center evidence on the event.
+Its first call must be `cluster.profile_baseline` with an explicit namespace
+from the incident. The profiler inventories all deployments in that namespace
+and cluster nodes, then correlates Kubernetes state with bounded Prometheus
+metrics, Loki samples, network-probe coverage, and an overlay/underlay latency
+matrix. Incidents spanning namespaces profile each represented namespace;
+cluster-scoped events profile every namespace configured under
+`workloads.namespaces`. When the detector timestamp is known it is passed as
+`evaluation_time` to center evidence on the event.
 
 Missing signals and tool errors are not evidence of health. They must appear in
 `Failed Investigation` or uncertainty. Only after the baseline returns may the
@@ -222,6 +225,7 @@ mutation is allowed, retry is considered safe.
 | `worker.lease_seconds` | `1200` |
 | `worker.max_attempts` | `3` |
 | `manager.max_rounds` | `10` top-level model rounds. |
+| `workloads.namespaces` | Application namespaces eligible for incident profiling. |
 
 Langfuse credentials are supplied through the component Secret and correlated
 with `session_id=<rca-job-id>`, trace name `rca`.

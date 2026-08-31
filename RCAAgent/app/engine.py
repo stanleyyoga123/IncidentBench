@@ -39,7 +39,11 @@ class RCAEngine:
 
     def run(self, job_id, request: RCAJobRequest) -> tuple[RCAResult, str]:
         system = "\n\n".join(
-            [get_role_prompt("agent_orchestrator"), CLUSTER_KNOWLEDGE]
+            [
+                get_role_prompt("agent_orchestrator"),
+                CLUSTER_KNOWLEDGE,
+                self._workload_context(request),
+            ]
         )
         agent = Agent(
             name="rca-agent",
@@ -74,6 +78,7 @@ class RCAEngine:
                     [
                         f"Event ID: {item.get('event_id', 'unknown')}",
                         f"Detected at: {item.get('detected_at', 'unknown')}",
+                        f"Namespace: {item.get('namespace') or 'cluster-scoped'}",
                         f"Resource: {item.get('resource', 'unknown')}",
                         f"Name: {item.get('name', 'unknown')}",
                         f"Metric: {item.get('metric', 'unknown')}",
@@ -102,6 +107,25 @@ class RCAEngine:
             + "\n\n---\n\n".join(sections)
             + lessons
             + context
+        )
+
+    def _workload_context(self, request: RCAJobRequest) -> str:
+        configured = list(dict.fromkeys(self.settings.workloads.namespaces))
+        observed = sorted(
+            {
+                str(item["namespace"])
+                for item in request.anomalies
+                if item.get("namespace")
+            }
+        )
+        return (
+            "# Runtime Workload Scope\n\n"
+            f"- Configured application namespaces: {', '.join(configured)}.\n"
+            f"- Namespaces carried by this incident: {', '.join(observed) if observed else 'none; the detector events are cluster-scoped'}.\n"
+            "- Select baseline namespaces from incident evidence. For a cluster-scoped "
+            "event, profile each configured application namespace before declaring its "
+            "blast radius. Never assume a particular application, frontend, service "
+            "name, or topology; discover all of them from current evidence."
         )
 
     @classmethod

@@ -7,15 +7,17 @@ long-running coordination service.
 Detailed schema relationships and migration/runtime flows start at
 [`docs/README.md`](docs/README.md).
 
-Head revision `20260819_0003` retains the split-agent schema and adds:
+Head revision `20260831_0004` retains the split-agent schema and adds:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`;
 - singleton `agent_execution_slot` for global RCA/remediation/learning serialization;
 - `agent_tool_call`, `remediation_artifact`, `learning_job`, and
-  `incident_lesson` tables.
+  `incident_lesson` tables;
+- namespace scope on anomaly events and reusable lessons.
 
 Revision `20260817_0002` performs the destructive legacy replacement;
-`20260819_0003` is additive and also repairs a missing singleton slot row.
+`20260819_0003` adds learning and repairs a missing singleton slot row;
+`20260831_0004` adds workload namespace scope.
 
 The upgrade is intentionally destructive. When any legacy table has records,
 it refuses to proceed unless `ALLOW_AGENT_WORKFLOW_RESET=true` is supplied.

@@ -1,0 +1,17 @@
+{
+  "name": "real-node-memory-worker-3-one-hour",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-worker-node-3-memory-exhaustion",
+      "chaos": ["node-memory-worker-3"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

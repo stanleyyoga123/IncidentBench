@@ -11,6 +11,7 @@ from testbed.chaos.execution.cluster_chaos_state_cleaner import ClusterChaosStat
 from testbed.command.command_logger import CommandLogger
 from testbed.command.command_runner import CommandRunner
 from testbed.evaluator.prometheus import PrometheusClient
+from testbed.orchestration.baseline_phase import BaselinePhase
 from testbed.orchestration import ExperimentRunner
 from testbed.reporting import AgentComparator
 from testbed.reporting.chaos_window import ChaosWindowReader
@@ -18,6 +19,50 @@ from testbed.reporting.metadata_reader import MetadataReader
 
 
 class ArchitectureTests(unittest.TestCase):
+    def test_baseline_waits_for_application_warmup_before_starting_load(self):
+        events = []
+
+        class Metadata:
+            def write(self, _metadata):
+                events.append("metadata")
+
+        class Evaluator:
+            def collect_snapshot(self, _name):
+                events.append("snapshot")
+                return {}
+
+        process = SimpleNamespace(command=["locust"])
+        context = SimpleNamespace(
+            config=SimpleNamespace(
+                startup_delay_seconds=180,
+                application="teastore",
+                repo_root=Path("/app"),
+                output_dir=Path("/results"),
+                loadgenerator="constant",
+                loadgenerator_module="applications.teastore",
+                host="http://teastore",
+                baseline_seconds=0,
+                agents_enabled=False,
+            ),
+            metadata={"snapshots": [], "loadgenerator": {}, "phases": []},
+            evaluator=Evaluator(),
+            load_process=None,
+            run_started_wall=None,
+            phase_results=[],
+            total_load_duration=60,
+        )
+        phase = BaselinePhase(
+            lambda **_kwargs: events.append("load") or process,
+            lambda *_args: None,
+            Metadata(),
+            lambda _message: None,
+            sleep=lambda seconds: events.append(f"sleep:{seconds}"),
+        )
+
+        phase.execute(context)
+
+        self.assertEqual(events[:3], ["sleep:180", "snapshot", "load"])
+
     def test_main_is_a_small_entrypoint(self):
         testbed = Path(__file__).resolve().parents[1] / "testbed"
         main_path = testbed / "main.py"

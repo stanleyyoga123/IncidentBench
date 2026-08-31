@@ -1,13 +1,11 @@
 import hashlib
 import json
-import os
 from pathlib import Path
 
 from ..artifacts.artifact_layout import ArtifactLayout
 from ..command.command_logger import CommandLogger
 from ..command.command_runner import CommandRunner
 from ..domain.placement import (
-    APPLICATION_DEPLOYMENTS,
     HOSTNAME_LABEL,
     SERVICES_LABEL,
     SERVICES_LABEL_VALUE,
@@ -26,19 +24,14 @@ class ApplicationDeploymentController:
         command_logger: CommandLogger,
         repo_root: Path,
         *,
-        infrastructure_root: Path | None = None,
+        application_profile=None,
     ) -> None:
         self.runner = runner
         self.kubectl = kubectl
         self.artifacts = artifacts
         self.command_logger = command_logger
         self.repo_root = repo_root
-        self.infrastructure_root = infrastructure_root or Path(
-            os.getenv(
-                "INFRASTRUCTURE_ROOT",
-                Path(repo_root).parent / "Infrastructure",
-            )
-        )
+        self.application_profile = application_profile
 
     def normalize_nodes(self, profile: PlacementProfile) -> dict:
         nodes = {}
@@ -98,7 +91,17 @@ class ApplicationDeploymentController:
                 for condition in conditions
             )
             schedulable = not spec.get("unschedulable", False)
-            services_label = labels.get(SERVICES_LABEL)
+            selector_key = (
+                self.application_profile.placement.node_selector_key
+                if self.application_profile is not None
+                else SERVICES_LABEL
+            )
+            selector_value = (
+                self.application_profile.placement.node_selector_value
+                if self.application_profile is not None
+                else SERVICES_LABEL_VALUE
+            )
+            services_label = labels.get(selector_key)
             hostname = labels.get(HOSTNAME_LABEL)
             blocking_taints = []
             for taint in spec.get("taints", []):
@@ -133,9 +136,9 @@ class ApplicationDeploymentController:
                 logged["errors"].append(f"node is not Ready: {node_name}")
             if not schedulable:
                 logged["errors"].append(f"node is unschedulable: {node_name}")
-            if services_label != SERVICES_LABEL_VALUE:
+            if services_label != selector_value:
                 logged["errors"].append(
-                    f"node {node_name} must have {SERVICES_LABEL}={SERVICES_LABEL_VALUE}"
+                    f"node {node_name} must have {selector_key}={selector_value}"
                 )
             if hostname != node_name:
                 logged["errors"].append(
@@ -150,11 +153,12 @@ class ApplicationDeploymentController:
         return logged
 
     def verify_placement(self, profile: PlacementProfile, namespace: str) -> dict:
+        workload_names = tuple(sorted(profile.allowed_nodes))
         deployment_result = self.kubectl.run(
             [
                 "get",
                 "deployments",
-                *APPLICATION_DEPLOYMENTS,
+                *workload_names,
                 "-n",
                 namespace,
                 "-o",
@@ -204,16 +208,21 @@ class ApplicationDeploymentController:
             for item in deployments
             if item.get("metadata", {}).get("name")
         }
-        if set(live_deployments) != set(APPLICATION_DEPLOYMENTS):
+        if set(live_deployments) != set(workload_names):
             verification["errors"].append(
                 "live Deployment set does not match the placement profile"
             )
-        for name in APPLICATION_DEPLOYMENTS:
+        for name in workload_names:
             deployment = live_deployments.get(name)
             if deployment is None:
                 continue
             try:
-                nodes, _ = extract_deployment_placement(deployment)
+                nodes, _ = extract_deployment_placement(
+                    deployment,
+                    self.application_profile.placement
+                    if self.application_profile is not None
+                    else None,
+                )
             except ValueError as exc:
                 verification["errors"].append(str(exc))
                 continue
@@ -221,11 +230,16 @@ class ApplicationDeploymentController:
                 verification["errors"].append(
                     f"Deployment {name} placement differs from archived profile"
                 )
-        counts = {name: {} for name in APPLICATION_DEPLOYMENTS}
-        pod_counts = {name: 0 for name in APPLICATION_DEPLOYMENTS}
+        counts = {name: {} for name in workload_names}
+        pod_counts = {name: 0 for name in workload_names}
+        label_key = (
+            self.application_profile.placement.label_key
+            if self.application_profile is not None
+            else "app"
+        )
         for pod in pods:
             metadata = pod.get("metadata", {})
-            app = metadata.get("labels", {}).get("app")
+            app = metadata.get("labels", {}).get(label_key)
             if app not in counts:
                 continue
             pod_counts[app] += 1

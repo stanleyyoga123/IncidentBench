@@ -15,8 +15,14 @@ class PortForwardPhase(PhaseSupport):
             self.log("port-forward phase skipped")
             return self.record(context, PhaseResult.success(self.name, skipped=True))
         port = context.config.port_forward_port
-        self.log(f"port-forward phase: forwarding svc/frontend to localhost:{port}")
-        process, result = self.controller.start(context.config.namespace, port)
+        service = context.config.port_forward_service
+        self.log(f"port-forward phase: forwarding svc/{service} to localhost:{port}")
+        process, result = self.controller.start(
+            context.config.namespace,
+            port,
+            remote_port=context.config.port_forward_remote_port,
+            service=service,
+        )
         context.port_forward_process = process
         context.metadata["commands"]["port_forward_frontend"] = result
         if result["returncode"] != 0:

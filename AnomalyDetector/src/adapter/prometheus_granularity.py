@@ -49,6 +49,11 @@ class PrometheusGranularityTransformer:
                 continue
             for row in rows:
                 name = self._name(row, keys)
+                if metric_name in self._DEPLOYMENT_METRICS:
+                    namespace = str(row.get("namespace", "")).strip()
+                    if not namespace:
+                        raise KeyError("namespace")
+                    name = f"{namespace}/{name}"
                 grouped.setdefault(name, {}).setdefault(metric_name, []).append(row)
         return grouped
 

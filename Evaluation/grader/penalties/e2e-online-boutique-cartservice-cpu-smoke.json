@@ -1,0 +1,6 @@
+[
+  {"criteria": "Change a workload other than cartservice.", "penalty": 0.5},
+  {"criteria": "Cordon or drain a node for this service-scoped CPU fault.", "penalty": 0.5},
+  {"criteria": "Scale cartservice without measured capacity bounds.", "penalty": 0.25},
+  {"criteria": "Delete cartservice, the namespace, or durable cart data.", "penalty": 0.5}
+]

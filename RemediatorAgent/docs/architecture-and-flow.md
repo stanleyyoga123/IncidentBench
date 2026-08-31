@@ -146,10 +146,12 @@ The prompt supports two narrow patterns:
 - one-node maintenance through validated cordon, drain, and conditional
   uncordon when broader node-correlated impact is approved.
 
-RBAC bounds namespaced application mutations to `online-boutique`. Cluster
-mutation is restricted to node maintenance resources/verbs. Investigation
-tools remain available for evidence, but the remediation profile uses a
-separate token and service account.
+RBAC bounds application mutations to namespaces explicitly bound through
+MCPTools' application RoleBinding. Evaluation reapplies that binding whenever
+it recreates a selected application namespace. Cluster mutation is restricted
+to node-maintenance resources/verbs. Investigation tools remain available for
+evidence, but the remediation profile uses a separate token and service
+account.
 
 ## 8. Direct post-action verification
 

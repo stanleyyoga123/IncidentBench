@@ -1,0 +1,30 @@
+id: teastore
+namespace: teastore
+host: http://teastore-webui.teastore.svc.cluster.local:8080/tools.descartes.teastore.webui
+port_forward_service: teastore-webui
+port_forward_remote_port: 8080
+loadgenerator_module: applications.teastore
+startup_delay_seconds: 180
+installer:
+  type: kustomize
+  source_environment: TEASTORE_ROOT
+  source_default: Evaluation/applications/teastore
+  path: kustomize
+  required_files:
+    - kustomization.yaml
+  prerequisite_manifests: []
+placement:
+  mode: rendered
+  root: applications/teastore/kustomize/overlays
+  workload_names:
+    - teastore-auth
+    - teastore-db
+    - teastore-image
+    - teastore-persistence
+    - teastore-recommender
+    - teastore-registry
+    - teastore-webui
+  workload_prefixes: []
+  label_key: app
+  node_selector_key: role
+  node_selector_value: services

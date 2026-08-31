@@ -11,6 +11,7 @@ class LoadGeneratorLauncher:
         repo_root: Path,
         output_dir: Path,
         scenario: str,
+        application_module: str,
         host: str,
         duration_seconds: int,
     ):
@@ -18,6 +19,7 @@ class LoadGeneratorLauncher:
             repo_root=repo_root,
             output_dir=output_dir,
             scenario=scenario,
+            application_module=application_module,
             host=host,
             duration_seconds=duration_seconds,
         )

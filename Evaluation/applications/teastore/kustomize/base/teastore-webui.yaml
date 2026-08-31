@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-webui
+  labels:
+    app: teastore-webui
+spec:
+  selector:
+    matchLabels:
+      app: teastore-webui
+  template:
+    metadata:
+      labels:
+        app: teastore-webui
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "false"
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    spec:
+      containers:
+        - name: teastore-webui
+          image: descartesresearch/teastore-webui
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-webui"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: REGISTRY_PORT
+              value: "8080"
+            - name: SERVICE_PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: 1500m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 3Gi
+          startupProbe:
+            exec:
+              command: ["/bin/bash", "-lc", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
+          readinessProbe:
+            exec:
+              command: ["/bin/bash", "-lc", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/bin/bash", "-lc", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-webui
+  labels:
+    app: teastore-webui
+spec:
+  type: ClusterIP
+  selector:
+    app: teastore-webui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-webui-external
+  labels:
+    app: teastore-webui
+spec:
+  type: NodePort
+  selector:
+    app: teastore-webui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30081

@@ -18,10 +18,12 @@ class ScenarioLoader:
         repo_root: Path,
         catalog: ChaosCatalog,
         placement_catalog: PlacementCatalog,
+        application_catalog=None,
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         self.catalog = catalog
         self.placement_catalog = placement_catalog
+        self.application_catalog = application_catalog
 
     def load(self, path: Path) -> Scenario:
         source = Path(path).expanduser()
@@ -33,10 +35,16 @@ class ScenarioLoader:
         raw = json.loads(source.read_text())
         if not isinstance(raw, dict):
             raise ValueError("scenario must be a JSON object")
-        unknown = set(raw) - {"name", "placement", "steps"}
+        unknown = set(raw) - {"name", "application", "placement", "steps"}
         if unknown:
             raise ValueError(f"scenario has unknown fields: {', '.join(sorted(unknown))}")
         name = self._safe_name(raw.get("name"), "scenario name")
+        application = self._safe_name(
+            raw.get("application", "online-boutique"),
+            "application reference",
+        )
+        if self.application_catalog is not None:
+            self.application_catalog.resolve(application)
         placement = self._safe_name(raw.get("placement"), "placement reference")
         self.placement_catalog.resolve(placement)
         raw_steps = raw.get("steps")
@@ -51,6 +59,20 @@ class ScenarioLoader:
             placement=placement,
             steps=steps,
             path=str(source),
+            application=application,
+        )
+
+    @classmethod
+    def application_reference(cls, repo_root: Path, path: Path) -> str:
+        source = Path(path).expanduser()
+        if not source.is_absolute():
+            source = Path(repo_root) / source
+        raw = json.loads(source.resolve().read_text())
+        if not isinstance(raw, dict):
+            raise ValueError("scenario must be a JSON object")
+        return cls._safe_name(
+            raw.get("application", "online-boutique"),
+            "application reference",
         )
 
     def _parse_step(self, index: int, raw: Any) -> ScenarioStep:

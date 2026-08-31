@@ -79,6 +79,36 @@ class DetectorProfileRegistryTest(unittest.TestCase):
                 expected_version=1,
             )
 
+    def test_namespace_scoped_override_does_not_cross_applications(self):
+        default = self.registry.resolve(
+            "threshold", "deployments", "frontend", "http_5xx_rate",
+            "other-app",
+        )
+        override = self.registry.create_override(
+            method="threshold",
+            namespace="online-boutique",
+            resource="deployments",
+            name="frontend",
+            metric="http_5xx_rate",
+            changes={"threshold": 0.08},
+            reason="workload-specific calibration",
+        )
+
+        self.assertEqual(
+            override.id,
+            self.registry.resolve(
+                "threshold", "deployments", "frontend", "http_5xx_rate",
+                "online-boutique",
+            ).id,
+        )
+        self.assertEqual(
+            default.id,
+            self.registry.resolve(
+                "threshold", "deployments", "frontend", "http_5xx_rate",
+                "other-app",
+            ).id,
+        )
+
     def test_rejects_unsafe_or_immutable_changes(self):
         cpu_profile = self.registry.resolve(
             "threshold",

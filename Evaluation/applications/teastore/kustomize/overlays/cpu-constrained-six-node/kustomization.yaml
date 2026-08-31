@@ -1,0 +1,72 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: teastore
+# Evaluation-only profile: preserve canonical scheduling while modelling an
+# overly restrictive policy in which every application CPU limit equals its
+# request and therefore provides no burst headroom.
+resources:
+  - ../canonical-six-node
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 750m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-registry
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 750m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-persistence
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-auth
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 750m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-image
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-recommender
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 750m
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-webui
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1500m

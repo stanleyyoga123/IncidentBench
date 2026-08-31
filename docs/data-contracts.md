@@ -3,7 +3,8 @@
 ## Anomaly envelope
 
 Required fields are `event_id`, timezone-aware `detected_at`, `resource`, `name`,
-`metric`, `method`, and `detail`. Optional provenance is `profile_id`,
+`metric`, `method`, and `detail`. `namespace` is required for namespaced
+deployment events and null for cluster-scoped node events. Optional provenance is `profile_id`,
 `profile_version`, and `profile_parameters`. `event_id` is deterministic over
 the stable detection content; duplicate values do not create new rows.
 
@@ -28,7 +29,9 @@ snapshot: anomalies, structured RCA, optional remediation, and bounded tool-call
 audits. Results contain a summary and zero or more atomic lessons categorized as
 investigation, diagnosis, remediation, verification, or guardrail. Lessons carry
 applicability, avoidance guidance, evidence references, optional scope/tags, and
-confidence. They remain untrusted historical hypotheses.
+confidence. Namespace-scoped lessons retain their application namespace;
+cluster-wide lessons use a null namespace. They remain untrusted historical
+hypotheses.
 
 ## Database
 

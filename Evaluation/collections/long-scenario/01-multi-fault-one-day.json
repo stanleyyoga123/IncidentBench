@@ -1,5 +1,6 @@
 {
   "name": "long-multi-fault-one-day",
+  "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [
     {

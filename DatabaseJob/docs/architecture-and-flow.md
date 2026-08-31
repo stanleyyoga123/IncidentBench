@@ -17,10 +17,11 @@ DSN.
 <base>
   -> 20260817_0001  adopt/create legacy anomaly workflow schema
   -> 20260817_0002  destructive split-agent schema replacement
-  -> 20260819_0003  additive learning jobs and incident lessons (head)
+  -> 20260819_0003  additive learning jobs and incident lessons
+  -> 20260831_0004  anomaly and lesson namespace scope (head)
 ```
 
-Alembic must report one head: `20260819_0003`.
+Alembic must report one head: `20260831_0004`.
 
 ## Coordinated migration sequence
 
@@ -74,9 +75,10 @@ timestamps. Later revision 0003 adds learning reference/status/error.
 ### `anomaly_event`
 
 One detector envelope. `event_id` is globally unique for idempotent ingestion.
-It stores detection scope, method/detail, profile provenance, original JSONB
-payload, processing status, optional workflow FK, and timestamps. The pending
-index supports oldest-event intake.
+It stores optional namespace, detection scope, method/detail, profile
+provenance, original JSONB payload, processing status, optional workflow FK,
+and timestamps. Pending indexes support oldest-event intake and namespace-
+isolated workflow batching.
 
 ### `rca_job`
 
@@ -123,9 +125,16 @@ RCA. Deleting the source workflow cascades to its learning job.
 Multiple ordered lessons may belong to one learning job. The unique
 `(learning_job_id, ordinal)` constraint makes publication idempotent while
 retaining model order. Each row stores category, title, guidance, applicability,
-avoidance guidance, evidence references, optional resource/name/metric scope,
-tags, confidence, active flag, optimistic version, status actor/reason, and
-timestamps.
+avoidance guidance, evidence references, optional
+namespace/resource/name/metric scope, tags, confidence, active flag,
+optimistic version, status actor/reason, and timestamps.
+
+## Revision 0004: workload namespace scope
+
+Revision `20260831_0004` adds nullable `namespace` columns to `anomaly_event`
+and `incident_lesson`, backfills anomaly namespaces from retained JSONB, and
+rebuilds scope indexes. Cluster-scoped node evidence and lessons keep a null
+namespace; namespaced deployment evidence must carry its exact namespace.
 
 Confidence is constrained to 0–1; ordinal is non-negative; versions are
 positive. Indexes support active scope/recency retrieval and confidence review.
@@ -235,7 +244,7 @@ experiments.
   printing the DSN.
 - Evaluation TRUNCATE FK error: ensure every referencing runtime table from the
   current head is included in the same TRUNCATE statement.
-- Execution slot row absent: apply revision 0003/head; its repair insert is
+- Execution slot row absent: apply through the current head; revision 0003's repair insert is
   idempotent.
 
 ## Source map
@@ -247,6 +256,7 @@ experiments.
 | `migrations/versions/20260817_0001_initial_schema.py` | Legacy create/adopt baseline. |
 | `migrations/versions/20260817_0002_agent_services.py` | Destructive split-agent replacement. |
 | `migrations/versions/20260819_0003_learning_lessons.py` | Additive learning schema and slot repair. |
+| `migrations/versions/20260831_0004_namespace_scope.py` | Namespace scope for anomaly events and lessons. |
 | `kubernetes/job.yaml` | In-cluster migration execution. |
 | `deploy.sh` | Context/Secret validation, PostgreSQL readiness/password sync, Job run. |
 | `tests/test_migrations.py` | Migration and destructive-guard contracts. |

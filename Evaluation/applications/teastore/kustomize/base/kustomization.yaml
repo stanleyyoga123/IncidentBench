@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- teastore-db.yaml
+- teastore-registry.yaml
+- teastore-persistence.yaml
+- teastore-auth.yaml
+- teastore-image.yaml
+- teastore-recommender.yaml
+- teastore-webui.yaml

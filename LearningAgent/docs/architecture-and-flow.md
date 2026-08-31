@@ -129,6 +129,7 @@ claim/action, not a narrative incident report:
 | `applies_when` | up to 10 applicability conditions |
 | `avoid` | up to 10 unsafe/ineffective actions |
 | `evidence_refs` | up to 20 event/job/tool-call references |
+| `namespace` | application namespace, or null only for cluster-wide guidance |
 | `resource` | optional resource scope |
 | `name` | optional workload/name scope |
 | `metric` | optional detector metric scope |
@@ -143,7 +144,8 @@ also coerces common model-shape mistakes into the canonical schema: a prose
 string for `applies_when`, `avoid`, `evidence_refs`, or `tags` becomes a
 one-item list; qualitative confidence labels such as `high` or `medium` become
 0–1 numbers; blank `resource`/`name`/`metric` become null. Remaining JSON or
-Pydantic errors still fail the attempt. AgentOrchestrator continues to require
+Pydantic errors still fail the attempt. Blank namespace/resource/name/metric
+values become null. AgentOrchestrator continues to require
 the canonical lists-and-float shape on publication.
 
 ## 6. Durable publication
@@ -179,8 +181,9 @@ budget is exhausted.
 ## 8. Effect on future RCA
 
 LearningAgent does not retrieve or send lessons itself. Before each new RCA
-submission, AgentOrchestrator ranks all active lessons against all batch
-anomalies by exact scope, metric/resource, metric, resource, and recency. It
+submission, AgentOrchestrator excludes lessons scoped to another namespace and
+ranks the remaining active lessons against all batch anomalies by exact scope,
+metric/resource, metric, resource, and recency. It
 sends no more than 40 and stops before 24,000 serialized characters.
 
 RCAAgent inserts them after anomaly details in the user prompt. The prompt

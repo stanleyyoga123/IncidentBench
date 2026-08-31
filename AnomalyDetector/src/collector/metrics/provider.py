@@ -66,7 +66,8 @@ class PrometheusSeriesProvider:
     ) -> list[MetricSeries]:
         result = []
         for resource, named_metrics in payload.items():
-            for name, metrics in named_metrics.items():
+            for scoped_name, metrics in named_metrics.items():
+                namespace, name = PrometheusSeriesProvider._scope(scoped_name, resource)
                 for metric, rows in metrics.items():
                     by_timestamp = {}
                     for row in rows:
@@ -81,6 +82,7 @@ class PrometheusSeriesProvider:
                     result.append(
                         MetricSeries(
                             metadata=Metadata(
+                                namespace=namespace,
                                 name=name,
                                 resource=resource,
                                 metric=metric,
@@ -90,3 +92,12 @@ class PrometheusSeriesProvider:
                         )
                     )
         return result
+
+    @staticmethod
+    def _scope(scoped_name: str, resource: str) -> tuple[str | None, str]:
+        if resource != "deployments":
+            return None, scoped_name
+        namespace, separator, name = scoped_name.partition("/")
+        if not separator or not namespace or not name:
+            raise ValueError(f"deployment metric lacks namespace scope: {scoped_name}")
+        return namespace, name

@@ -15,6 +15,7 @@ class HistoricalLesson(BaseModel):
     applies_when: list[str] = Field(default_factory=list)
     avoid: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+    namespace: str | None = None
     resource: str | None = None
     name: str | None = None
     metric: str | None = None

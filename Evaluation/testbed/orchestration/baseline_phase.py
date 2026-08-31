@@ -8,12 +8,20 @@ from .phase_support import PhaseSupport
 class BaselinePhase(PhaseSupport):
     name = "baseline"
 
-    def __init__(self, load_launcher, wait_until, metadata, log) -> None:
+    def __init__(self, load_launcher, wait_until, metadata, log, sleep=time.sleep) -> None:
         super().__init__(metadata, log)
         self.load_launcher = load_launcher
         self.wait_until = wait_until
+        self.sleep = sleep
 
     def execute(self, context):
+        delay = context.config.startup_delay_seconds
+        if delay:
+            self.log(
+                f"baseline phase: waiting {delay}s for "
+                f"{context.config.application} startup warm-up"
+            )
+            self.sleep(delay)
         self.log("baseline phase: collecting snapshot before load")
         context.metadata["snapshots"].append(context.evaluator.collect_snapshot("baseline-before-load"))
         self.log(
@@ -24,6 +32,7 @@ class BaselinePhase(PhaseSupport):
             repo_root=context.config.repo_root,
             output_dir=context.config.output_dir,
             scenario=context.config.loadgenerator,
+            application_module=context.config.loadgenerator_module,
             host=context.config.host,
             duration_seconds=context.total_load_duration,
         )

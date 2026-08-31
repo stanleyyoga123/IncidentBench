@@ -30,6 +30,7 @@ class DetectorProfile(BaseModel):
     id: str
     version: int = Field(ge=1)
     method: DetectorMethod
+    namespace: str
     resource: str
     name: str
     metric: str
@@ -41,14 +42,15 @@ class DetectorProfile(BaseModel):
     created_at: datetime
 
     @property
-    def scope_key(self) -> tuple[str, str, str, str]:
-        return self.method, self.resource, self.name, self.metric
+    def scope_key(self) -> tuple[str, str, str, str, str]:
+        return self.method, self.namespace, self.resource, self.name, self.metric
 
     def provenance_lines(self) -> list[str]:
         return [
             f"detector_profile_id = {self.id}",
             f"detector_profile_version = {self.version}",
             f"detector_profile_source = {self.source}",
+            f"detector_profile_namespace = {self.namespace}",
             *(
                 f"detector_parameter_{key} = {value}"
                 for key, value in sorted(self.parameters.items())
@@ -170,7 +172,7 @@ class DetectorProfileRegistry:
         self._lock = RLock()
         self._profiles: dict[str, DetectorProfile] = {}
         self._history: dict[str, list[DetectorProfile]] = {}
-        self._active_by_scope: dict[tuple[str, str, str, str], str] = {}
+        self._active_by_scope: dict[tuple[str, str, str, str, str], str] = {}
         self._default_parameters: dict[str, dict[str, Any]] = {}
         self._install_defaults()
 
@@ -205,11 +207,14 @@ class DetectorProfileRegistry:
         resource: str,
         name: str,
         metric: str,
+        namespace: str = "*",
     ) -> DetectorProfile | None:
         candidates = (
-            (method, resource, name, metric),
-            (method, resource, "*", metric),
-            (method, "*", "*", metric),
+            (method, namespace, resource, name, metric),
+            (method, namespace, resource, "*", metric),
+            (method, "*", resource, name, metric),
+            (method, "*", resource, "*", metric),
+            (method, "*", "*", "*", metric),
         )
         with self._lock:
             for scope in candidates:
@@ -227,14 +232,16 @@ class DetectorProfileRegistry:
         metric: str,
         changes: dict[str, Any],
         reason: str,
+        namespace: str = "*",
     ) -> DetectorProfile:
+        namespace = self._scope_value(namespace, "namespace")
         resource = self._scope_value(resource, "resource")
         name = self._scope_value(name, "name")
-        scope = (method, resource, name, metric)
+        scope = (method, namespace, resource, name, metric)
         with self._lock:
             if scope in self._active_by_scope:
                 raise ProfileConflictError("an active profile already exists for this scope")
-            base = self.resolve(method, resource, name, metric)
+            base = self.resolve(method, resource, name, metric, namespace)
             if base is None:
                 raise ProfileValidationError(
                     f"method {method!r} does not support metric {metric!r}"
@@ -244,6 +251,7 @@ class DetectorProfileRegistry:
                 id=str(uuid4()),
                 version=1,
                 method=method,
+                namespace=namespace,
                 resource=resource,
                 name=name,
                 metric=metric,
@@ -332,6 +340,7 @@ class DetectorProfileRegistry:
                     id=profile_id,
                     version=1,
                     method=method,
+                    namespace="*",
                     resource="*",
                     name="*",
                     metric=metric,

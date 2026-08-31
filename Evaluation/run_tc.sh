@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
     echo "Usage: $0 <scenario-folder>" >&2
-    echo "Example: $0 ./collections/real-scenario" >&2
+    echo "Example: $0 ./collections/online-boutique-scenario" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -35,7 +35,7 @@ fi
 
 LOADGENERATOR="${LOADGENERATOR:-burst}"
 BASELINE_MINUTES="${BASELINE_MINUTES:-60}"
-TARGET_HOST="${TARGET_HOST:-http://frontend.online-boutique.svc.cluster.local}"
+TARGET_HOST="${TARGET_HOST:-}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://prometheus-server.monitoring.svc.cluster.local}"
 POSTGRES_DSN="${POSTGRES_DSN:-postgresql://anomaly_detector:anomaly_detector@postgres.agents.svc.cluster.local:5432/anomaly_detector}"
 S3_RESULTS_URI="${S3_RESULTS_URI:-}"
@@ -85,10 +85,13 @@ run_scenario() {
         --scenario "$scenario"
         --output-dir "$output_dir"
         --baseline-minutes "$BASELINE_MINUTES"
-        --host "$TARGET_HOST"
         --prometheus-url "$PROMETHEUS_URL"
         --postgres-dsn "$POSTGRES_DSN"
     )
+
+    if [[ -n "$TARGET_HOST" ]]; then
+        command+=(--host "$TARGET_HOST")
+    fi
 
     if [[ "$mode" == "skip-agents" ]]; then
         command+=(--skip-agents)

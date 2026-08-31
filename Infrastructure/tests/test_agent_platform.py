@@ -100,6 +100,10 @@ def test_component_manifest_paths_exist_and_central_bundles_are_removed():
     assert not (INFRASTRUCTURE / "kubernetes/agents/anomaly-detector.yaml").exists()
     assert not (INFRASTRUCTURE / "kubernetes/agents/shared.yaml").exists()
     assert not (INFRASTRUCTURE / "kubernetes/database/postgres.yaml").exists()
+    assert not (INFRASTRUCTURE / "kubernetes/online-boutique").exists()
+    assert (
+        WORKSPACE / "Evaluation/applications/online-boutique/kustomize/kustomization.yaml"
+    ).is_file()
     assert not (INFRASTRUCTURE / "compose/database.yml").exists()
 
 
@@ -325,7 +329,7 @@ def test_infrastructure_site_is_platform_only():
         assert not (INFRASTRUCTURE / "ansible/playbooks" / deleted_playbook).exists()
 
 
-def test_platform_bootstraps_shared_application_namespaces():
+def test_platform_bootstraps_only_shared_platform_namespaces():
     variables = yaml.safe_load(
         (INFRASTRUCTURE / "ansible/group_vars/all.yml").read_text()
     )
@@ -334,10 +338,14 @@ def test_platform_bootstraps_shared_application_namespaces():
     for key, namespace in {
         "agents_namespace": "agents",
         "utility_namespace": "utility",
-        "application_namespace": "online-boutique",
     }.items():
         assert variables[key] == namespace
-        assert f'{{{{ {key} }}}}' in platform
+        assert key in platform
+    assert "application_namespaces" not in variables
+    assert "+ application_namespaces" not in platform
+    assert "online-boutique" not in platform
+    assert "teastore" not in platform
+    assert "train-ticket" not in platform
 
 
 def test_istio_is_pinned_and_keeps_metrics_and_tracing_providers():

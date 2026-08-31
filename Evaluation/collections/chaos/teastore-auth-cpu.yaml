@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-auth-cpu
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-auth
+    stressors:
+      cpu:
+        workers: 1
+        # 55% of one CPU approximates the 500m limit minus 50m.
+        load: 55
+    duration: 25s

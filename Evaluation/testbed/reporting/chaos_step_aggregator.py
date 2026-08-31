@@ -25,7 +25,7 @@ class ChaosStepAggregator:
         if not rows:
             return pd.DataFrame()
         return pd.DataFrame(rows).sort_values(
-            ["scenario", "placement", "step_index", "mode", "run"]
+            ["application", "scenario", "placement", "step_index", "mode", "run"]
         ).reset_index(drop=True)
 
     def _aggregate_window(self, run, metadata, window):
@@ -37,6 +37,10 @@ class ChaosStepAggregator:
         return {
             "run": Path(run).name,
             "scenario": metadata.get("scenario", {}).get("name", Path(run).name),
+            "application": metadata.get(
+                "application",
+                metadata.get("scenario", {}).get("application", "online-boutique"),
+            ),
             "placement": metadata.get("placement", {}).get(
                 "reference", "unmanaged"
             ),

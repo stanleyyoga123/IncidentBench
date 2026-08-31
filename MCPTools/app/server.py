@@ -128,7 +128,7 @@ def create_server(settings: Settings | None = None):
 
     @mcp.tool(name="jaeger.retrieve_slow_traces", structured_output=True)
     def jaeger_slow_traces(
-        service: str = "frontend.online-boutique",
+        service: str,
         lookback: str = "30m",
         limit: int = 5,
         min_duration: str | None = None,
@@ -221,7 +221,7 @@ def create_server(settings: Settings | None = None):
 
     @mcp.tool(name="cluster.profile_baseline", structured_output=True)
     def cluster_profile_baseline(
-        namespace: str = "online-boutique",
+        namespace: str,
         window_minutes: int = 30,
         evaluation_time: str | None = None,
         include_error_samples: bool = True,

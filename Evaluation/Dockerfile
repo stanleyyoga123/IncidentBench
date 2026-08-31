@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 ARG KUBECTL_VERSION=v1.30.4
+ARG HELM_VERSION=v3.16.1
 ARG TARGETARCH
 
 ENV PYTHONUNBUFFERED=1 \
@@ -18,6 +19,11 @@ RUN apt-get update \
     esac \
     && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_ARCH}/kubectl" -o /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubectl \
+    && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${KUBECTL_ARCH}.tar.gz" -o /tmp/helm.tar.gz \
+    && tar -xzf /tmp/helm.tar.gz -C /tmp \
+    && mv "/tmp/linux-${KUBECTL_ARCH}/helm" /usr/local/bin/helm \
+    && chmod +x /usr/local/bin/helm \
+    && rm -rf /tmp/helm.tar.gz "/tmp/linux-${KUBECTL_ARCH}" \
     && apt-get purge -y --auto-remove curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,6 +32,7 @@ RUN pip install -r requirements.txt
 
 COPY Evaluation /app
 COPY Infrastructure /infrastructure
+COPY MCPTools/kubernetes/application-role-binding.yaml /MCPTools/kubernetes/application-role-binding.yaml
 RUN chmod +x \
     /app/run.sh \
     /app/run_single.sh \

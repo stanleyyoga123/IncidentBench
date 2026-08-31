@@ -153,6 +153,8 @@ class PrometheusSeriesProviderTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("team\\-a|team\\.b", collector.collect_calls[0]["namespace_regex"])
         self.assertEqual("tools\\-node", collector.collect_calls[0]["excluded_node_regex"])
         self.assertEqual(1, len(first))
+        self.assertEqual("default", first[0].metadata.namespace)
+        self.assertEqual("checkout", first[0].metadata.name)
         self.assertEqual([30.0, 60.0], first[0].timestamps)
         self.assertEqual([3.0, 2.0], first[0].values)
 

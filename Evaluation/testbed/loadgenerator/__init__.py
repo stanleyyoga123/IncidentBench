@@ -1,4 +1,4 @@
-"""Locust load scenarios for Online Boutique."""
+"""Reusable Locust traffic shapes and launch mechanics."""
 
 from .load_generator_launcher import LoadGeneratorLauncher
 

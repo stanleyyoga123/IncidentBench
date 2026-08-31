@@ -25,7 +25,7 @@
   },
   {
     "name": "jaeger.retrieve_slow_traces",
-    "description": "Retrieve slow Jaeger trace samples for a service. Use this first when investigating latency. Services are usually named like frontend.online-boutique. Returns compact trace summaries with trace IDs, duration, root operation, span count, and involved services."
+    "description": "Retrieve slow Jaeger trace samples for an exact service returned by jaeger.list_services. Use this first when investigating latency. Returns compact trace summaries with trace IDs, duration, root operation, span count, and involved services."
   },
   {
     "name": "jaeger.investigate_trace",

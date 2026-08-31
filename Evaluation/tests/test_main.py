@@ -11,12 +11,12 @@ class CliTests(unittest.TestCase):
                 "--loadgenerator",
                 "constant",
                 "--scenario",
-                "collections/real-scenario/01-node-delay-worker-3.json",
+                "collections/online-boutique-scenario/01-node-delay-worker-3.json",
             ]
         )
         self.assertEqual(
             args.scenario,
-            Path("collections/real-scenario/01-node-delay-worker-3.json"),
+            Path("collections/online-boutique-scenario/01-node-delay-worker-3.json"),
         )
 
     def test_negative_grace_period_is_rejected(self):

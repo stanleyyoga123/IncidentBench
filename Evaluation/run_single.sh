@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
     echo "Usage: $0 [scenario-folder] [loadgenerator]" >&2
-    echo "Default: $0 ./collections/real-scenario constant" >&2
+    echo "Default: $0 ./collections/online-boutique-scenario constant" >&2
 }
 
 if [[ $# -gt 2 ]]; then
@@ -13,7 +13,7 @@ fi
 
 CALLER_DIR="$PWD"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCENARIO_DIR="${1:-$SCRIPT_DIR/collections/real-scenario}"
+SCENARIO_DIR="${1:-$SCRIPT_DIR/collections/online-boutique-scenario}"
 LOADGENERATOR_ARGUMENT="${2:-}"
 
 if [[ "$SCENARIO_DIR" != /* ]]; then
@@ -36,7 +36,7 @@ fi
 
 LOADGENERATOR="${LOADGENERATOR_ARGUMENT:-${LOADGENERATOR:-constant}}"
 BASELINE_MINUTES="${BASELINE_MINUTES:-60}"
-TARGET_HOST="${TARGET_HOST:-http://frontend.online-boutique.svc.cluster.local}"
+TARGET_HOST="${TARGET_HOST:-}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://prometheus-server.monitoring.svc.cluster.local}"
 POSTGRES_DSN="${POSTGRES_DSN:-postgresql://anomaly_detector:anomaly_detector@postgres.agents.svc.cluster.local:5432/anomaly_detector}"
 S3_RESULTS_URI="${S3_RESULTS_URI:-}"
@@ -94,15 +94,19 @@ run_scenario() {
 
     echo
     echo "Running $(basename "$scenario") [agents, $LOADGENERATOR load]"
-    ./run.sh \
-        --loadgenerator "$LOADGENERATOR" \
-        --scenario "$scenario" \
-        --output-dir "$output_dir" \
-        --baseline-minutes "$BASELINE_MINUTES" \
-        --host "$TARGET_HOST" \
-        --prometheus-url "$PROMETHEUS_URL" \
-        --postgres-dsn "$POSTGRES_DSN" \
-        || run_returncode=$?
+    local command=(
+        ./run.sh
+        --loadgenerator "$LOADGENERATOR"
+        --scenario "$scenario"
+        --output-dir "$output_dir"
+        --baseline-minutes "$BASELINE_MINUTES"
+        --prometheus-url "$PROMETHEUS_URL"
+        --postgres-dsn "$POSTGRES_DSN"
+    )
+    if [[ -n "$TARGET_HOST" ]]; then
+        command+=(--host "$TARGET_HOST")
+    fi
+    "${command[@]}" || run_returncode=$?
 
     echo "Running authoritative post-scenario chaos cleanup"
     "$SCRIPT_DIR/cleanup_chaos_state.sh" --yes \

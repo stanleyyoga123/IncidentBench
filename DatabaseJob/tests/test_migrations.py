@@ -111,7 +111,7 @@ class MigrationContractTest(TestCase):
     def test_history_has_one_head(self) -> None:
         result = self._alembic("heads")
 
-        self.assertIn("20260819_0003 (head)", result.stdout)
+        self.assertIn("20260831_0004 (head)", result.stdout)
 
     def test_offline_upgrade_creates_the_complete_schema(self) -> None:
         result = self._alembic("upgrade", "head", "--sql")
@@ -143,6 +143,8 @@ class MigrationContractTest(TestCase):
             sql,
         )
         self.assertIn("create index ix_incident_lesson_active_scope", sql)
+        self.assertIn("add column namespace", sql)
+        self.assertIn("create index ix_anomaly_event_namespace_pending", sql)
         self.assertIn("create index ix_incident_lesson_confidence", sql)
         self.assertIn(
             "insert into agent_execution_slot (id) values (1) on conflict (id) do nothing",

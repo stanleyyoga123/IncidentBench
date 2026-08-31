@@ -97,8 +97,10 @@ configuration.
 
 Investigation rejects mutation before execution. Remediation can invoke wider
 commands, but the service account restricts actual Kubernetes authorization to
-read access cluster-wide, bounded `online-boutique` workload operations, and
-node-maintenance verbs.
+read access cluster-wide, bounded operations in explicitly bound application
+namespaces, and node-maintenance verbs. The reusable
+`kubernetes/application-role-binding.yaml` grants the workload ClusterRole in
+one namespace; it is reapplied after namespace recreation.
 
 ## Prometheus and Loki
 
@@ -187,9 +189,19 @@ file content/results to AgentOrchestrator for durable workflow history.
 | investigation SA | Cluster get/list/watch over core/app/batch/autoscaling/network/metrics resources; utility probe get/list/exec. |
 | remediation SA | Same investigation reads; utility probes; bounded namespaced application mutation; node patch/update, pod delete/eviction for maintenance. |
 
-The remediation namespace Role includes workload patch/update and selected
-pod/job/configmap operations only in `online-boutique`. It is not a general
-cluster-admin identity.
+The remediation workload ClusterRole includes workload patch/update and
+selected pod/job/configmap operations, but it has no authority until a
+RoleBinding grants it inside a particular application namespace. It is not a
+general cluster-admin identity. Application installers create their namespaces
+and apply the binding after namespace recreation. `APPLICATION_NAMESPACES` is
+an optional space-separated override for binding already-running namespaces;
+it is empty by default so MCPTools contains no application catalog. After
+applying each requested binding, deployment fails closed unless the remediation
+ServiceAccount can patch both Deployments and HorizontalPodAutoscalers in that
+namespace. The binding is named
+`mcp-tools-remediation-workload`; deployment removes the obsolete
+`mcp-tools-remediation` RoleBinding first because Kubernetes forbids changing a
+RoleBinding's `roleRef` in place.
 
 ## Configuration
 

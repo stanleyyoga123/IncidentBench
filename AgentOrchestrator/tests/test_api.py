@@ -158,6 +158,7 @@ def event():
     return {
         "event_id": "a" * 64,
         "detected_at": datetime.now(timezone.utc).isoformat(),
+        "namespace": "online-boutique",
         "resource": "deployment",
         "name": "checkout",
         "metric": "latency",
@@ -193,6 +194,13 @@ def test_token_separation_idempotency_and_operation_ids():
             json={"anomalies": [event()]},
         )
         assert response.status_code == 201
+        unscoped = event()
+        unscoped.pop("namespace")
+        assert client.post(
+            "/api/v1/anomalies",
+            headers={"Authorization": "Bearer ingest"},
+            json={"anomalies": [unscoped]},
+        ).status_code == 422
         assert response.json()["accepted"] == 1
         duplicate = client.post(
             "/api/v1/anomalies",

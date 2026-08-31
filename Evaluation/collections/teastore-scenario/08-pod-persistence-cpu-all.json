@@ -1,0 +1,19 @@
+{
+  "name": "teastore-pod-persistence-cpu-all-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-persistence-cpu-all-chaos",
+      "chaos": [
+        "teastore-persistence-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

@@ -56,8 +56,8 @@ An agent changing a detector profile should use this sequence:
 
 1. Call `get_anomaly_detector_health`. Stop if the service is unavailable or
    `mutations_enabled` is false.
-2. Call `resolve_detector_profile` with the exact detector method, resource,
-   name, and metric involved in the evaluated alert.
+2. Call `resolve_detector_profile` with the exact detector method, namespace,
+   resource, name, and metric involved in the evaluated alert.
 3. Inspect `mutable_parameters`, the current `parameters`, and `version`.
 4. Prefer a scoped override for one workload or resource class. Do not modify a
    global default unless the evidence applies globally.
@@ -83,16 +83,19 @@ update as durable configuration.
 
 For a metric series, AnomalyDetector selects the first active match:
 
-1. exact `(method, resource, name, metric)`;
-2. resource-wide `(method, resource, "*", metric)`;
-3. global `(method, "*", "*", metric)`.
+1. exact `(method, namespace, resource, name, metric)`;
+2. namespace/resource-wide `(method, namespace, resource, "*", metric)`;
+3. namespace-wildcard exact/resource-wide overrides;
+4. global `(method, "*", "*", "*", metric)`.
 
 Typical resource values are `deployments` and `nodes`. For deployments, `name`
 is the Kubernetes Deployment name. For nodes, it is the node name.
 
-Creating an exact override for `deployments/checkout/http_5xx_rate` does not
-change any other deployment. Creating an override with `name: "*"` changes all
-matching resources that do not already have a more specific override.
+Creating an exact override for
+`online-boutique/deployments/checkout/http_5xx_rate` does not change the same
+name in another namespace. Creating an override with `name: "*"` changes all
+matching resources in its namespace that do not already have a more specific
+override. Namespace `*` is an explicit cross-application scope.
 
 ## Tool catalog
 
@@ -116,6 +119,7 @@ Most operations return a `DetectorProfile`:
   "id": "default-threshold-http-5xx-rate",
   "version": 1,
   "method": "threshold",
+  "namespace": "*",
   "resource": "*",
   "name": "*",
   "metric": "http_5xx_rate",
@@ -143,6 +147,7 @@ Field semantics:
 | `id` | Stable identity. Built-in IDs are readable; scoped override IDs are UUIDs. |
 | `version` | Monotonically increasing revision number for this ID. |
 | `method` | `threshold` or `z_score`. |
+| `namespace` | Exact application namespace or deliberate cross-application `*`. |
 | `resource` | Resource scope, normally `deployments`, `nodes`, or `*`. |
 | `name` | Deployment/node name or `*`. |
 | `metric` | Prometheus-derived detector metric. |
@@ -212,7 +217,7 @@ Returns the active profile that the next detection cycle would use for a metric
 series.
 
 ```http
-GET /api/v1/detector/profiles/resolve?method=threshold&resource=deployments&name=checkout&metric=http_5xx_rate
+GET /api/v1/detector/profiles/resolve?method=threshold&namespace=online-boutique&resource=deployments&name=checkout&metric=http_5xx_rate
 ```
 
 Inputs:
@@ -220,6 +225,7 @@ Inputs:
 | Query parameter | Required | Allowed values |
 | --- | --- | --- |
 | `method` | Yes | `threshold`, `z_score` |
+| `namespace` | No | Exact workload namespace; defaults to `*` for cluster-scoped/global lookup |
 | `resource` | Yes | Exact runtime resource, usually `deployments` or `nodes` |
 | `name` | Yes | Exact Deployment/node name |
 | `metric` | Yes | A metric supported by the selected method |
@@ -279,6 +285,7 @@ Request:
 ```json
 {
   "method": "threshold",
+  "namespace": "online-boutique",
   "resource": "deployments",
   "name": "checkout",
   "metric": "http_5xx_rate",
@@ -464,13 +471,14 @@ BASE_URL=http://127.0.0.1:8080
 curl -fsS "$BASE_URL/health"
 
 curl -fsS \
-  "$BASE_URL/api/v1/detector/profiles/resolve?method=threshold&resource=deployments&name=checkout&metric=http_5xx_rate"
+  "$BASE_URL/api/v1/detector/profiles/resolve?method=threshold&namespace=online-boutique&resource=deployments&name=checkout&metric=http_5xx_rate"
 
 curl -fsS -X POST "$BASE_URL/api/v1/detector/profiles" \
   -H 'Content-Type: application/json' \
   -H 'X-Detector-Profile-Token: <detector-profile-token>' \
   -d '{
     "method": "threshold",
+    "namespace": "online-boutique",
     "resource": "deployments",
     "name": "checkout",
     "metric": "http_5xx_rate",

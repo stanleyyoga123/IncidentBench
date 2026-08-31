@@ -1,0 +1,24 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-persistence-capacity-loss
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PodChaos
+  podChaos:
+    action: pod-failure
+    mode: one
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-persistence
+    duration: 25s

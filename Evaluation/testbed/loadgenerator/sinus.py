@@ -4,9 +4,6 @@ import random
 
 from locust import LoadTestShape
 
-from testbed.loadgenerator.common import WebsiteUser
-
-
 class SinusLoadShape(LoadTestShape):
     """Move traffic smoothly between minimum and maximum user counts."""
 

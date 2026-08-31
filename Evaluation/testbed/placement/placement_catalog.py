@@ -6,8 +6,9 @@ SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 class PlacementCatalog:
-    def __init__(self, collection_dir: Path) -> None:
+    def __init__(self, collection_dir: Path, marker: str = "kustomization.yaml") -> None:
         self.collection_dir = Path(collection_dir).resolve()
+        self.marker = marker
         self._profiles = self._discover()
 
     @property
@@ -33,9 +34,9 @@ class PlacementCatalog:
                 continue
             if not SAFE_NAME.fullmatch(path.name):
                 raise ValueError(f"unsafe placement profile name: {path.name}")
-            if not (path / "kustomization.yaml").is_file():
+            if not (path / self.marker).is_file():
                 raise ValueError(
-                    f"placement profile is missing kustomization.yaml: {path.name}"
+                    f"placement profile is missing {self.marker}: {path.name}"
                 )
             profiles[path.name] = path.resolve()
         if not profiles:

@@ -7,8 +7,9 @@
 2. It builds deterministic event IDs and submits one authenticated batch.
 3. AgentOrchestrator commits all events before returning acknowledgement.
 4. Only then does AnomalyDetector start per-series cooldown.
-5. Every 60 seconds AgentOrchestrator claims the oldest 100 pending events and
-   creates one RCA job.
+5. Every 60 seconds AgentOrchestrator claims up to the oldest 100 pending events
+   from one namespace scope and creates one RCA job. Cluster-scoped events form
+   their own batch.
 6. RCAAgent acquires the global lease through AgentOrchestrator, gathers
    evidence through investigation MCPTools, persists a structured result and
    audits via the job-store APIs, then releases the lease.
@@ -46,8 +47,9 @@ idempotency key.
    evidence-linked atomic lessons. It has no MCP tools or database credentials.
 3. AgentOrchestrator publishes valid lessons and completes the workflow. After
    three learning failures it completes without lessons and records the error.
-4. For each new RCA workflow, AgentOrchestrator ranks active lessons by exact
-   workload/metric, metric/resource, metric, resource, then recency. It sends at
+4. For each new RCA workflow, AgentOrchestrator excludes lessons scoped to a
+   different namespace, then ranks active lessons by exact workload/metric,
+   metric/resource, metric, resource, then recency. It sends at
    most 40 lessons within 24,000 serialized characters.
 5. RCAAgent places them in the user prompt as untrusted hypotheses and verifies
    them against current evidence.

@@ -1,0 +1,17 @@
+{
+  "name": "e2e-online-boutique-cartservice-cpu-smoke",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-cartservice-cpu-smoke",
+      "chaos": ["single-cartservice-cpu"],
+      "duration": 600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 300
+    }
+  ]
+}

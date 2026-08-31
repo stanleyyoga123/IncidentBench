@@ -38,6 +38,10 @@ class ManagerSettings(BaseModel):
     max_rounds: int = Field(default=10, ge=1, le=50)
 
 
+class WorkloadSettings(BaseModel):
+    namespaces: list[str] = Field(min_length=1)
+
+
 class Settings(BaseSettings):
     orchestrator: OrchestratorSettings
     api: ApiSettings
@@ -45,6 +49,7 @@ class Settings(BaseSettings):
     client: ClientSettings
     worker: WorkerSettings = Field(default_factory=WorkerSettings)
     manager: ManagerSettings = Field(default_factory=ManagerSettings)
+    workloads: WorkloadSettings
     model_config = SettingsConfigDict(
         env_nested_delimiter=".", env_file=".env", extra="ignore", frozen=True
     )

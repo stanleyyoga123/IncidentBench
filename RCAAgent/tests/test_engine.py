@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from engine import RCAEngine, RCA_TOOL_NAMES
 from schema import RCAJobRequest
 import prompt
@@ -85,6 +87,35 @@ def test_historical_lessons_are_untrusted_user_prompt_context():
     assert "untrusted historical hypotheses" in rendered
     assert "Inspect node schedulability" in rendered
     assert rendered.index("# Historical Lessons") > rendered.index("Event ID")
+
+
+def test_runtime_scope_preserves_incident_namespace_without_topology_assumptions():
+    request = RCAJobRequest.model_validate(
+        {
+            "anomalies": [
+                {
+                    "event_id": "b" * 64,
+                    "namespace": "other-app",
+                    "resource": "deployments",
+                    "name": "frontend",
+                    "metric": "deployment_cpu_usage",
+                    "method": "z_score",
+                }
+            ]
+        }
+    )
+    engine = RCAEngine(
+        SimpleNamespace(
+            workloads=SimpleNamespace(
+                namespaces=["online-boutique"]
+            )
+        )
+    )
+
+    assert "Namespace: other-app" in engine._prompt(request)
+    context = engine._workload_context(request)
+    assert "Namespaces carried by this incident: other-app" in context
+    assert "Never assume a particular application" in context
 
 
 def test_parse_accepts_markdown_emphasis_around_headings():

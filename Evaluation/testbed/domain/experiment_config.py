@@ -6,6 +6,9 @@ from pathlib import Path
 class ExperimentConfig:
     repo_root: Path
     loadgenerator: str
+    application: str
+    loadgenerator_module: str
+    startup_delay_seconds: int
     scenario_path: Path
     host: str
     baseline_seconds: int
@@ -17,6 +20,8 @@ class ExperimentConfig:
     skip_agents: bool
     port_forward: bool
     port_forward_port: int
+    port_forward_service: str
+    port_forward_remote_port: int
 
     @property
     def agents_enabled(self) -> bool:
@@ -32,6 +37,9 @@ class ExperimentConfig:
         return cls(
             repo_root=repo_root,
             loadgenerator=args.loadgenerator,
+            application=args.application,
+            loadgenerator_module=args.loadgenerator_module,
+            startup_delay_seconds=args.startup_delay_seconds,
             scenario_path=args.scenario,
             host=args.host,
             baseline_seconds=baseline_seconds,
@@ -43,4 +51,6 @@ class ExperimentConfig:
             skip_agents=args.skip_agents,
             port_forward=args.port_forward,
             port_forward_port=args.port_forward_port,
+            port_forward_service=args.port_forward_service,
+            port_forward_remote_port=args.port_forward_remote_port,
         )

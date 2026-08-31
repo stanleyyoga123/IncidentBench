@@ -31,6 +31,7 @@ class PortForwardController:
         namespace: str,
         local_port: int,
         remote_port: int = 80,
+        service: str = "frontend",
         timeout_seconds: int = 30,
     ) -> tuple[object | None, dict]:
         output_dir = self.artifacts.commands
@@ -40,7 +41,7 @@ class PortForwardController:
         command = [
             "kubectl",
             "port-forward",
-            "svc/frontend",
+            f"svc/{service}",
             f"{local_port}:{remote_port}",
             "-n",
             namespace,

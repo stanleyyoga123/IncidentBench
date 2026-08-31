@@ -36,6 +36,13 @@ the lease; remediator claims it after RCA releases.
 Every HTTP Service is ClusterIP-only. NetworkPolicy, bearer authentication,
 server-side tool profiles, and Kubernetes RBAC are independent security layers.
 
+Application namespace is a first-class incident field. The detector preserves
+it from Prometheus labels, AgentOrchestrator isolates namespaced batches and
+lesson retrieval, RCA profiles the incident namespace rather than assuming an
+application topology, and remediation authority is granted per namespace with
+a RoleBinding. Cluster-scoped node incidents remain explicit and may require
+profiling every configured application namespace.
+
 Deployment ownership follows runtime ownership: every component keeps its
 ConfigMap, placeholder Secret, manifests, and a deploy script that uses
 kubectl's current context. AgentOrchestrator owns the shared ingress

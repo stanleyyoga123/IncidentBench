@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import yaml
 
+from testbed.applications import ApplicationCatalog
 from testbed.artifacts import ArtifactLayout
 from testbed.chaos.catalog import ChaosCatalog, ScheduleLoader
 from testbed.chaos.execution.execution_context import ChaosExecutionContext
@@ -68,37 +69,74 @@ class CollectionValidationTests(unittest.TestCase):
     def test_primary_scenario_collections_and_chaos_catalog_are_valid(self):
         root = Path(__file__).resolve().parents[1]
         catalog = ChaosCatalog(root / "collections" / "chaos")
-        placements = PlacementCatalog(
-            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+        boutique_placements = PlacementCatalog(
+            root / "applications" / "online-boutique" / "kustomize" / "overlays"
         )
-        real_scenarios = [
-            ScenarioLoader(root, catalog, placements).load(path)
-            for path in sorted((root / "collections" / "real-scenario").glob("*.json"))
+        teastore_placements = PlacementCatalog(
+            root / "applications" / "teastore" / "kustomize" / "overlays"
+        )
+        boutique_scenarios = [
+            ScenarioLoader(root, catalog, boutique_placements).load(path)
+            for path in sorted(
+                (root / "collections" / "online-boutique-scenario").glob("*.json")
+            )
         ]
-        new_scenarios = [
-            ScenarioLoader(root, catalog, placements).load(path)
-            for path in sorted((root / "collections" / "new-scenario").glob("*.json"))
+        teastore_scenarios = [
+            ScenarioLoader(root, catalog, teastore_placements).load(path)
+            for path in sorted(
+                (root / "collections" / "teastore-scenario").glob("*.json")
+            )
         ]
-        scenarios = real_scenarios + new_scenarios
-        self.assertEqual(len(catalog.schedules), 26)
-        self.assertEqual(len(real_scenarios), 11)
-        self.assertEqual(len(new_scenarios), 12)
+        scenarios = boutique_scenarios + teastore_scenarios
+        self.assertEqual(len(catalog.schedules), 39)
+        self.assertEqual(len(boutique_scenarios), 23)
+        self.assertEqual(len(teastore_scenarios), 23)
         self.assertEqual(
             len({scenario.name for scenario in scenarios}),
             len(scenarios),
         )
         self.assertEqual(
-            placements.references,
+            boutique_placements.references,
             ("canonical-six-node", "cpu-constrained-six-node"),
         )
-        placement = PlacementRenderer(CommandRunner(), root).render(
-            "canonical-six-node",
-            placements.resolve("canonical-six-node"),
+        self.assertEqual(
+            teastore_placements.references,
+            ("canonical-six-node", "cpu-constrained-six-node"),
         )
-        validate_pod_chaos_selectors(placement, catalog.schedules)
+        boutique_placement = PlacementRenderer(CommandRunner(), root).render(
+            "canonical-six-node",
+            boutique_placements.resolve("canonical-six-node"),
+        )
+        teastore_profile = ApplicationCatalog(
+            root / "applications", root.parent
+        ).resolve("teastore")
+        teastore_placement = PlacementRenderer(
+            CommandRunner(),
+            root,
+            application_profile=teastore_profile,
+        ).render(
+            "canonical-six-node",
+            teastore_placements.resolve("canonical-six-node"),
+        )
+        boutique_pod_schedules = tuple(
+            schedule
+            for schedule in catalog.schedules
+            if schedule.child_type != "PhysicalMachineChaos"
+            and schedule.manifest["spec"][schedule.child_key]["selector"]["namespaces"]
+            == ["online-boutique"]
+        )
+        teastore_pod_schedules = tuple(
+            schedule
+            for schedule in catalog.schedules
+            if schedule.child_type != "PhysicalMachineChaos"
+            and schedule.manifest["spec"][schedule.child_key]["selector"]["namespaces"]
+            == ["teastore"]
+        )
+        validate_pod_chaos_selectors(boutique_placement, boutique_pod_schedules)
+        validate_pod_chaos_selectors(teastore_placement, teastore_pod_schedules)
         referenced = {
             reference
-            for scenario in scenarios
+            for scenario in boutique_scenarios
             for step in scenario.steps
             for reference in step.chaos
         }
@@ -133,6 +171,41 @@ class CollectionValidationTests(unittest.TestCase):
                 "single-emailservice-cpu",
             },
         )
+        teastore_referenced = {
+            reference
+            for scenario in teastore_scenarios
+            for step in scenario.steps
+            for reference in step.chaos
+        }
+        self.assertEqual(
+            teastore_referenced,
+            {
+                "node-delay-worker-2",
+                "node-delay-peers-to-worker-2",
+                "node-delay-worker-3",
+                "node-delay-peers-to-worker-3",
+                "node-delay-worker-5",
+                "node-delay-peers-to-worker-5",
+                "node-loss-worker-1",
+                "node-loss-worker-2",
+                "node-loss-worker-3",
+                "node-cpu-worker-2",
+                "node-memory-worker-3",
+                "teastore-auth-cpu",
+                "teastore-persistence-cpu",
+                "teastore-recommender-cpu",
+                "teastore-image-cpu",
+                "teastore-registry-cpu",
+                "teastore-image-memory",
+                "teastore-persistence-capacity-loss",
+                "teastore-image-bandwidth",
+                "teastore-db-memory",
+                "teastore-auth-memory",
+                "teastore-recommender-bandwidth",
+                "teastore-registry-capacity-loss",
+                "teastore-webui-cpu",
+            },
+        )
         self.assertNotIn("node-delay-worker-4", catalog_refs)
         self.assertNotIn("node-delay-peers-to-worker-4", catalog_refs)
         for schedule in catalog.schedules:
@@ -161,16 +234,26 @@ class CollectionValidationTests(unittest.TestCase):
                     in {
                         "single-checkoutservice-capacity-loss",
                         "single-paymentservice-capacity-loss",
+                        "teastore-persistence-capacity-loss",
+                        "teastore-registry-capacity-loss",
                     }
                     else "all"
                 )
                 self.assertEqual(child["mode"], expected_mode)
-                self.assertEqual(selector["namespaces"], ["online-boutique"])
+                expected_namespace = (
+                    "teastore"
+                    if schedule.reference.startswith("teastore-")
+                    else "online-boutique"
+                )
+                self.assertEqual(selector["namespaces"], [expected_namespace])
                 self.assertNotIn("nodes", selector)
                 expressions = selector["expressionSelectors"]
                 self.assertEqual(expressions[0]["key"], "app")
                 self.assertEqual(expressions[0]["operator"], "In")
-                self.assertTrue(schedule.reference.startswith("single-"))
+                self.assertTrue(
+                    schedule.reference.startswith("single-")
+                    or schedule.reference.startswith("teastore-")
+                )
                 self.assertEqual(len(expressions[0]["values"]), 1)
                 self.assertNotIn("frontend", expressions[0]["values"])
         schedules_by_reference = {
@@ -190,6 +273,13 @@ class CollectionValidationTests(unittest.TestCase):
             "single-shippingservice-bandwidth": ("NetworkChaos", "bandwidth"),
             "single-paymentservice-capacity-loss": ("PodChaos", "pod-failure"),
             "single-emailservice-cpu": ("StressChaos", None),
+            "teastore-auth-memory": ("StressChaos", None),
+            "teastore-db-memory": ("StressChaos", None),
+            "teastore-image-memory": ("StressChaos", None),
+            "teastore-persistence-capacity-loss": ("PodChaos", "pod-failure"),
+            "teastore-registry-capacity-loss": ("PodChaos", "pod-failure"),
+            "teastore-image-bandwidth": ("NetworkChaos", "bandwidth"),
+            "teastore-recommender-bandwidth": ("NetworkChaos", "bandwidth"),
         }
         for reference, (child_type, action) in expected_new_faults.items():
             with self.subTest(reference=reference):
@@ -234,6 +324,9 @@ class CollectionValidationTests(unittest.TestCase):
                 "real-pod-emailservice-cpu-headroom-all-one-hour",
                 "real-pod-checkoutservice-cpu-headroom-all-one-hour",
                 "real-pod-productcatalogservice-cpu-headroom-all-one-hour",
+                "teastore-pod-webui-cpu-headroom-all-one-hour",
+                "teastore-pod-persistence-cpu-headroom-all-one-hour",
+                "teastore-pod-image-cpu-headroom-all-one-hour",
             }
             expected_placement = (
                 "cpu-constrained-six-node"
@@ -248,12 +341,16 @@ class CollectionValidationTests(unittest.TestCase):
             self.assertTrue(recovery_step.idle)
             self.assertEqual(recovery_step.duration, 600)
             self.assertTrue(recovery_step.name.endswith("recovery") or recovery_step.name == "02-recovery")
+            if scenario.name.startswith("teastore-"):
+                self.assertEqual(scenario.application, "teastore")
+            else:
+                self.assertEqual(scenario.application, "online-boutique")
 
     def test_long_scenario_collection_is_a_one_day_multi_fault(self):
         root = Path(__file__).resolve().parents[1]
         catalog = ChaosCatalog(root / "collections" / "chaos")
         placements = PlacementCatalog(
-            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+            root / "applications" / "online-boutique" / "kustomize" / "overlays"
         )
         paths = sorted((root / "collections" / "long-scenario").glob("*.json"))
         self.assertEqual([path.name for path in paths], ["01-multi-fault-one-day.json"])
@@ -370,7 +467,7 @@ class CollectionValidationTests(unittest.TestCase):
     def test_canonical_placement_renders_the_expected_service_map(self):
         root = Path(__file__).resolve().parents[1]
         catalog = PlacementCatalog(
-            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+            root / "applications" / "online-boutique" / "kustomize" / "overlays"
         )
         profile = PlacementRenderer(CommandRunner(), root).render(
             "canonical-six-node",
@@ -417,7 +514,7 @@ class CollectionValidationTests(unittest.TestCase):
     def test_cpu_constrained_placement_preserves_topology_and_removes_headroom(self):
         root = Path(__file__).resolve().parents[1]
         catalog = PlacementCatalog(
-            root.parent / "Infrastructure" / "kubernetes" / "online-boutique" / "kustomize" / "overlays"
+            root / "applications" / "online-boutique" / "kustomize" / "overlays"
         )
         profile = PlacementRenderer(CommandRunner(), root).render(
             "cpu-constrained-six-node",

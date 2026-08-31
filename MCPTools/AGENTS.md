@@ -9,7 +9,9 @@ explicit session ID and paths must remain below the configured session root.
 
 Own `kubernetes/` for both profile ConfigMaps and Deployments/Services,
 ServiceAccounts and RBAC, the remediation artifact PVC, and the utility
-network-probe DaemonSets. Also own placeholder-only
+network-probe DaemonSets. Namespaced workload mutation uses the MCPTools-owned
+workload ClusterRole plus `application-role-binding.yaml`; application
+installers must reapply that binding after recreating a namespace. Also own placeholder-only
 `kubernetes/secret.example.yml` and `deploy.sh`; copy the example to ignored
 `kubernetes/secret.yml` and replace every `++++++++` locally before deploying.
 The script uses kubectl's current context and refuses unreplaced placeholders.

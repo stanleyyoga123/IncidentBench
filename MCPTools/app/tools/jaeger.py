@@ -26,7 +26,7 @@ class JaegerTool:
 
     def retrieve_slow_traces(
         self,
-        service: str = "frontend.online-boutique",
+        service: str,
         lookback: str = "30m",
         limit: int = 5,
         min_duration: str | None = None,

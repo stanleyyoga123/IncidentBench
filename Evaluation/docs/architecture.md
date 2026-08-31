@@ -1,10 +1,17 @@
 # Collection-Driven Evaluation Architecture
 
-The runner consumes scenario JSON from `collections/real-scenario`,
-`collections/new-scenario`, or `collections/long-scenario`, complete Chaos Mesh
-`Schedule` resources from `collections/chaos`, and pre-authored Kustomize placement profiles from
-`../../Infrastructure/kubernetes/online-boutique/kustomize/overlays`. It never
-renders a chaos resource or monitors recurrence children in Python.
+The runner consumes scenario JSON from `collections/online-boutique-scenario`,
+`collections/teastore-scenario`, or `collections/long-scenario`, complete Chaos Mesh
+`Schedule` resources from `collections/chaos`, and application-owned deployment
+and placement inputs from `applications/`. Online Boutique's Kustomize tree is
+under `applications/online-boutique/kustomize`. TeaStore's ClusterIP tree is
+under `applications/teastore/kustomize`. The runner never renders a
+chaos resource or monitors recurrence children in Python.
+
+The root runner establishes exclusive ownership of agent lifecycle before
+prerun: it scales all agent-platform deployments to zero and verifies that no
+replicas remain ready before truncating durable workflow state. This avoids
+deadlocks with active workers left by a manual deployment or interrupted run.
 
 ## Collection contract
 
@@ -32,7 +39,7 @@ Every YAML file is a single `chaos-mesh.org/v1alpha1` `Schedule` in the
 than the interval.
 
 The scenario's required `placement` value is an exact placement-directory name.
-Each profile renders the full Online Boutique configuration and must cover all
+Each Online Boutique profile renders its full configuration and must cover all
 11 application Deployments. Each Deployment retains `role: services`, has no
 required node affinity, and adds exactly one soft
 `kubernetes.io/hostname` topology-spread constraint with `maxSkew: 1` and
@@ -45,6 +52,15 @@ labelled `role=services`. It controls distribution instead of node identity:
 | --- | ---: | ---: | --- |
 | frontend | 6 | 6 / 30 | soft spread across service nodes |
 | all other application Deployments | 2 | 2 / 30 | soft spread across service nodes |
+
+TeaStore's `canonical-six-node` overlay uses the same `role: services` spread
+contract for seven Deployments. `teastore-webui` starts at three replicas with
+HPA 3/3, `teastore-db` and `teastore-registry` stay at one replica without an
+HPA, and the remaining services start at two replicas with HPA 2/30.
+The web UI requests 1500m CPU and 2Gi memory, may burst to two CPU cores and
+3Gi memory, and uses the lower HPA maximum to keep recovery within cluster
+capacity. Across TeaStore, canonical requests use conventional rounded
+quantities while keeping the existing limits as anchors.
 
 The `role: services` selector defines eligibility. The spread rule asks the
 scheduler to balance matching replicas across hostnames but deliberately does
@@ -72,8 +88,9 @@ hash, and checked against the central Infrastructure Kustomize render. A mismatc
 fails the testbed before chaos. `prerun/run.sh` already applied that default
 Kustomization; no placement-manifest environment variable is needed.
 
-`prerun/run.sh` wipes the live agent tables and recreates `online-boutique`
-before the testbed starts. The application reset phase then uncordons
+`prerun/run.sh` wipes the live agent tables, deletes other catalog application
+namespaces, and recreates the selected application namespace before the testbed
+starts. The application reset phase then uncordons
 every referenced node to clear persistent scheduling state left by an earlier
 remediation. It logs every command and then verifies that each node exists, is
 Ready and schedulable, carries the expected services and hostname labels, and
@@ -81,6 +98,11 @@ has no untolerated blocking taint. Labels and taints are never changed. After
 waiting for rollouts, the phase verifies live spread constraints and Ready
 pod placement. It records a canonical per-Deployment node-count map and
 fingerprint before baseline collection.
+Before capturing that baseline or starting Locust, the runner waits for the
+selected application's profile-defined `startup_delay_seconds`. TeaStore uses a
+180-second warm-up so its registry entries, persistence initialization, image
+service, and recommender training can settle after Kubernetes reports the pods
+Ready. Applications that omit the field start load immediately.
 Agent/control comparison requires the same rendered placement SHA-256, not the
 same observed pod-to-node fingerprint; the latter remains diagnostic evidence
 because soft spreading permits multiple valid placements.
@@ -176,11 +198,12 @@ scenario-selected placement.
 
 ```bash
 ./run.sh --loadgenerator burst \
-  --scenario ./collections/real-scenario/01-node-delay-worker-3.json \
+  --scenario ./collections/online-boutique-scenario/01-node-delay-worker-3.json \
   --baseline-minutes 5 \
   --prometheus-url http://localhost:9090
 
-./run_tc.sh ./collections/real-scenario
+./run_tc.sh ./collections/online-boutique-scenario
+./run_tc.sh ./collections/teastore-scenario
 
 ./run_single.sh ./collections/long-scenario
 

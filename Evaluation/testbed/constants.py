@@ -19,9 +19,6 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 INFRASTRUCTURE_ROOT = Path(
     os.getenv("INFRASTRUCTURE_ROOT", WORKSPACE_ROOT / "Infrastructure")
 ).resolve()
-ONLINE_BOUTIQUE_KUSTOMIZE_ROOT = (
-    INFRASTRUCTURE_ROOT / "kubernetes" / "online-boutique" / "kustomize"
-)
 NODE_INVENTORY_PATH = Path(
     os.getenv(
         "CHAOS_NODE_INVENTORY",

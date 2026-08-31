@@ -3,9 +3,6 @@ import random
 
 from locust import LoadTestShape
 
-from testbed.loadgenerator.common import WebsiteUser
-
-
 class ConstantLoadShape(LoadTestShape):
     """Drive total users with a stable base count plus a small upward bias."""
 

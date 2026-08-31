@@ -188,6 +188,10 @@ create new revisions, or reset defaults/overrides. It cannot change method,
 scope, metric, direction, numerical stability parameters, or exceed validated
 bounds.
 
+Profile scope includes namespace. A namespace-specific override cannot affect
+an identically named Deployment in another application; namespace `*` remains
+available only for deliberate cross-application policy.
+
 Runtime adaptation is currently operator/control-agent initiated. LearningAgent
 lessons do not automatically change detector profiles.
 
@@ -195,7 +199,7 @@ lessons do not automatically change detector profiles.
 
 | Setting | Cluster default | Effect |
 | --- | --- | --- |
-| `collector.metadata.namespaces` | `online-boutique` | Deployment metric scope. |
+| `collector.metadata.namespaces` | `online-boutique`, `teastore` | Allow-listed deployment metric scopes; add application namespaces here. |
 | `collector.metadata.excluded_nodes` | `tools-node` | Node signals omitted from detection. |
 | `collector.metrics.base_url` | Prometheus service DNS | Query/rule API. |
 | `collector.metrics.timeout` | `10` seconds | HTTP timeout. |

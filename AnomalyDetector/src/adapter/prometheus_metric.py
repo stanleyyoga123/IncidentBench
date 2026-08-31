@@ -84,14 +84,17 @@ class PrometheusMetricAdapter:
         payload: dict[str, Any],
         spec: PrometheusMetricSpec,
     ) -> list[MetricDict]:
-        return [
-            {
+        rows = []
+        for metric, timestamp, value in self._reader.read(payload):
+            row: MetricDict = {
                 "timestamp": timestamp,
                 spec.output_key: metric[spec.label],
                 "value": self._value(value, spec),
             }
-            for metric, timestamp, value in self._reader.read(payload)
-        ]
+            if spec.output_key == "deployment":
+                row["namespace"] = metric["namespace"]
+            rows.append(row)
+        return rows
 
     @staticmethod
     def _value(value: str, spec: PrometheusMetricSpec) -> int | float:

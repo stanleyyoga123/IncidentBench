@@ -51,15 +51,22 @@ def start_locust(
     repo_root: Path,
     output_dir: Path,
     scenario: str,
+    application_module: str,
     host: str,
     duration_seconds: int,
 ) -> LoadGeneratorProcess:
-    locustfile = scenario_file(repo_root, scenario)
-    if not locustfile.exists():
-        raise FileNotFoundError(f"locust scenario file not found: {locustfile}")
+    shape_file = scenario_file(repo_root, scenario)
+    if not shape_file.exists():
+        raise FileNotFoundError(f"locust shape file not found: {shape_file}")
 
     load_dir = output_dir / "loadgenerator"
     load_dir.mkdir(parents=True, exist_ok=True)
+
+    locustfile = load_dir / "locustfile.py"
+    locustfile.write_text(
+        f"from {application_module} import *\n"
+        f"from testbed.loadgenerator.{scenario} import *\n"
+    )
 
     csv_prefix = load_dir / scenario
     html_report = load_dir / f"{scenario}.html"

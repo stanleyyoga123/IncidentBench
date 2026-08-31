@@ -68,8 +68,9 @@ sequenceDiagram
 
 AnomalyDetector calls `POST /api/v1/anomalies` with the ingestion bearer token.
 One request may contain 1–1000 envelopes. Each envelope includes a deterministic
-`event_id`, timezone-aware detection timestamp, resource, name, metric, method,
-detail, and optional detector-profile provenance.
+`event_id`, timezone-aware detection timestamp, namespace for namespaced
+resources, resource, name, metric, method, detail, and optional detector-profile
+provenance. Cluster-scoped resources use a null namespace.
 
 The store inserts each event with `ON CONFLICT (event_id) DO NOTHING`. It then
 reads the persisted row and returns a record marked `duplicate=true` when the
@@ -88,10 +89,12 @@ the cluster ConfigMap). It first checks whether the singleton execution slot is
 available. If another RCA, remediation, or learning job owns the slot, intake
 does not create another RCA batch during that cycle.
 
-When available, the store locks the oldest pending events using a transaction,
-up to `scheduler.batch_size` (100 by default), creates one `agent_workflow`,
-associates those events with it, and marks the workflow for RCA submission.
-The batch is ordered by `detected_at` and stable database identity.
+When available, the store finds the oldest pending event, locks up to
+`scheduler.batch_size` (100 by default) from that same namespace scope, creates
+one `agent_workflow`, associates those events with it, and marks the workflow
+for RCA submission. Cluster-scoped events form a separate null-namespace batch.
+The batch is ordered by `detected_at` and stable database identity. This avoids
+mixing identically named workloads from different applications in one RCA.
 
 If RCA submission fails, `fail_submission` returns the events to `pending` and
 deletes the newly created workflow. This permits a later intake cycle to retry
@@ -99,8 +102,10 @@ without losing or duplicating the committed detector events.
 
 ## 3. Historical lesson retrieval
 
-Before submitting RCA, the orchestrator reads active `incident_lesson` rows and
-ranks each lesson against every anomaly in the batch:
+Before submitting RCA, the orchestrator reads active `incident_lesson` rows.
+A lesson with an explicit namespace is ineligible for anomalies in another
+namespace; null-namespace lessons remain cluster-wide. It then ranks each
+eligible lesson against every anomaly in the batch:
 
 1. exact resource, name, and metric;
 2. matching metric and resource;

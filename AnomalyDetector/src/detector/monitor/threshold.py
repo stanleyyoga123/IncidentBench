@@ -28,6 +28,7 @@ class ThresholdMonitor(_BaseMonitor):
                 series.metadata.resource,
                 series.metadata.name,
                 series.metadata.metric,
+                series.metadata.namespace or "*",
             )
             if profile is None:
                 continue

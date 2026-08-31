@@ -2,9 +2,6 @@ import os
 
 from locust import LoadTestShape
 
-from testbed.loadgenerator.common import WebsiteUser
-
-
 class DailyTrafficShape(LoadTestShape):
     """Replay a 24-hour traffic curve. Edit `stages` here; 100% is DAILY_BASE_USERS."""
 

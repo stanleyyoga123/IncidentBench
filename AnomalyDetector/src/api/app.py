@@ -39,6 +39,7 @@ class ProfileHistory(BaseModel):
 
 class ProfileCreateRequest(BaseModel):
     method: DetectorMethod
+    namespace: str = "*"
     resource: str = "*"
     name: str = "*"
     metric: str = Field(min_length=1)
@@ -189,9 +190,10 @@ def create_app(
         resource: str,
         name: str,
         metric: str,
+        namespace: str = "*",
     ) -> DetectorProfile:
         """Resolve exact scope, then resource wildcard, then global default."""
-        profile = profile_registry.resolve(method, resource, name, metric)
+        profile = profile_registry.resolve(method, resource, name, metric, namespace)
         if profile is None:
             raise HTTPException(status_code=404, detail="no matching detector profile")
         return profile
@@ -248,6 +250,7 @@ def create_app(
                 metric=request.metric,
                 changes=request.parameters,
                 reason=request.reason,
+                namespace=request.namespace,
             )
         except ProfileConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc

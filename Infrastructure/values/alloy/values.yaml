@@ -46,8 +46,8 @@ alloy:
           target_label  = "node"
         }
 
-        # Eviction storms can leave thousands of terminal Pods. Their logs are
-        # no longer live telemetry and previously amplified Loki WAL growth.
+        // Eviction storms can leave thousands of terminal Pods. Their logs are
+        // no longer live telemetry and previously amplified Loki WAL growth.
         rule {
           source_labels = ["__meta_kubernetes_pod_phase"]
           regex         = "Succeeded|Failed"

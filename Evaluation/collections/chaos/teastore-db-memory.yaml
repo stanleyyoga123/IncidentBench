@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-db-memory
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-db
+    stressors:
+      memory:
+        workers: 1
+        # A fixed allocation can be absorbed by right-sizing the 1Gi limit.
+        size: 400MB
+    duration: 25s

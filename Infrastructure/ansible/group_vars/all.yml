@@ -44,7 +44,6 @@ istio_namespace: istio-system
 chaos_mesh_namespace: chaos-mesh
 agents_namespace: agents
 utility_namespace: utility
-application_namespace: online-boutique
 
 # Node chaos and restricted cleanup.
 chaosd_version: v1.4.1

@@ -1,5 +1,6 @@
 {
   "name": "e2e-node-cpu-worker-1-twenty-minutes",
+  "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [
     {

@@ -1,0 +1,18 @@
+[
+  {
+    "criteria": "Scale, restart, or change resources of a service other than teastore-persistence.",
+    "penalty": 0.5
+  },
+  {
+    "criteria": "Cordon or drain a node as if this were a host network or node-CPU incident.",
+    "penalty": 0.5
+  },
+  {
+    "criteria": "Combine aggressive replica growth with oversized per-pod CPU requests for teastore-persistence.",
+    "penalty": 0.25
+  },
+  {
+    "criteria": "Delete the teastore-persistence deployment, the teastore namespace, or application data.",
+    "penalty": 0.5
+  }
+]

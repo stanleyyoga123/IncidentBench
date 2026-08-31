@@ -106,9 +106,9 @@ class LoadGeneratorSeedTests(unittest.TestCase):
         samples = {
             0: (120, 2),
             7 * 3600: (240, 3),
-            10.1 * 3600: (840, 15),
+            10.1 * 3600: (1200, 15),
             12 * 3600: (450, 10),
-            13.1 * 3600: (1080, 20),
+            13.1 * 3600: (1500, 20),
             23 * 3600: (150, 3),
         }
         for elapsed, expected in samples.items():

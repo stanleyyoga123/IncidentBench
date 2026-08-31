@@ -28,7 +28,7 @@ class OutputFilter(BaseModel):
 
 class FlexibleKubectlRequest(BaseModel):
     args: str | list[str] = Field(
-        description="Arguments after kubectl, as a shell-like string or token list. Examples: 'get pods -n online-boutique -o wide', ['describe', 'svc', 'frontend', '-n', 'online-boutique']."
+        description="Arguments after kubectl, as a shell-like string or token list. Examples: 'get pods -n <incident-namespace> -o wide', ['describe', 'svc', '<service>', '-n', '<incident-namespace>']."
     )
     grep: str | None = Field(default=None, description="Optional regex/substring used to keep only matching stdout lines. Use this instead of shell pipes.")
     timeout_seconds: int | None = Field(default=None, description="Optional command timeout override.")
@@ -60,7 +60,7 @@ class JaegerListServicesRequest(BaseModel):
 
 
 class JaegerRetrieveSlowTracesRequest(BaseModel):
-    service: str = Field(default="frontend.online-boutique", description="Jaeger service name to sample, e.g. frontend.online-boutique.")
+    service: str = Field(description="Exact Jaeger service name returned by jaeger.list_services.")
     lookback: str = Field(default="30m", description="Lookback window for action='slow_traces', e.g. 15m, 30m, 1h.")
     limit: int = Field(default=5, description="Number of slow trace summaries to return for action='slow_traces'.")
     min_duration: str | None = Field(default=None, description="Optional Jaeger minDuration for action='slow_traces', e.g. 20ms, 100ms, 1s.")
@@ -174,7 +174,6 @@ class NetworkTcpConnectRequest(BaseModel):
 
 class ClusterProfileBaselineRequest(BaseModel):
     namespace: str = Field(
-        default="online-boutique",
         pattern=r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
         max_length=63,
         description="Kubernetes namespace whose complete live Deployment inventory will be profiled.",

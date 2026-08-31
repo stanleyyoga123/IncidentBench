@@ -55,11 +55,13 @@ window each cycle and does not perform startup backfill.
 
 ## Adaptability Contract
 
-Profiles resolve from most specific to least specific:
+Profiles resolve from most specific to least specific while preserving
+namespace scope:
 
-1. exact `method/resource/name/metric`;
-2. resource-wide wildcard name;
-3. built-in global wildcard.
+1. exact `method/namespace/resource/name/metric`;
+2. namespace/resource-wide wildcard name;
+3. namespace-wildcard exact or resource-wide override;
+4. built-in global wildcard.
 
 Runtime profile mutations are versioned, require a reason, and use optional
 optimistic concurrency through `expected_version`. Mutation endpoints require

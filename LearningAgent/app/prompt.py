@@ -16,12 +16,14 @@ exactly these typed fields:
 - avoid: JSON array of strings, never a single string
 - evidence_refs: JSON array of strings identifying source event IDs, job IDs, or
   tool-call IDs from the supplied data
-- resource, name, metric: string or null
+- namespace, resource, name, metric: string or null; set namespace whenever the
+  lesson applies to one workload namespace and leave it null only for genuinely
+  cluster-wide guidance
 - tags: JSON array of strings
 - confidence: a number from 0.0 to 1.0, never words such as "high" or "medium"
 
 Example lesson:
-{"category":"investigation","title":"Check node schedulability","guidance":"When pods stay Pending, inspect node cordon, taints, and capacity before changing placement.","applies_when":["pods are Pending","scheduling appears blocked"],"avoid":["uncordoning a node without checking why it was cordoned"],"evidence_refs":["event:abc","tool-call:12"],"resource":"nodes","name":null,"metric":"app_instance_count","tags":["scheduling"],"confidence":0.8}
+{"category":"investigation","title":"Check node schedulability","guidance":"When pods stay Pending, inspect node cordon, taints, and capacity before changing placement.","applies_when":["pods are Pending","scheduling appears blocked"],"avoid":["uncordoning a node without checking why it was cordoned"],"evidence_refs":["event:abc","tool-call:12"],"namespace":null,"resource":"nodes","name":null,"metric":"app_instance_count","tags":["scheduling"],"confidence":0.8}
 
 Return an empty lessons array when the evidence supports no safe reusable conclusion.
 """

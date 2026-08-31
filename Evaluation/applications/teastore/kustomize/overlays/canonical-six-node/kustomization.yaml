@@ -1,0 +1,142 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: teastore
+# ClusterIP TeaStore on nodes labelled role=services. Replica distribution
+# is preferred across hostnames without making scheduling fail when an even
+# spread is temporarily impossible. teastore-db stays at one replica because
+# the bundled MySQL image is not clustered. teastore-registry stays at one
+# replica because its catalog is in-memory and extra replicas do not share
+# registrations.
+resources:
+  - ../../base
+  - hpa.yaml
+patches:
+  - path: node-selector-path.yaml
+    target:
+      kind: Deployment
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-db
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-db
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-registry
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-registry
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-persistence
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-persistence
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-auth
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-auth
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-image
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-image
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-recommender
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-recommender
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: teastore-webui
+    patch: |-
+      - op: add
+        path: /spec/replicas
+        value: 3
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: teastore-webui

@@ -7,6 +7,7 @@ from ..domain.placement import PlacementProfile
 def validate_pod_chaos_selectors(
     profile: PlacementProfile,
     schedules: Iterable[ChaosSchedule],
+    label_key: str = "app",
 ) -> None:
     for schedule in schedules:
         if schedule.child_type == "PhysicalMachineChaos":
@@ -26,11 +27,11 @@ def validate_pod_chaos_selectors(
         expressions = [
             expression
             for expression in selector.get("expressionSelectors", [])
-            if expression.get("key") == "app" and expression.get("operator") == "In"
+            if expression.get("key") == label_key and expression.get("operator") == "In"
         ]
         if len(expressions) != 1:
             raise ValueError(
-                f"pod Schedule {schedule.reference} must contain exactly one app In selector"
+                f"pod Schedule {schedule.reference} must contain exactly one {label_key} In selector"
             )
         actual_values = expressions[0].get("values")
         if not isinstance(actual_values, list) or any(

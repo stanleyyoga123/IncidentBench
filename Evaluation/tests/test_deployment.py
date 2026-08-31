@@ -46,6 +46,9 @@ def test_evaluation_owns_runner_secrets_playbook_and_deploy_script():
     env = {item["name"]: item["value"] for item in container["env"]}
     assert "POSTGRES_DSN" not in env
     assert env["INFRASTRUCTURE_ROOT"] == "/infrastructure"
+    assert env["ONLINE_BOUTIQUE_ROOT"] == "/app/applications/online-boutique"
+    assert env["TEASTORE_ROOT"] == "/app/applications/teastore"
+    assert "TRAIN_TICKET_ROOT" not in env
     assert env["CHAOS_NODE_SSH_USER"] == "chaos-cleaner"
     assert env["CHAOS_NODE_SSH_IDENTITY_FILE"] == (
         "/var/run/evaluation-runner/ssh/id_ed25519"

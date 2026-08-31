@@ -6,9 +6,11 @@ Re-check live Kubernetes state, metrics, logs, and traces during each incident.
 ## Cluster Context
 
 - Kubernetes distribution: k3s.
-- Main application namespace: `online-boutique`.
-- Application: Google Cloud Online Boutique microservices demo.
-- Service mesh: Istio with sidecars expected in `online-boutique`.
+- One or more microservice applications may be active. Their namespaces are
+  supplied at runtime and must be preserved throughout investigation and
+  remediation planning.
+- Application names, entry points, service dependencies, replica policies, and
+  sidecar presence are workload-specific and must be discovered live.
 - Prometheus is in `monitoring`, Loki is in `observability`, and Jaeger/Istio components are in `istio-system`.
 - Supporting namespaces include `agents`, `loadgenerator`, and `utility`.
 
@@ -21,11 +23,13 @@ Re-check live Kubernetes state, metrics, logs, and traces during each incident.
 
 ## Application Topology
 
-- Treat `frontend` as the common user-visible symptom source, not as the default root cause.
-- `frontend-external` exposes `frontend` through NodePort `30080` in the expected configuration.
-- Application deployments are `frontend`, `adservice`, `cartservice`, `checkoutservice`, `currencyservice`, `emailservice`, `paymentservice`, `productcatalogservice`, `recommendationservice`, `shippingservice`, and `redis-cart`.
-- Each application pod normally includes its application container and an Istio sidecar.
-- CPU-based HPAs are normally configured for the application deployments. Re-check targets, replica bounds, and behavior live before recommending autoscaling changes.
+- Discover Deployments, StatefulSets, Services, endpoints, HPAs, ingress or
+  gateway entry points, sidecars, and dependency paths in the incident's
+  namespace. Do not import topology from another application.
+- Treat a user-visible entry service as a symptom source, not the default root
+  cause.
+- Re-check autoscaling targets, replica bounds, resource policies, and behavior
+  live before recommending changes.
 
 ## Application Invariants
 
@@ -38,8 +42,8 @@ Re-check live Kubernetes state, metrics, logs, and traces during each incident.
 
 ## Investigation Defaults
 
-- Default namespace: `online-boutique`.
-- Default user-visible service: `frontend`.
+- There is no default application namespace or user-visible service. Use the
+  runtime workload scope and live discovery.
 - If no time window is provided, inspect recent data.
 - Treat this knowledge as expected topology, not current health. Verify nodes, deployments, replicas, HPAs, PodDisruptionBudgets, endpoints, and placement live.
 - Empty metrics, logs, or traces are not proof of health. Treat them as missing evidence or a tool/data gap.

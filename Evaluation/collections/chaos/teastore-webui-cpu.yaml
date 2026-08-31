@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-webui-cpu
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-webui
+    stressors:
+      cpu:
+        workers: 1
+        # 55% of one CPU exceeds the constrained 250m limit.
+        load: 55
+    duration: 25s

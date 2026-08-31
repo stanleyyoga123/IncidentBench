@@ -1,0 +1,17 @@
+{
+  "name": "real-pod-paymentservice-capacity-loss-one-hour",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-paymentservice-single-replica-capacity-loss",
+      "chaos": ["single-paymentservice-capacity-loss"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

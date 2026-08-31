@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 class AnomalyEventInput(BaseModel):
     event_id: str = Field(min_length=16, max_length=128)
     detected_at: datetime
+    namespace: str | None = Field(default=None, min_length=1, max_length=253)
     resource: str = Field(min_length=1)
     name: str = Field(min_length=1)
     metric: str = Field(min_length=1)
@@ -23,6 +24,8 @@ class AnomalyEventInput(BaseModel):
     def timezone_required(self) -> "AnomalyEventInput":
         if self.detected_at.tzinfo is None:
             raise ValueError("detected_at must be timezone-aware")
+        if self.resource in {"deployment", "deployments"} and not self.namespace:
+            raise ValueError("deployment anomaly events require namespace")
         return self
 
 
@@ -201,6 +204,7 @@ class IncidentLesson(BaseModel):
     applies_when: list[str] = Field(default_factory=list)
     avoid: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+    namespace: str | None = None
     resource: str | None = None
     name: str | None = None
     metric: str | None = None
@@ -262,6 +266,7 @@ class LearningLessonInput(BaseModel):
     applies_when: list[str] = Field(default_factory=list, max_length=10)
     avoid: list[str] = Field(default_factory=list, max_length=10)
     evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+    namespace: str | None = Field(default=None, max_length=253)
     resource: str | None = Field(default=None, max_length=200)
     name: str | None = Field(default=None, max_length=300)
     metric: str | None = Field(default=None, max_length=300)

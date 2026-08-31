@@ -27,9 +27,8 @@ class ServiceHardeningTests(unittest.TestCase):
     def setUpClass(cls):
         cls.root = Path(__file__).resolve().parents[1]
         cls.kustomize_root = (
-            cls.root.parent
-            / "Infrastructure"
-            / "kubernetes"
+            cls.root
+            / "applications"
             / "online-boutique"
             / "kustomize"
         )

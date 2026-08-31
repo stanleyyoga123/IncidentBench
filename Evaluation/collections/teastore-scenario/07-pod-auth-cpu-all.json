@@ -1,0 +1,19 @@
+{
+  "name": "teastore-pod-auth-cpu-all-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-auth-cpu-all-chaos",
+      "chaos": [
+        "teastore-auth-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

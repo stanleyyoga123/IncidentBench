@@ -2,13 +2,15 @@ from pydantic import BaseModel
 
 
 class Metadata(BaseModel):
+    namespace: str | None = None
     name: str
     resource: str
     metric: str
 
     @property
     def key(self):
-        return f"{self.resource}:{self.name}:{self.metric}"
+        scope = self.namespace or "_cluster"
+        return f"{scope}:{self.resource}:{self.name}:{self.metric}"
 
 
 class MetricSeries(BaseModel):

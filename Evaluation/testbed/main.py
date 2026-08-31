@@ -1,4 +1,4 @@
-"""CLI entrypoint for collection-driven Online Boutique evaluation runs."""
+"""CLI entrypoint for collection-driven multi-application evaluation runs."""
 
 import signal
 import subprocess
@@ -15,9 +15,6 @@ from testbed.cli import (
 )
 from testbed.constants import (
     AGENT_DEPLOYMENTS,
-    DEFAULT_AGENT_NAMESPACE,
-    DEFAULT_HOST,
-    DEFAULT_NAMESPACE,
 )
 from testbed.evaluator.evaluator import Evaluator
 from testbed.loadgenerator.runner import start_locust

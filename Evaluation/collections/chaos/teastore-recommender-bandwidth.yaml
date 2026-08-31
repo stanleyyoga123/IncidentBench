@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-recommender-bandwidth
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: NetworkChaos
+  networkChaos:
+    action: bandwidth
+    mode: all
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-recommender
+    bandwidth:
+      rate: 1mbps
+      limit: 2097152
+      buffer: 10000
+    duration: 25s

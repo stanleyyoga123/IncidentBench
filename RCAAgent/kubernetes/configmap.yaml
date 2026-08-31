@@ -19,3 +19,4 @@ data:
     worker.lease_seconds=1200
     worker.max_attempts=3
     manager.max_rounds=10
+    workloads.namespaces=["online-boutique","teastore"]

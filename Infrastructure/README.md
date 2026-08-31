@@ -8,7 +8,7 @@ their default-current-context deploy scripts live with their components.
 ## Layout
 
 - `ansible/`: inventory plus cluster, platform, and node-preparation playbooks.
-- `kubernetes/`: Online Boutique platform/workload inputs.
+- `kubernetes/`: workload inputs currently owned for Online Boutique.
 - `values/`: Prometheus, Grafana, Loki, Alloy, Jaeger, and tracing configuration.
 - `generated/`: ignored kubeconfig and pinned SSH host keys produced by Ansible.
 - `backups/`: ignored placeholder for externally managed restores; never used
@@ -82,8 +82,9 @@ ansible-playbook playbooks/istio.yml
 ## Build images
 
 Build component images from their component directories. The Evaluation image
-must use the workspace root as its Docker build context because it embeds the
-central Online Boutique manifests:
+must use the workspace root as its Docker build context because application
+profiles may resolve workspace-owned manifests and MCPTools namespace-access
+policy:
 
 ```bash
 docker build -f Evaluation/Dockerfile -t <registry>/agent-evaluator:<tag> .
@@ -95,8 +96,11 @@ Set immutable image tags in component manifests before a reproducible release.
 ## Runtime boundary
 
 Evaluation owns `deploy.sh`, its runner Secrets, `kubernetes/pod.yaml`,
-`prerun/run.sh`, and `postrun/run.sh`. Runtime scripts still read Online Boutique
-and inventory inputs through `INFRASTRUCTURE_ROOT`.
+`prerun/run.sh`, `postrun/run.sh`, and every application deployment input under
+`Evaluation/applications/`. Infrastructure exposes only cluster, node,
+inventory, storage, and shared platform prerequisites through
+`INFRASTRUCTURE_ROOT`. Application namespaces are created by Evaluation, not by
+the platform playbook.
 
 ## Local database
 
@@ -118,7 +122,8 @@ placeholder before running these commands.
 cd Infrastructure/ansible
 ansible-inventory --graph
 ansible-playbook site.yml --syntax-check
-kubectl kustomize ../kubernetes/online-boutique/kustomize >/dev/null
+cd ../../Evaluation
+kubectl kustomize applications/online-boutique/kustomize >/dev/null
 ```
 
 Syntax checks are safe and local. Do not run provisioning, chart upgrades,

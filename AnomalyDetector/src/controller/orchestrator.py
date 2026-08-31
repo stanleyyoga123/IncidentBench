@@ -32,6 +32,7 @@ class AgentOrchestratorSink:
     def _identity(detection: Detection) -> str:
         stable = {
             "detected_at": detection.detected_at.isoformat() if detection.detected_at else None,
+            "namespace": detection.metadata.namespace,
             "resource": detection.metadata.resource,
             "name": detection.metadata.name,
             "metric": detection.metadata.metric,
@@ -49,6 +50,7 @@ class AgentOrchestratorSink:
         return {
             "event_id": self._identity(detection),
             "detected_at": detected_at.isoformat(),
+            "namespace": detection.metadata.namespace,
             "resource": detection.metadata.resource,
             "name": detection.metadata.name,
             "metric": detection.metadata.metric,

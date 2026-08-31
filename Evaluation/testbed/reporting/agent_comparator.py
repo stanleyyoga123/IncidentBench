@@ -26,6 +26,7 @@ class AgentComparator:
         if summary.empty:
             return pd.DataFrame()
         keys = [
+            "application",
             "scenario",
             "placement",
             "placement_definition_fingerprint",
@@ -34,6 +35,8 @@ class AgentComparator:
             "chaos",
         ]
         working = summary.copy()
+        if "application" not in working:
+            working["application"] = "online-boutique"
         if "placement" not in working:
             working["placement"] = "unmanaged"
         if "placement_definition_fingerprint" not in working:

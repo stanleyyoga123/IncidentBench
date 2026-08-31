@@ -4,9 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_SINGLE_SCRIPT="${RUN_SINGLE_SCRIPT:-$SCRIPT_DIR/run_single.sh}"
 
-echo "Running real scenarios with the constant load generator"
+echo "Running TeaStore scenarios with the constant load generator"
 "$RUN_SINGLE_SCRIPT" \
-    "$SCRIPT_DIR/collections/real-scenario" \
+    "$SCRIPT_DIR/collections/teastore-scenario" \
+    constant
+
+echo "Running Online Boutique scenarios with the constant load generator"
+"$RUN_SINGLE_SCRIPT" \
+    "$SCRIPT_DIR/collections/online-boutique-scenario" \
     constant
 
 echo
@@ -16,4 +21,4 @@ echo "Running long scenarios with the daily load generator"
     daily
 
 echo
-echo "Completed all real and long scenarios."
+echo "Completed Online Boutique, TeaStore, and long scenarios."

@@ -1,38 +1,48 @@
 This project evaluates the Anomaly Detection and Kubernetes RCA & Remediation
-Agent against Online Boutique microservices.
+Agent against microservice systems. Application profiles currently cover
+Online Boutique and TeaStore.
 
 The runner is collection-driven:
 
 - `collections/chaos/` contains complete Chaos Mesh `Schedule` YAML files used
-  by the real-scenario, new-scenario, and long-scenario suites.
-- `../Infrastructure/kubernetes/online-boutique/kustomize/overlays/` contains
-  pre-authored Kustomize placement profiles.
-- `collections/real-scenario/` contains JSON scenarios referencing YAML
-  filename stems and one required placement profile.
-- `collections/new-scenario/` contains production-style resource and capacity
-  incidents whose accepted remediations are ordinary kubectl mutations rather
-  than restart, rollback, or version changes.
+  by the Online Boutique, TeaStore, and long-scenario suites.
+- `applications/online-boutique/kustomize/` contains the complete Online
+  Boutique base, components, and pre-authored placement overlays.
+- `applications/teastore/kustomize/` contains the TeaStore ClusterIP base and
+  placement overlays.
+- `applications/online_boutique.py` and `applications/teastore.py` own the
+  application-specific Locust journeys; reusable traffic shapes stay under
+  `testbed/loadgenerator/`.
+- `collections/online-boutique-scenario/` contains Online Boutique node and
+  service incidents.
+- `collections/teastore-scenario/` contains the matching TeaStore incidents.
+- `collections/e2e-smoke/` contains short smoke scenarios for both applications.
 - `collections/long-scenario/` contains one 24-hour multi-fault scenario.
+- `applications/*/profile.yaml` owns installer, source, namespace, endpoint,
+  workload selection, placement mode, and loadgenerator behavior.
 - `chaos: []` represents an idle recovery step.
 - Multiple references in one step are applied together.
 
 Example commands:
 
 ```bash
-./run.sh --loadgenerator constant --scenario ./collections/real-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
+./run.sh --loadgenerator constant --scenario ./collections/online-boutique-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
+./run.sh --loadgenerator constant --scenario ./collections/teastore-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
 ./run.sh --loadgenerator daily --scenario ./collections/long-scenario/01-multi-fault-one-day.json
 ./run_all.sh
 ```
 
-`run_all.sh` runs the complete real-scenario collection through `run_single.sh`
-with constant load, followed by the long-scenario collection with daily load.
+`run_all.sh` runs the Online Boutique collection, then the TeaStore collection,
+through `run_single.sh` with constant load, followed by the long-scenario
+collection with daily load.
 It stops if either batch fails. `run_single.sh` accepts an optional explicit
 load-generator argument after the scenario folder.
 
 Important modules:
 
-- `prerun/run.sh` wipes current agent workflow tables and recreates
-  `online-boutique` from the central Infrastructure Kustomize.
+- `prerun/run.sh` resolves the scenario application and invokes its fail-closed
+  installer after source validation. The installer deletes other catalog
+  application namespaces before recreating the selected one.
 - `testbed/` is the experiment executor (formerly `src/`).
 - `postrun/run.sh` dumps anomaly, RCA, remediation, learning, and workflow rows into
   the run `sessions/` folder for later S3 upload.
@@ -60,15 +70,17 @@ Important modules:
 - The evaluation-runner ServiceAccount, ClusterRoleBinding, and Pod in
   `kubernetes/pod.yaml`, placeholder `kubernetes/secret.yml`, and
   default-current-context `deploy.sh` stay here. Replace required `++++++++`
-  placeholders before deployment. Cluster/platform installation, inventory,
-  node preparation, and Online Boutique manifests belong in
-  `../Infrastructure/` and are resolved through `INFRASTRUCTURE_ROOT`.
+  placeholders before deployment. Application manifests and source inputs
+  belong under `applications/`; cluster/platform installation, inventory, and
+  node preparation remain in `../Infrastructure/` and are resolved through
+  `INFRASTRUCTURE_ROOT`.
 
 Scenario format:
 
 ```json
 {
   "name": "real-node-delay-worker-3-one-hour",
+  "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [
     {
@@ -86,15 +98,17 @@ Experiment flow:
 Each scenario is `prerun/run.sh`, then `testbed/run.sh`, then
 `postrun/run.sh`. `./run.sh` orchestrates those three programs.
 
-1. Prerun truncates live agent tables (`anomaly_event`, `agent_workflow`,
+1. Prerun validates the selected application source, truncates live agent tables (`anomaly_event`, `agent_workflow`,
    `rca_job`, `remediation_job`, `learning_job`, `incident_lesson`,
    `agent_tool_call`, `remediation_artifact`)
-   and clears `agent_execution_slot`, then deletes and recreates
-   `online-boutique` from the central Kustomize.
+   and clears `agent_execution_slot`, then deletes other catalog application
+   namespaces so leftover workloads cannot starve placement, deletes and recreates
+   the selected application namespace, and installs the selected placement.
 2. Testbed scales agent deployments down.
 3. Testbed uncordons the selected placement nodes, preflights them, waits
    for rollouts, and verifies Ready pod placement.
-4. Start Locust and collect a baseline.
+4. Wait for the application profile's startup warm-up (TeaStore: 180 seconds),
+   then start Locust and collect a baseline.
 5. Scale agents up unless `--skip-agents` is set.
 6. Execute ordered scenario steps.
 7. For a non-idle step, remove stale Schedules, apply all references, wait for
@@ -105,13 +119,19 @@ Each scenario is `prerun/run.sh`, then `testbed/run.sh`, then
    remediation session, learning session with lessons, workflow) into the run
    output directory.
 
-Placement profiles must cover all 11 application Deployments, retain
+Online Boutique placement profiles must cover all 11 of its Deployments, retain
 `role: services`, contain no required node affinity, and define exactly one
 soft `kubernetes.io/hostname` topology-spread constraint per Deployment with
 `maxSkew: 1`, `whenUnsatisfiable: ScheduleAnyway`, and an app-specific label
 selector. The canonical profile starts every Deployment at two replicas except
 `frontend`, which starts at six. Matching HPA minima are 2 and 6, and every HPA
 maximum is 30.
+TeaStore follows the same scheduling contract for its seven Deployments. The
+canonical profile uses ClusterIP Services, starts `teastore-webui` at three
+replicas, `teastore-db` and `teastore-registry` at one replica, and the
+remaining services at two. `teastore-db` has no HPA because the bundled MySQL
+image is not clustered. `teastore-registry` has no HPA because its catalog is
+in-memory and extra replicas do not share registrations.
 The runner explicitly uncordons referenced nodes to clear scheduling state left
 by earlier remediation, but does not modify labels, taints, tolerations,
 replica counts, or HPAs. After prerun recreates the namespace, a referenced
@@ -134,8 +154,8 @@ Schedule requirements:
 - child duration shorter than the cadence
 - Schedule name no longer than 57 characters
 
-The default application namespace is `online-boutique`; it affects metrics and
-snapshots only. Chaos targets and namespaces are defined entirely by the YAML.
+The selected application profile supplies the namespace used for metrics and
+snapshots. Chaos targets and namespaces are defined entirely by the YAML.
 Every Schedule must be absent before the runner advances to the next step.
 `--skip-reset` is not supported because placement must be applied and verified
 for every run.

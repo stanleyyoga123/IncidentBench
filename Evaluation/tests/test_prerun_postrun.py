@@ -32,12 +32,19 @@ class PrerunTests(unittest.TestCase):
         self.assertIn("UPDATE agent_execution_slot", sql)
         self.assertNotIn("TRUNCATE agent_execution_slot", sql)
 
-    def test_prerun_recreates_online_boutique_from_central_kustomize(self):
+    def test_prerun_delegates_to_application_aware_installer(self):
         script = (ROOT / "prerun" / "run.sh").read_text()
-        self.assertIn("kubectl delete ns", script)
-        self.assertIn("kubectl apply -k", script)
-        self.assertIn("cleanup.sh", script)
-        self.assertNotIn("PLACEMENT_MANIFEST", script)
+        installer = (ROOT / "testbed" / "applications" / "installers.py").read_text()
+        self.assertIn("testbed.applications.prerun", script)
+        self.assertIn("SCENARIO", script)
+        self.assertIn('"delete"', installer)
+        self.assertIn('"namespace"', installer)
+        self.assertIn("extra_namespaces", installer)
+        self.assertIn('"apply",\n                "-k"', installer)
+        self.assertIn('"helm",\n                "upgrade"', installer)
+        prerun = (ROOT / "testbed" / "applications" / "prerun.py").read_text()
+        self.assertIn("other_namespaces", prerun)
+        self.assertIn("clear_namespaces=sibling_namespaces", prerun)
         self.assertNotIn("detected_anomaly", script)
         self.assertNotIn("in_progress", script)
 

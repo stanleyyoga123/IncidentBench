@@ -8,7 +8,7 @@
 4. Copy `DatabaseJob/kubernetes/secret.example.yml` to ignored
    `kubernetes/secret.yml`, replace every `++++++++` placeholder, and run
    `ALLOW_AGENT_WORKFLOW_RESET=true ./DatabaseJob/deploy.sh`. Migration
-   Alembic head `20260819_0003` must finish before any service starts.
+   Alembic head `20260831_0004` must finish before any service starts.
 5. Copy each component `secret.example.yml` to ignored `secret.yml`, replace
    placeholders while keeping the pairwise token matrix matching, then deploy
    MCPTools, LearningAgent, RCAAgent/RemediatorAgent, AgentOrchestrator, and
@@ -19,6 +19,23 @@
 7. Confirm committed detector ingestion.
 8. Exercise no-action, decline, and approved-remediation mocked flows before a
    controlled live experiment.
+
+For every supported application, keep `collector.metadata.namespaces` in
+AnomalyDetector and `workloads.namespaces` in RCAAgent aligned. MCPTools
+`APPLICATION_NAMESPACES` binds namespaces that already exist during its
+deployment; any installer that deletes and recreates an application namespace
+must then reapply `MCPTools/kubernetes/application-role-binding.yaml` and verify
+the remediation service account's intended namespaced permission. Evaluation's
+application installer performs both steps automatically.
+MCPTools does not create or catalog application namespaces. Evaluation creates
+the selected namespace, applies the binding, and verifies both Deployment and
+HorizontalPodAutoscaler patch authorization before application installation.
+For an application already running outside Evaluation, pass its namespace
+explicitly through `APPLICATION_NAMESPACES` when deploying MCPTools.
+During upgrade, MCPTools deletes only the obsolete namespaced RoleBinding named
+`mcp-tools-remediation` and creates `mcp-tools-remediation-workload`. This name
+change avoids Kubernetes' immutable-`roleRef` rejection when migrating from the
+old namespaced Role to the workload ClusterRole.
 
 Downgrade recreates legacy table structure only. Deleted records are not
 recoverable. Return `ALLOW_AGENT_WORKFLOW_RESET` to false after migration.

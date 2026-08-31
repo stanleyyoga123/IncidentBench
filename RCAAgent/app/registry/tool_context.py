@@ -55,7 +55,7 @@ TOOL_USAGE_CONTEXT = {
     "kubectl": [
         "Use for Kubernetes state: pods, deployments, services, endpoints, HPAs, rollout status, node placement, and readiness.",
         "Kubernetes Events are intentionally excluded by cluster policy; do not query them.",
-        "Pass only arguments after the kubectl binary, for example `get pods -n online-boutique -o wide`.",
+        "Pass only arguments after the kubectl binary, for example `get pods -n <incident-namespace> -o wide`.",
         "Do not use shell pipes or shell operators. Use the tool's `grep` argument for line filtering.",
         "Prefer read-only validation before proposing or relying on any mutation.",
         "Dangerous deletes and scaling workloads to zero are guarded; report blocked tool results as evidence.",
@@ -82,7 +82,7 @@ TOOL_USAGE_CONTEXT = {
     ],
     "jaeger.retrieve_slow_traces": [
         "Use first for latency investigations when you need representative slow trace IDs for a service.",
-        "Services are usually named like `frontend.online-boutique`; use a bounded `lookback` such as `15m` or `30m` and a small `limit`.",
+        "Discover the exact service name first; use a bounded `lookback` such as `15m` or `30m` and a small `limit`.",
         "Trace absence is missing evidence unless the query window and service name are confirmed.",
     ],
     "jaeger.investigate_trace": [

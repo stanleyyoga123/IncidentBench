@@ -1,6 +1,9 @@
-# Online Boutique Chaos Evaluation
+# Multi-application Kubernetes Chaos Evaluation
 
-Run scenario-driven evaluations using predefined Chaos Mesh Schedules.
+Run scenario-driven evaluations against Online Boutique or TeaStore using
+predefined Chaos Mesh Schedules. Each scenario selects an application profile;
+the profile owns installation, runtime defaults, placement discovery, and its
+Locust user journey.
 
 Evaluation owns its runner deployment: `deploy.sh`,
 `kubernetes/secret.example.yml`, and `kubernetes/pod.yaml`. Copy
@@ -8,34 +11,53 @@ the example to ignored `kubernetes/secret.yml` and replace the
 required SSH and `POSTGRES_DSN` `++++++++` placeholders before running
 `./deploy.sh`; replace all four optional S3 placeholders or leave all four
 unchanged. The script uses kubectl's current context. Infrastructure must install
-the platform and namespaces first, but does not install this runner.
+the shared platform namespaces and services first; Evaluation creates the
+selected application namespace during prerun.
 
 ```text
 collections/
-├── chaos/          # Complete Schedule YAML resources used by scenario suites
-├── real-scenario/  # Relocatable, user-impacting production analogues
-├── new-scenario/   # Kubectl-remediable resource and capacity incidents
-└── long-scenario/  # One 24-hour multi-fault day
+├── chaos/                       # Complete Schedule YAML resources
+├── online-boutique-scenario/    # Online Boutique node and service incidents
+├── teastore-scenario/           # Matching TeaStore incidents
+├── e2e-smoke/                   # Short smoke scenarios for both applications
+└── long-scenario/               # One 24-hour multi-fault day
 ```
 
-Every scenario must select a placement profile from
-`../Infrastructure/kubernetes/online-boutique/kustomize/overlays/`. The runner
-uncordons that profile's nodes,
-renders and archives the overlay, verifies all referenced nodes after prerun
-recreates Online Boutique, and verifies the live pod-to-node mapping before
-baseline collection. Runs with different observed placement fingerprints are not
-compared by reporting.
+All application-owned definitions and deployment inputs live under
+`applications/<application>/`. Online Boutique's complete Kustomize tree is
+under `applications/online-boutique/kustomize`. TeaStore's ClusterIP Kustomize
+tree is under `applications/teastore/kustomize`.
+The corresponding Locust journeys are `applications/online_boutique.py` and
+`applications/teastore.py`; `testbed/loadgenerator/` contains only reusable
+traffic shapes and launch mechanics.
+The runner archives the selected placement and verifies the live pod-to-node
+mapping before baseline collection. Runs with different placement-definition
+fingerprints are not compared. Infrastructure remains responsible only for
+cluster, node, storage, and shared platform prerequisites.
+
+The profile namespace is authoritative because chaos selectors and upstream
+manifests also encode it. `--namespace` may repeat that value but cannot move an
+application to a different namespace; `--host` remains available for alternate
+ingress or port-forward targets.
 
 Each `./run.sh` scenario is `prerun/run.sh`, then `testbed/run.sh`, then
-`postrun/run.sh`. Prerun wipes agent workflow tables and recreates
-`online-boutique`. Postrun writes database sessions into
-`results/<run-id>/sessions/` so later S3 sync includes them.
+`postrun/run.sh`. Prerun resolves the application, validates its source, wipes
+agent workflow tables, deletes other catalog application namespaces, recreates
+the selected namespace, and installs the scenario-selected placement. It writes
+`application-install.json` into the run directory. Postrun writes database
+sessions into `results/<run-id>/sessions/` so later S3 sync includes them.
+
+Before prerun touches the workflow database, `run.sh` scales all seven agent
+deployments to zero and waits until no replicas are ready. This also makes a
+retry safe after an interrupted run and prevents worker transactions from
+deadlocking the workflow-table reset. The testbed starts them again after the
+agents-off baseline and scales them down during finalization.
 
 Run one scenario:
 
 ```bash
 ./run.sh --loadgenerator burst \
-  --scenario ./collections/real-scenario/01-node-delay-worker-3.json \
+  --scenario ./collections/online-boutique-scenario/01-node-delay-worker-3.json \
   --baseline-minutes 5 \
   --prometheus-url http://localhost:9090
 ```
@@ -43,7 +65,7 @@ Run one scenario:
 Run the full agent/non-agent batch:
 
 ```bash
-./run_tc.sh ./collections/real-scenario
+./run_tc.sh ./collections/online-boutique-scenario
 ```
 
 Run the curated real-world suite once with agents and constant load:
@@ -52,22 +74,35 @@ Run the curated real-world suite once with agents and constant load:
 ./run_single.sh
 ```
 
-The real-world suite is ordered with node-level incidents first, followed by
-the original service CPU incidents.
+The Online Boutique suite is ordered with node-level incidents first, followed
+by service CPU, memory, bandwidth, capacity-loss, and CPU-headroom incidents.
 
-Run the kubectl-remediable resource and capacity suite separately:
+Run the matching TeaStore suite:
 
 ```bash
-./run_single.sh ./collections/new-scenario constant
+./run_single.sh ./collections/teastore-scenario constant
 ```
 
-Every `new-scenario` primary remediation is an ordinary Kubernetes mutation:
+Every service-scoped primary remediation is an ordinary Kubernetes mutation:
 node cordon/drain, vertical resource sizing, or bounded HPA scaling. The suite
 does not require restart, rollback, or image version changes as solutions.
-The email, checkout, and product-catalog CPU-headroom cases use the
-`cpu-constrained-six-node` Infrastructure overlay, which preserves canonical
-placement while setting every application CPU limit equal to its request. Each
-scenario right-sizes only its affected Deployment's CPU request and limit.
+The CPU-headroom cases use the `cpu-constrained-six-node` overlay, which
+preserves canonical placement while setting every application CPU limit equal
+to its request. Each scenario right-sizes only its affected Deployment's CPU
+request and limit.
+
+TeaStore's web UI baseline uses three replicas with an HPA maximum of 3. Each
+replica requests 1500m CPU and 2Gi memory, with limits of 2000m CPU and 3Gi
+memory. Canonical TeaStore requests use conventional rounded quantities while
+keeping the existing limits as anchors.
+
+Run a short TeaStore smoke:
+
+```bash
+./run.sh --loadgenerator constant \
+  --scenario ./collections/e2e-smoke/03-teastore-auth-cpu.json \
+  --baseline-minutes 5
+```
 
 Run the 24-hour compounding-incident day with the daily traffic curve:
 
@@ -79,7 +114,10 @@ Times in that scenario are on the daily load clock (locust start = 00:00). A
 60-minute baseline therefore idles until 01:00; the first chaos window is
 02:00–04:00.
 
-Edit the stage table in `testbed/loadgenerator/daily.py`. Each stage's
+Traffic shapes and application behavior are separate. The reusable shapes are
+`constant`, `burst`, `sinus`, and `daily`; Online Boutique and TeaStore user
+journeys live under `applications/`. Edit the stage table
+in `testbed/loadgenerator/daily.py`. Each stage's
 `percentage_users` is a percent of `DAILY_BASE_USERS` (or `DAILY_BASE_USER`);
 20 with a base of 600 is 120 users.
 

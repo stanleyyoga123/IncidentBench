@@ -30,7 +30,7 @@ if [[ "$(<"$secret_file")" == *"++++++++"* ]]; then
   exit 1
 fi
 
-for namespace in agents utility online-boutique; do
+for namespace in agents utility; do
   if ! kubectl get namespace "$namespace" >/dev/null 2>&1; then
     echo "Error: namespace '$namespace' is unavailable in context '$context'." >&2
     exit 1
@@ -40,6 +40,36 @@ done
 kubectl apply -f "$secret_file"
 kubectl apply -f "$script_dir/kubernetes/configmap.yaml"
 kubectl apply -f "$script_dir/kubernetes/rbac.yaml"
+# Application installers own namespace creation and reapply the binding after
+# every reset. This optional list exists only for already-running namespaces.
+application_namespaces="${APPLICATION_NAMESPACES:-}"
+for namespace in $application_namespaces; do
+  if [[ ! "$namespace" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+    echo "Error: invalid namespace in APPLICATION_NAMESPACES: '$namespace'." >&2
+    exit 1
+  fi
+  if kubectl get namespace "$namespace" >/dev/null 2>&1; then
+    # Kubernetes does not allow changing roleRef in place. Remove the legacy
+    # binding whose name previously referred to a namespaced Role, then create
+    # the distinctly named ClusterRole binding below.
+    kubectl delete rolebinding mcp-tools-remediation \
+      --namespace "$namespace" \
+      --ignore-not-found
+    kubectl apply --namespace "$namespace" \
+      -f "$script_dir/kubernetes/application-role-binding.yaml"
+    for resource in deployments.apps horizontalpodautoscalers.autoscaling; do
+      if ! kubectl auth can-i patch "$resource" \
+        --namespace "$namespace" \
+        --as system:serviceaccount:agents:mcp-tools-remediation \
+        --quiet; then
+        echo "Error: remediation ServiceAccount cannot patch $resource in namespace '$namespace'." >&2
+        exit 1
+      fi
+    done
+  else
+    echo "Application namespace '$namespace' is not present; remediation access will be bound when the application is installed."
+  fi
+done
 kubectl apply -f "$script_dir/kubernetes/network-probes.yaml"
 kubectl apply -f "$script_dir/kubernetes/investigation.yaml"
 kubectl apply -f "$script_dir/kubernetes/remediation.yaml"

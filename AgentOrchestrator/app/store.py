@@ -43,15 +43,15 @@ class WorkflowStore:
                 cur.execute(
                     """
                     INSERT INTO anomaly_event (
-                        id, event_id, detected_at, resource, name, metric, method,
+                        id, event_id, detected_at, namespace, resource, name, metric, method,
                         detail, profile_id, profile_version, profile_parameters,
                         payload, status
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
                     ON CONFLICT (event_id) DO NOTHING
                     RETURNING id
                     """,
                     (
-                        uuid4(), anomaly.event_id, anomaly.detected_at,
+                        uuid4(), anomaly.event_id, anomaly.detected_at, anomaly.namespace,
                         anomaly.resource, anomaly.name, anomaly.metric,
                         anomaly.method, anomaly.detail, anomaly.profile_id,
                         anomaly.profile_version, Jsonb(anomaly.profile_parameters),
@@ -95,13 +95,26 @@ class WorkflowStore:
                 return None
             cur.execute(
                 """
+                SELECT namespace FROM anomaly_event
+                WHERE status = 'pending'
+                ORDER BY detected_at, created_at
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
+            )
+            scope = cur.fetchone()
+            if scope is None:
+                return None
+            cur.execute(
+                """
                 SELECT id, payload FROM anomaly_event
                 WHERE status = 'pending'
+                  AND namespace IS NOT DISTINCT FROM %s
                 ORDER BY detected_at, created_at
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
                 """,
-                (limit,),
+                (scope["namespace"], limit),
             )
             rows = cur.fetchall()
             if not rows:
@@ -732,9 +745,9 @@ class WorkflowStore:
                     INSERT INTO incident_lesson (
                         id, learning_job_id, source_workflow_id, ordinal,
                         category, title, guidance, applies_when, avoid,
-                        evidence_refs, resource, name, metric, tags, confidence
+                        evidence_refs, namespace, resource, name, metric, tags, confidence
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                              %s, %s, %s, %s, %s)
+                              %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (learning_job_id, ordinal) DO NOTHING
                     """,
                     (
@@ -748,6 +761,7 @@ class WorkflowStore:
                         Jsonb(lesson.get("applies_when", [])),
                         Jsonb(lesson.get("avoid", [])),
                         Jsonb(lesson.get("evidence_refs", [])),
+                        lesson.get("namespace"),
                         lesson.get("resource"),
                         lesson.get("name"),
                         lesson.get("metric"),
@@ -806,6 +820,12 @@ class WorkflowStore:
         def score(lesson: IncidentLesson) -> tuple[int, datetime]:
             best = 0
             for anomaly in anomalies:
+                namespace = (
+                    lesson.namespace is not None
+                    and lesson.namespace == anomaly.get("namespace")
+                )
+                if lesson.namespace is not None and not namespace:
+                    continue
                 name = lesson.name is not None and lesson.name == anomaly.get("name")
                 metric = lesson.metric is not None and lesson.metric == anomaly.get("metric")
                 resource = (
@@ -813,13 +833,13 @@ class WorkflowStore:
                     and lesson.resource == anomaly.get("resource")
                 )
                 if name and metric and resource:
-                    best = max(best, 400)
+                    best = max(best, 450 if namespace else 400)
                 elif metric and resource:
-                    best = max(best, 300)
+                    best = max(best, 350 if namespace else 300)
                 elif metric:
-                    best = max(best, 200)
+                    best = max(best, 250 if namespace else 200)
                 elif resource:
-                    best = max(best, 100)
+                    best = max(best, 150 if namespace else 100)
             return best, lesson.created_at
 
         ranked = sorted(candidates, key=score, reverse=True)

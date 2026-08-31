@@ -253,13 +253,13 @@ def test_set_rca_state_requires_boolean_true():
 def test_retrieve_lessons_prioritizes_relevance_then_recency_and_budget():
     now = datetime.now(timezone.utc)
 
-    def lesson(title, resource=None, name=None, metric=None, age=0):
+    def lesson(title, namespace=None, resource=None, name=None, metric=None, age=0):
         return {
             "id": uuid4(), "learning_job_id": uuid4(),
             "source_workflow_id": uuid4(), "ordinal": 0,
             "category": "investigation", "title": title,
             "guidance": f"guidance for {title}", "applies_when": [],
-            "avoid": [], "evidence_refs": [], "resource": resource,
+            "avoid": [], "evidence_refs": [], "namespace": namespace, "resource": resource,
             "name": name, "metric": metric, "tags": [], "confidence": 0.8,
             "active": True, "version": 1, "status_actor": None,
             "status_reason": None, "created_at": now - timedelta(seconds=age),
@@ -270,19 +270,23 @@ def test_retrieve_lessons_prioritizes_relevance_then_recency_and_budget():
         lesson("recent unrelated"),
         lesson("metric match", metric="latency", age=20),
         lesson(
-            "exact match", resource="deployments", name="checkout",
+            "exact match", namespace="shop", resource="deployments", name="checkout",
             metric="latency", age=100,
+        ),
+        lesson(
+            "other namespace", namespace="tickets", resource="deployments",
+            name="checkout", metric="latency", age=0,
         ),
     ]
     store = Store(Connection(Cursor(all_rows=rows)))
     selected = store.retrieve_lessons(
-        [{"resource": "deployments", "name": "checkout", "metric": "latency"}],
+        [{"namespace": "shop", "resource": "deployments", "name": "checkout", "metric": "latency"}],
         limit=2,
     )
     assert [item["title"] for item in selected] == ["exact match", "metric match"]
 
     too_small = store.retrieve_lessons(
-        [{"resource": "deployments", "name": "checkout", "metric": "latency"}],
+        [{"namespace": "shop", "resource": "deployments", "name": "checkout", "metric": "latency"}],
         character_budget=10,
     )
     assert too_small == []

@@ -44,6 +44,10 @@ spec:
       env:
         - name: INFRASTRUCTURE_ROOT
           value: /infrastructure
+        - name: ONLINE_BOUTIQUE_ROOT
+          value: /app/applications/online-boutique
+        - name: TEASTORE_ROOT
+          value: /app/applications/teastore
         - name: CHAOS_NODE_INVENTORY
           value: /infrastructure/ansible/inventory.ini
         - name: CHAOS_NODE_SSH_USER
@@ -52,8 +56,6 @@ spec:
           value: /var/run/evaluation-runner/ssh/id_ed25519
         - name: CHAOS_NODE_SSH_KNOWN_HOSTS_FILE
           value: /var/run/evaluation-runner/ssh/known_hosts
-        - name: TARGET_HOST
-          value: http://frontend.online-boutique.svc.cluster.local
         - name: PROMETHEUS_URL
           value: http://prometheus-server.monitoring.svc.cluster.local
       envFrom:

@@ -25,10 +25,12 @@ class Scenario:
     placement: str
     steps: tuple[ScenarioStep, ...]
     path: str
+    application: str = "online-boutique"
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
+            "application": self.application,
             "placement": self.placement,
             "path": self.path,
             "steps": [step.to_dict() for step in self.steps],

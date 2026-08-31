@@ -100,6 +100,7 @@ class AtomicLesson(BaseModel):
     applies_when: list[str] = Field(default_factory=list, max_length=10)
     avoid: list[str] = Field(default_factory=list, max_length=10)
     evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+    namespace: str | None = Field(default=None, max_length=253)
     resource: str | None = Field(default=None, max_length=200)
     name: str | None = Field(default=None, max_length=300)
     metric: str | None = Field(default=None, max_length=300)
@@ -118,7 +119,7 @@ class AtomicLesson(BaseModel):
     def coerce_string_lists(cls, value: Any) -> Any:
         return _as_string_list(value)
 
-    @field_validator("resource", "name", "metric", mode="before")
+    @field_validator("namespace", "resource", "name", "metric", mode="before")
     @classmethod
     def blank_scope_to_none(cls, value: Any) -> Any:
         if isinstance(value, str):

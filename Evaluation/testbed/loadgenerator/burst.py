@@ -3,9 +3,6 @@ import random
 
 from locust import LoadTestShape
 
-from testbed.loadgenerator.common import WebsiteUser
-
-
 class BurstLoadShape(LoadTestShape):
     """Alternate between a low baseline and short high-traffic bursts."""
 

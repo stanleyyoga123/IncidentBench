@@ -26,7 +26,7 @@ class ClusterProfileTool:
 
     def profile_baseline(
         self,
-        namespace: str = "online-boutique",
+        namespace: str,
         window_minutes: int = 30,
         evaluation_time: datetime | str | None = None,
         include_error_samples: bool = True,
