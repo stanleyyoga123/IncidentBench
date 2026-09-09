@@ -31,7 +31,7 @@ class ArchitectureTests(unittest.TestCase):
                 events.append("snapshot")
                 return {}
 
-        process = SimpleNamespace(command=["locust"])
+        process = SimpleNamespace(command=["locust"], process=SimpleNamespace(poll=lambda: None))
         context = SimpleNamespace(
             config=SimpleNamespace(
                 startup_delay_seconds=180,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
 import json
@@ -27,12 +28,6 @@ from .reports import (
     write_run_report,
     write_summary_csv,
 )
-from .reports import (
-    write_global_report,
-    write_rubric_score_csv,
-    write_run_report,
-    write_summary_csv,
-)
 from .rubric import (
     DEFAULT_RUBRIC_PATH,
     KindRubric,
@@ -46,6 +41,7 @@ from .rubric import (
 
 
 LOGGER = logging.getLogger("grader.pipeline")
+DEFAULT_CONCURRENCY = 5
 
 
 @dataclass(frozen=True)
@@ -57,6 +53,7 @@ class GraderConfig:
     penalties_path: Path = DEFAULT_PENALTIES_DIR
     model: str = "unknown"
     judge_max_tokens: int = 8192
+    concurrency: int = DEFAULT_CONCURRENCY
     window_minutes: float = 5.0
     threshold: float = 0.15
     refresh_judge: bool = False
@@ -67,14 +64,17 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
         raise ValueError("window_minutes must be positive")
     if not 0 < config.threshold < 1:
         raise ValueError("threshold must be between zero and one")
+    if config.concurrency <= 0:
+        raise ValueError("concurrency must be positive")
     rubric = load_rubric(config.rubric_path)
     penalties = load_penalties(config.penalties_path)
     LOGGER.info(
-        "grading started input=%s output=%s model=%s judge_max_tokens=%s window_minutes=%s threshold=%s refresh_judge=%s rubric=%s rubric_hash=%s penalties=%s penalty_scenarios=%d",
+        "grading started input=%s output=%s model=%s judge_max_tokens=%s concurrency=%s window_minutes=%s threshold=%s refresh_judge=%s rubric=%s rubric_hash=%s penalties=%s penalty_scenarios=%d",
         config.input_path,
         config.output_path,
         config.model,
         config.judge_max_tokens,
+        config.concurrency,
         config.window_minutes,
         config.threshold,
         config.refresh_judge,
@@ -93,8 +93,7 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
     LOGGER.info("discovered runs=%d", len(metadata_files))
     output = Path(config.output_path)
     (output / "runs").mkdir(parents=True, exist_ok=True)
-    grades: list[dict[str, Any]] = []
-    rows: list[dict[str, Any]] = []
+    run_specs: list[tuple[Path, Path, str, Path]] = []
     seen_names: set[str] = set()
     for metadata_path in metadata_files:
         run_folder = metadata_path.parent
@@ -103,6 +102,10 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
             raise ValueError(f"duplicate run folder name under input: {run_name}")
         seen_names.add(run_name)
         run_output = output / "runs" / run_name
+        run_specs.append((metadata_path, run_folder, run_name, run_output))
+
+    def process_run(spec: tuple[Path, Path, str, Path]) -> dict[str, Any]:
+        metadata_path, run_folder, run_name, run_output = spec
         run_output.mkdir(parents=True, exist_ok=True)
         LOGGER.info("run started run=%s path=%s", run_name, run_folder)
         grade = _grade_run(
@@ -121,8 +124,6 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
                 cache_path,
                 {**_cache_metadata(config.model, rubric.source_hash), "entries": {}},
             )
-        grades.append(grade)
-        rows.extend(_summary_rows(grade))
         (run_output / "grade.json").write_text(
             json.dumps(grade, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -141,6 +142,15 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
                 grade.get("scenario"),
                 grade.get("reason"),
             )
+        return grade
+
+    worker_count = min(config.concurrency, max(1, len(run_specs)))
+    LOGGER.info("grading runs concurrently workers=%d", worker_count)
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        # executor.map preserves the sorted input order for aggregate reports.
+        grades = list(executor.map(process_run, run_specs))
+
+    rows = [row for grade in grades for row in _summary_rows(grade)]
     write_summary_csv(output / "summary.csv", rows)
     write_rubric_score_csv(
         output / "rca_rubric_score.csv", grades, rubric.kind("rca")
@@ -314,6 +324,7 @@ def _grade_run(
             "prompt_version": PROMPT_VERSION,
             "model": config.model,
             "judge_max_tokens": config.judge_max_tokens,
+            "concurrency": config.concurrency,
             "window_minutes": config.window_minutes,
             "threshold": config.threshold,
             "rubric_path": str(rubric.source_path),
@@ -377,7 +388,6 @@ def _grade_job(
         kind=kind,
         scenario=scenario,
         ground_truth=truth,
-        chaos_manifests=chaos,
         result=result,
     )
     key = _cache_key(kind, payload, config.model, rubric.source_hash)
@@ -440,6 +450,7 @@ def _grade_job(
         return _attach_penalties(
             graded,
             payload,
+            chaos,
             penalty_set,
             config,
             judge,
@@ -473,6 +484,7 @@ def _apply_classifications(
 def _attach_penalties(
     graded: dict[str, Any],
     payload: dict[str, Any],
+    chaos_manifests: list[dict[str, Any]],
     penalty_set: PenaltySet,
     config: GraderConfig,
     judge: JudgeClient,
@@ -486,7 +498,9 @@ def _attach_penalties(
         scored["penalties"] = []
         graded["rubric"] = scored
         return graded
-    penalty_payload = build_penalty_payload(payload, penalty_set)
+    penalty_payload = build_penalty_payload(
+        payload, penalty_set, chaos_manifests
+    )
     key = _cache_key(
         "remediation_penalty",
         penalty_payload,

@@ -2,26 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Cart reads and updates slow or fail as Redis approaches
-  its container memory limit, while Redis remains network-reachable and node
-  memory remains healthy.
-- **Affected scope:** All `redis-cart` replicas have inadequate memory headroom
-  for their working set and a fixed additional allocation.
-- **Root cause:** `redis-cart` is vertically under-sized, causing sustained memory
-  pressure and risk of OOM termination as the in-memory dataset or cache grows.
-- **Corroborating evidence:** High Redis working-set and limit utilization,
-  memory-allocation or OOM evidence, healthy node memory, and cart-specific
-  degradation distinguish the problem from a node or network incident.
+### Expected incident condition
+
+- Every Running `redis-cart` replica experiences recurring per-pod memory pressure, exhausting container memory headroom rather than causing node-wide memory exhaustion.
+- `redis-cart` is the non-sharded cart state store; degradation affects cart persistence and checkout and makes data-destructive or replica-splitting actions unsafe.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring per-pod memory pressure affects all `redis-cart` replicas in namespace `online-boutique`.
+- **Corroboration:** Working-set and limit utilization, OOM/restart evidence, and memory pressure must affect all `redis-cart` pods while nodes and unrelated services retain memory headroom.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Vertically right-size Redis with `kubectl set resources deployment/redis-cart
-  -n online-boutique --containers=redis`, increasing memory requests and limits
-  enough for the measured working set plus safe headroom.
-- Confirm that the requested memory fits available node capacity and preserve the
-  existing CPU settings unless evidence justifies changing them.
-- Do not use horizontal scaling as a substitute for memory headroom because the
-  current Redis Deployment is not configured as a sharded data tier.
-- Verify the applied requests and limits, stable memory utilization below the new
-  limit, absence of OOM events, ready Redis endpoints, cart latency and errors,
-  and successful cart operations.
+### Fully correct
+
+- Vertically right-size only `redis-cart` memory request and limit using working-set, OOM, and eligible-node-capacity evidence. Preserve CPU and unrelated settings and complete a controlled rollout.
+
+### Helpful but incomplete
+
+- A safe limit-only increase or one controlled restart after memory pressure has cleared can restore service and earns partial credit, but request/QoS or recurring headroom remains unresolved.
+
+### Rejected approaches
+
+- Horizontal scaling does not remove per-pod memory pressure affecting every replica. Horizontal replicas are additionally unsafe for this stateful singleton. Repeated restart-only treatment while memory pressure persists, node isolation, or oversized unschedulable memory values are not safe fixes.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

@@ -13,26 +13,13 @@ HIGHER = "higher_is_better"
 STABLE = "stable_is_better"
 
 METRIC_POLICIES: dict[str, str] = {
-    "app_instance_count": STABLE,
-    "deployment_cpu_request_utilization_percent": LOWER,
-    "deployment_cpu_usage": LOWER,
-    "deployment_disk_io_bytes_per_second": STABLE,
-    "deployment_memory_request_utilization_percent": LOWER,
-    "deployment_network_io_bytes_per_second": STABLE,
     "http_5xx_rate": LOWER,
-    "node_cpu_utilization_percent": LOWER,
-    "node_disk_io_bytes_per_second": STABLE,
-    "node_memory_utilization_percent": LOWER,
-    "node_network_io_bytes_per_second": STABLE,
     "response_time_p95_seconds": LOWER,
-    "traffic_rps": HIGHER,
 }
 
 CORE_METRICS = (
     "response_time_p95_seconds",
     "http_5xx_rate",
-    "traffic_rps",
-    "app_instance_count",
 )
 
 

@@ -2,27 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Price conversion becomes slow or unreliable across
-  storefront and checkout flows while unrelated services and node memory remain
-  healthy.
-- **Affected scope:** Every running `currencyservice` replica approaches its
-  container memory limit, leaving no instance with adequate memory headroom.
-- **Root cause:** `currencyservice` is vertically under-sized for sustained
-  working-set growth, such as a larger conversion cache, request concurrency, or
-  runtime heap demand.
-- **Corroborating evidence:** High working-set and memory-limit utilization on all
-  currency pods, allocation or OOM evidence, currency-specific latency, and
-  healthy node memory distinguish this from host-wide pressure.
+### Expected incident condition
+
+- Every Running `currencyservice` replica experiences recurring per-pod memory pressure, exhausting container memory headroom rather than causing node-wide memory exhaustion.
+- `currencyservice` performs price conversion for storefront and checkout paths; degradation affects displayed prices and transaction calculations.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring per-pod memory pressure affects all `currencyservice` replicas in namespace `online-boutique`.
+- **Corroboration:** Working-set and limit utilization, OOM/restart evidence, and memory pressure must affect all `currencyservice` pods while nodes and unrelated services retain memory headroom.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Use `kubectl set resources deployment/currencyservice -n online-boutique
-  --containers=server` to increase memory requests and limits based on measured
-  working set plus safe operating headroom.
-- Confirm the new memory request fits eligible-node capacity and preserves all
-  required replicas as schedulable.
-- Preserve CPU settings unless CPU evidence independently justifies a change;
-  do not horizontally scale as a substitute for insufficient per-pod memory.
-- Verify the applied resources, stable memory below the new limit, absence of OOM
-  events, ready endpoints, restored conversion latency and errors, and successful
-  storefront and checkout requests.
+### Fully correct
+
+- Vertically right-size only `currencyservice` memory request and limit using working-set, OOM, and eligible-node-capacity evidence. Preserve CPU and unrelated settings and complete a controlled rollout.
+
+### Helpful but incomplete
+
+- A safe limit-only increase or one controlled restart after memory pressure has cleared can restore service and earns partial credit, but request/QoS or recurring headroom remains unresolved.
+
+### Rejected approaches
+
+- Horizontal scaling does not remove per-pod memory pressure affecting every replica. Repeated restart-only treatment while memory pressure persists, node isolation, or oversized unschedulable memory values are not safe fixes.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

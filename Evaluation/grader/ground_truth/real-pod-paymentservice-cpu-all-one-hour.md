@@ -2,30 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Payment authorization becomes slow or fails, causing
-  checkout attempts to stall or return errors while earlier shopping steps may
-  remain healthy.
-- **Affected scope:** All running `paymentservice` replicas are CPU constrained,
-  leaving no healthy payment endpoint for checkout traffic.
-- **Root cause:** An abnormal CPU-intensive execution path or runaway process in
-  `paymentservice` is consuming its available CPU and causing sustained service
-  CPU saturation.
-- **Corroborating evidence:** High CPU usage or throttling across every
-  `paymentservice` pod, increased payment RPC latency or failures, and checkout
-  errors at the payment stage support a service-wide CPU problem rather than a
-  node-specific or general traffic issue.
+### Expected incident condition
+
+- Every Running `paymentservice` replica experiences a recurring increase in CPU usage leading to saturation, creating service-wide compute contention rather than a single-node or version issue.
+- `paymentservice` authorizes charges in the checkout path; degradation can fail or delay completed purchases and requires transaction-safe handling.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring service-wide CPU saturation affects all `paymentservice` replicas in namespace `online-boutique`.
+- **Corroboration:** CPU usage must rise to saturation across all `paymentservice` replicas without a single-node concentration; node memory and unrelated workloads should remain comparatively healthy.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Prefer vertical scaling when the existing replicas can safely handle the
-  workload: increase `paymentservice` CPU requests and limits using measured
-  usage, throttling, and available node capacity as the sizing basis.
-- Alternatively, use horizontal scaling with an explicit, capacity-tested HPA
-  maximum so `paymentservice` gains enough replicas to recover without growing
-  to an excessive instance count or exhausting cluster capacity.
-- Apply either scaling change as a controlled rollout that preserves in-flight
-  transaction safety and idempotency so recovery does not create duplicate
-  payment attempts.
-- Verify that CPU usage and throttling fall across `paymentservice` and that
-  payment latency, errors, traffic, endpoint health, and completed checkouts
-  recover.
+### Fully correct
+
+- Increase only `paymentservice` CPU capacity using measured evidence: either vertically raise request and limit within eligible-node capacity, or use bounded horizontal scaling with an explicit capacity-tested HPA maximum. Do not combine aggressive replica growth with oversized requests.
+
+### Helpful but incomplete
+
+- A conservative one-dimensional CPU change or bounded temporary scale-out can reduce pressure and earns partial credit when it is safe, but it is incomplete without coherent sizing, bounds, and rollout verification.
+
+### Rejected approaches
+
+- Restart-only treatment is transient because replacement pods experience the same unresolved service-wide CPU pressure. Node isolation and unrelated-service mutations do not address pressure affecting every replica.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

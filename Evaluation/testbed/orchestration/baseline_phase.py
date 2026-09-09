@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timezone
 
 from ..domain.phase_result import PhaseResult
+from ..loadgenerator.baseline_health import assess_baseline
 from .phase_support import PhaseSupport
 
 
@@ -44,4 +45,17 @@ class BaselinePhase(PhaseSupport):
             message += " before agents start"
         self.log(message)
         self.wait_until(context.config.baseline_seconds, started_at)
+        if context.config.application == "teastore":
+            health = assess_baseline(
+                context.config.output_dir / "loadgenerator"
+                / f"{context.config.loadgenerator}_stats_history.csv",
+                time.time(),
+            )
+            if context.load_process.process.poll() is not None:
+                health["passed"] = False
+                health["errors"].append("load generator exited before baseline validation")
+            context.metadata["baseline_health"] = health
+            if not health["passed"]:
+                self.log("TeaStore baseline rejected: " + "; ".join(health["errors"]))
+                return self.record(context, PhaseResult.failure(self.name, health=health))
         return self.record(context, PhaseResult.success(self.name))

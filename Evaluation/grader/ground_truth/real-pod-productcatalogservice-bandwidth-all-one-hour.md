@@ -2,27 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Product listing, search, and product-detail responses
-  slow down as traffic grows, although CPU, memory, pod readiness, and dependency
-  health remain normal.
-- **Affected scope:** Every `productcatalogservice` replica reaches a per-instance
-  network throughput ceiling, constraining aggregate catalog throughput.
-- **Root cause:** `productcatalogservice` has insufficient horizontal capacity
-  for a per-pod bandwidth bottleneck, consistent with a sidecar, CNI, interface,
-  or platform rate limit applied independently to each instance.
-- **Corroborating evidence:** Per-pod network throughput plateaus, request queues
-  and latency grow with traffic, CPU remains below saturation, and load is evenly
-  distributed across otherwise healthy catalog pods.
+### Expected incident condition
+
+- Every Running `productcatalogservice` pod exhibits an approximately 1 Mbps throughput ceiling. The constraint is per pod, so aggregate service bandwidth—not CPU, memory, or a node link—is the limiting resource.
+- `productcatalogservice` serves product lists, searches, and details to the frontend, recommendation, and checkout paths.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** A recurring per-pod network throughput constraint affects all `productcatalogservice` replicas in namespace `online-boutique`.
+- **Corroboration:** Per-pod throughput should plateau across `productcatalogservice` replicas while CPU, memory, readiness, dependencies, and node links remain healthy; queueing, latency, or errors should follow traffic demand.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Increase aggregate service throughput with `kubectl patch hpa
-  productcatalogservice-hpa -n online-boutique`, raising `minReplicas` so traffic
-  is distributed across more independently limited pods.
-- Set a justified `maxReplicas` in the same HPA change to prevent runaway
-  instance growth and keep total requested capacity within cluster limits.
-- Do not vertically increase CPU or memory when evidence identifies network
-  throughput—not compute or memory—as the limiting resource.
-- Verify the HPA bounds, desired and ready replicas, lower traffic per pod,
-  improved aggregate traffic, catalog latency and errors, endpoint health, and
-  product retrieval.
+### Fully correct
+
+- Increase aggregate `productcatalogservice` throughput with one bounded HPA patch: raise `minReplicas` based on demand and set an explicit capacity-tested `maxReplicas`, while preserving resources and service behavior.
+
+### Helpful but incomplete
+
+- A safe direct replica increase can temporarily add per-pod bandwidth and earns partial credit, but an existing HPA may reconcile it unless durable bounds are updated.
+
+### Rejected approaches
+
+- CPU or memory sizing, node isolation, restart-only treatment, or unbounded scale-out does not safely address the per-pod network ceiling.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

@@ -24,7 +24,7 @@ from .rubric import (
 LOGGER = logging.getLogger("grader.judge")
 
 
-PROMPT_VERSION = "simple-grader-v2"
+PROMPT_VERSION = "production-incident-grader-v3"
 DEFAULT_JUDGE_URL = "http://localhost:8000/v1"
 DEFAULT_JUDGE_MODEL = "Qwen/Qwen3.6-35B-A3B"
 DEFAULT_TIMEOUT_SECONDS = 600.0
@@ -147,25 +147,25 @@ def build_payload(
     kind: str,
     scenario: str,
     ground_truth: dict[str, str],
-    chaos_manifests: list[dict[str, Any]],
     result: Any,
 ) -> dict[str, Any]:
     expected = ground_truth["rca" if kind == "rca" else "remediation"]
     return {
         "scenario": scenario,
         "ground_truth": expected,
-        "chaos_manifests": chaos_manifests,
         "agent_result": result,
     }
 
 
 def build_penalty_payload(
-    payload: dict[str, Any], penalty_set: PenaltySet
+    payload: dict[str, Any],
+    penalty_set: PenaltySet,
+    chaos_manifests: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "scenario": payload["scenario"],
         "ground_truth": payload["ground_truth"],
-        "chaos_manifests": payload["chaos_manifests"],
+        "chaos_manifests": chaos_manifests,
         "agent_result": payload["agent_result"],
         "penalties": penalty_set.judge_items(),
     }

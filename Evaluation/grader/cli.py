@@ -13,7 +13,7 @@ from .judge import (
     OpenAICompatibleJudge,
 )
 from .logging_utils import configure_logging
-from .pipeline import GraderConfig, grade_runs
+from .pipeline import DEFAULT_CONCURRENCY, GraderConfig, grade_runs
 from .penalty import DEFAULT_PENALTIES_DIR
 from .rubric import DEFAULT_RUBRIC_PATH, load_rubric
 
@@ -46,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=int(os.getenv("JUDGE_MAX_TOKENS", DEFAULT_MAX_TOKENS)),
     )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=int(os.getenv("GRADER_CONCURRENCY", DEFAULT_CONCURRENCY)),
+        help="number of run folders graded concurrently (default: 5)",
+    )
     parser.add_argument("--window-minutes", type=float, default=5.0)
     parser.add_argument("--threshold", type=float, default=0.15)
     parser.add_argument("--refresh-judge", action="store_true")
@@ -61,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.judge_max_tokens <= 0:
         raise SystemExit("--judge-max-tokens must be positive")
+    if args.concurrency <= 0:
+        raise SystemExit("--concurrency must be positive")
     configure_logging(args.output, verbose=args.verbose)
     rubric = load_rubric(args.rubric)
     judge = OpenAICompatibleJudge(
@@ -80,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
             penalties_path=args.penalties,
             model=args.model,
             judge_max_tokens=args.judge_max_tokens,
+            concurrency=args.concurrency,
             window_minutes=args.window_minutes,
             threshold=args.threshold,
             refresh_judge=args.refresh_judge,

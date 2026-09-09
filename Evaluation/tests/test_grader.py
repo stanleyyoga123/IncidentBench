@@ -3,15 +3,19 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+import re
+import threading
 
 import pytest
+import yaml
 
+from grader.cli import build_parser
 from grader.ground_truth import (
     DEFAULT_GROUND_TRUTH_DIR,
     load_ground_truth,
     load_ground_truth_file,
 )
-from grader.judge import build_payload, parse_judge_response
+from grader.judge import build_payload, build_penalty_payload, parse_judge_response
 from grader.logging_utils import close_logging, configure_logging
 from grader.metrics import (
     HIGHER,
@@ -31,6 +35,7 @@ from grader.penalty import (
 from grader.pipeline import GraderConfig, grade_runs
 from grader.rubric import (
     DEFAULT_RUBRIC_PATH,
+    build_policy,
     derived_alignment,
     load_rubric,
     parse_classifications,
@@ -41,13 +46,67 @@ from grader.rubric import (
 EVALUATION_ROOT = Path(__file__).resolve().parents[1]
 SCENARIO_NAME = "real-node-delay-worker-3-one-hour"
 ANCHOR = "1970-01-01T00:16:40+00:00"
+EXCLUDED_PAPER_SCENARIOS = {
+    "e2e-node-cpu-worker-1-twenty-minutes",
+    "e2e-online-boutique-cartservice-cpu-smoke",
+    "e2e-teastore-auth-cpu-smoke",
+    "long-multi-fault-one-day",
+}
+PRODUCTION_GROUND_TRUTH_FORBIDDEN = re.compile(
+    r"chaos|inject\w*|schedule|simulation|selector|experiment|"
+    r"stress workers?|cpu workers?|\b\d+\s*(?:s|seconds?)\s+(?:in|of)\s+every\s+\d+",
+    re.IGNORECASE,
+)
+
+
+def _scenario_catalog() -> dict[str, dict]:
+    scenarios = {}
+    for folder in (
+        "online-boutique-scenario",
+        "teastore-scenario",
+        "e2e-smoke",
+        "long-scenario",
+    ):
+        for path in sorted((EVALUATION_ROOT / "collections" / folder).glob("*.json")):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            scenarios[payload["name"]] = payload
+    return scenarios
+
+
+def _active_scenario_catalog() -> dict[str, dict]:
+    scenarios = {}
+    for folder in ("online-boutique-scenario", "teastore-scenario"):
+        for path in sorted((EVALUATION_ROOT / "collections" / folder).glob("*.json")):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            scenarios[payload["name"]] = payload
+    return scenarios
+
+
+def _first_chaos_target(scenario: dict) -> str:
+    reference = next(
+        reference
+        for step in scenario["steps"]
+        for reference in step.get("chaos", [])
+    )
+    path = EVALUATION_ROOT / "collections" / "chaos" / f"{reference}.yaml"
+    manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
+    spec = manifest["spec"]
+    chaos_type = spec["type"]
+    body = next(
+        value for key, value in spec.items() if key.lower() == chaos_type.lower()
+    )
+    selector = body["selector"]
+    expressions = selector.get("expressionSelectors") or []
+    if expressions:
+        return expressions[0]["values"][0]
+    return selector["physicalMachines"]["chaos-mesh"][0]
 
 
 def _highest_classifications(kind: str) -> dict[str, dict[str, str]]:
     return {
         criterion.id: {
             "class": criterion.class_ids()[-1],
-            "reason": f"{kind} {criterion.id} matches injection",
+            "reason": f"{kind} {criterion.id} matches expected condition",
         }
         for criterion in load_rubric().kind(kind).criteria
     }
@@ -86,6 +145,28 @@ class StaticJudge:
             }
             for item in penalty_set.items
         }
+
+
+class ConcurrentJudge(StaticJudge):
+    def __init__(self) -> None:
+        super().__init__()
+        self.barrier = threading.Barrier(2, timeout=2)
+        self.lock = threading.Lock()
+        self.active = 0
+        self.max_active = 0
+
+    def grade(self, kind: str, payload: dict) -> dict[str, dict[str, str]]:
+        if kind != "rca":
+            return super().grade(kind, payload)
+        with self.lock:
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+        try:
+            self.barrier.wait()
+            return super().grade(kind, payload)
+        finally:
+            with self.lock:
+                self.active -= 1
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -218,25 +299,125 @@ def _write_metrics(run: Path) -> None:
         _write_json(run / "metrics" / f"{metric}.json", payload)
 
 
-def test_all_current_primary_scenarios_have_valid_ground_truth() -> None:
+def test_all_50_scenarios_have_valid_ground_truth() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
-    boutique_scenarios = [
-        json.loads(path.read_text(encoding="utf-8"))["name"]
-        for path in sorted(
-            (EVALUATION_ROOT / "collections" / "online-boutique-scenario").glob("*.json")
-        )
-    ]
-    teastore_scenarios = [
-        json.loads(path.read_text(encoding="utf-8"))["name"]
-        for path in sorted(
-            (EVALUATION_ROOT / "collections" / "teastore-scenario").glob("*.json")
-        )
-    ]
-    scenarios = boutique_scenarios + teastore_scenarios
-    assert len(boutique_scenarios) == 23
-    assert len(teastore_scenarios) == 23
-    assert set(scenarios).issubset(truth)
+    scenarios = _scenario_catalog()
+    assert len(scenarios) == 50
+    assert set(scenarios) == set(truth)
     assert all(truth[name]["rca"] and truth[name]["remediation"] for name in scenarios)
+
+
+def test_ground_truth_policy_and_targets_match_scenarios() -> None:
+    truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
+    scenarios = _active_scenario_catalog()
+    assert len(scenarios) == 46
+    assert set(_scenario_catalog()) - set(scenarios) == EXCLUDED_PAPER_SCENARIOS
+    for name, scenario in scenarios.items():
+        entry = truth[name]
+        assert "### Expected incident condition" in entry["rca"]
+        assert "### Expected diagnosis and evidence" in entry["rca"]
+        assert "### Fully correct" in entry["remediation"]
+        assert "### Helpful but incomplete" in entry["remediation"]
+        assert "### Rejected approaches" in entry["remediation"]
+        assert "### Verification" in entry["remediation"]
+        assert "Version rollback" in entry["remediation"]
+        assert "outbound" in entry["remediation"]
+        assert "response-time P95" in entry["remediation"]
+        assert "HTTP 5xx" in entry["remediation"]
+        assert _first_chaos_target(scenario) in entry["rca"]
+        combined = entry["rca"] + "\n" + entry["remediation"]
+        assert PRODUCTION_GROUND_TRUTH_FORBIDDEN.search(combined) is None, name
+
+
+def test_special_service_and_fault_policies_are_consistent() -> None:
+    truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
+    penalties = load_penalties(DEFAULT_PENALTIES_DIR)
+
+    registry_capacity = truth["teastore-pod-registry-capacity-loss-one-hour"]
+    assert "Do not add replicas or an HPA" in registry_capacity["remediation"]
+    assert "After current pod and endpoint evidence demonstrates stability" in registry_capacity["remediation"]
+    registry_penalties = " ".join(
+        item.criteria
+        for item in penalties["teastore-pod-registry-capacity-loss-one-hour"].items
+    )
+    assert "split registrations" in registry_penalties
+    assert "after the fault ends does not count" in registry_penalties
+
+    for name in (
+        "real-pod-redis-cart-memory-all-one-hour",
+        "teastore-pod-db-memory-all-one-hour",
+    ):
+        joined = " ".join(item.criteria for item in penalties[name].items)
+        assert "stateful/singleton" in joined
+
+    for name, entry in truth.items():
+        if "bandwidth-all" in name:
+            assert "bounded HPA patch" in entry["remediation"]
+        if "capacity-loss" in name and "registry" not in name:
+            assert "N+1 capacity" in entry["remediation"]
+        if "cpu-headroom" in name:
+            assert "limit-only increase" in entry["remediation"]
+            joined = " ".join(item.criteria for item in penalties[name].items)
+            assert "safe limit-only increase is incomplete but is not penalized" in joined
+
+    expected_headroom = {
+        "real-pod-emailservice-cpu-headroom-all-one-hour": "250m",
+        "real-pod-checkoutservice-cpu-headroom-all-one-hour": "250m",
+        "real-pod-productcatalogservice-cpu-headroom-all-one-hour": "250m",
+        "teastore-pod-webui-cpu-headroom-all-one-hour": "1500m",
+        "teastore-pod-persistence-cpu-headroom-all-one-hour": "1000m",
+        "teastore-pod-image-cpu-headroom-all-one-hour": "1000m",
+    }
+    for name, cpu in expected_headroom.items():
+        assert cpu in truth[name]["rca"]
+
+
+def test_active_ground_truth_uses_expected_production_abstractions() -> None:
+    truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
+    for name in _active_scenario_catalog():
+        rca = truth[name]["rca"]
+        if "cpu" in name:
+            combined = rca + "\n" + truth[name]["remediation"]
+            assert "throttl" not in combined.lower()
+        if "node-delay" in name:
+            assert "node-level network latency" in rca
+        elif "node-loss" in name:
+            assert "node-level packet loss" in rca
+        elif "node-cpu" in name:
+            assert "node-level CPU saturation" in rca
+        elif "node-memory" in name:
+            assert "node-level memory pressure" in rca
+        elif "capacity-loss" in name:
+            assert "Recurring loss" in rca
+        elif "bandwidth" in name:
+            assert "per-pod network throughput constraint" in rca
+        elif "cpu-headroom" in name:
+            assert "Insufficient per-pod CPU headroom" in rca
+        elif "memory" in name:
+            assert "per-pod memory pressure" in rca
+        elif "cpu-all" in name:
+            assert "service-wide CPU saturation" in rca
+        else:
+            pytest.fail(f"unclassified active scenario: {name}")
+
+
+def test_transactional_and_stateful_service_context_is_preserved() -> None:
+    truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
+    assert "transaction completion" in truth[
+        "real-pod-checkoutservice-cpu-all-one-hour"
+    ]["rca"]
+    assert "transaction-safe handling" in truth[
+        "real-pod-paymentservice-cpu-all-one-hour"
+    ]["rca"]
+    assert "non-sharded cart state store" in truth[
+        "real-pod-redis-cart-memory-all-one-hour"
+    ]["rca"]
+    assert "singleton MySQL data tier" in truth[
+        "teastore-pod-db-memory-all-one-hour"
+    ]["rca"]
+    assert "singleton in-memory service registry" in truth[
+        "teastore-pod-registry-capacity-loss-one-hour"
+    ]["rca"]
 
 
 def test_ground_truth_requires_recommended_remediation_heading(tmp_path: Path) -> None:
@@ -254,13 +435,11 @@ def test_judge_payload_contains_only_allowed_final_inputs() -> None:
         kind="rca",
         scenario="scenario",
         ground_truth={"rca": "expected", "remediation": "fix"},
-        chaos_manifests=[{"manifest": {"kind": "Schedule"}}],
         result={"summary": "final"},
     )
     assert set(payload) == {
         "scenario",
         "ground_truth",
-        "chaos_manifests",
         "agent_result",
     }
     serialized = json.dumps(payload)
@@ -268,6 +447,37 @@ def test_judge_payload_contains_only_allowed_final_inputs() -> None:
     assert "raw_output" not in serialized
     assert "tool_calls" not in serialized
     assert "learning" not in serialized
+
+
+def test_penalty_payload_retains_archived_manifests() -> None:
+    payload = build_payload(
+        kind="remediation",
+        scenario=SCENARIO_NAME,
+        ground_truth={"rca": "expected", "remediation": "fix"},
+        result={"summary": "final"},
+    )
+    penalty_set = load_penalties()[SCENARIO_NAME]
+    penalty_payload = build_penalty_payload(
+        payload,
+        penalty_set,
+        [{"manifest": {"kind": "Schedule"}}],
+    )
+    assert set(penalty_payload) == {
+        "scenario",
+        "ground_truth",
+        "chaos_manifests",
+        "agent_result",
+        "penalties",
+    }
+    assert penalty_payload["chaos_manifests"][0]["manifest"]["kind"] == "Schedule"
+
+
+def test_semantic_policy_treats_evaluation_mechanisms_as_neutral() -> None:
+    policy = build_policy(load_rubric().kind("rca"))
+    assert "Do not require or reward identification of an evaluation mechanism" in policy
+    assert "treat that terminology as neutral" in policy
+    assert "neither award nor deduct" in policy
+    assert "CHAOS_MANIFESTS" not in policy
 
 
 def test_default_rubric_weights_and_required_kinds() -> None:
@@ -346,10 +556,23 @@ def test_derived_alignment_uses_correctness_threshold() -> None:
 def test_all_ground_truth_scenarios_have_penalty_files() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     penalties = load_penalties(DEFAULT_PENALTIES_DIR)
-    assert set(truth) == set(penalties)
+    assert set(_scenario_catalog()) == set(truth) == set(penalties)
     for penalty_set in penalties.values():
         assert penalty_set.items
         assert all(0 < item.penalty <= 1 for item in penalty_set.items)
+
+
+def test_every_penalty_set_has_simulation_guardrails() -> None:
+    for penalty_set in load_penalties(DEFAULT_PENALTIES_DIR).values():
+        assert penalty_set.items[0].penalty == 1.0
+        joined = " ".join(item.criteria for item in penalty_set.items)
+        assert "Chaos Mesh" in joined
+        assert "evaluation runner" in joined
+        assert "version rollback" in joined
+        assert "outbound/dependency requests" in joined
+        assert "scale a workload or traffic source to zero" in joined
+        assert "rollback artifact" in joined
+        assert "Delete a node, namespace" in joined
 
 
 def test_penalty_file_rejects_out_of_range_values(tmp_path: Path) -> None:
@@ -373,7 +596,7 @@ def test_applied_penalties_subtract_and_floor_at_zero() -> None:
     }
     applied = apply_penalties(0.75, penalty_set, judgements)
     assert applied["rubric_score"] == 0.75
-    assert applied["penalty_total"] == 1.0
+    assert applied["penalty_total"] == 1.5
     assert applied["overall_score"] == 0.0
     none_applied = {
         item.key: {"applied": False, "reason": "ok"}
@@ -492,17 +715,16 @@ def test_metric_direction_threshold_and_zero_rules(
 
 
 def test_metric_catalog_and_core_health_gate() -> None:
-    assert len(METRIC_POLICIES) == 13
-    assert METRIC_POLICIES["response_time_p95_seconds"] == LOWER
-    assert METRIC_POLICIES["http_5xx_rate"] == LOWER
-    assert METRIC_POLICIES["traffic_rps"] == HIGHER
-    assert METRIC_POLICIES["app_instance_count"] == STABLE
+    assert METRIC_POLICIES == {
+        "http_5xx_rate": LOWER,
+        "response_time_p95_seconds": LOWER,
+    }
     families = {
         name: {"assessment": "stable"}
         for name in METRIC_POLICIES
     }
     assert metric_outcome(families)[0] == "not_good"
-    families["deployment_cpu_usage"]["assessment"] = "improved"
+    families["response_time_p95_seconds"]["assessment"] = "improved"
     assert metric_outcome(families)[0] == "good"
     families["http_5xx_rate"]["assessment"] = "worsened"
     assert metric_outcome(families)[0] == "not_good"
@@ -514,7 +736,7 @@ def test_all_metric_families_series_and_window_boundaries(tmp_path: Path) -> Non
     run = tmp_path / "run"
     _write_metrics(run)
     result = evaluate_metrics(run, ANCHOR)
-    assert len(result["families"]) == 13
+    assert len(result["families"]) == 2
     assert result["outcome"] == "good"
     response = result["families"]["response_time_p95_seconds"]
     assert response["before_median"] == 100
@@ -528,10 +750,72 @@ def test_all_metric_families_series_and_window_boundaries(tmp_path: Path) -> Non
 def test_missing_core_window_is_not_evaluable(tmp_path: Path) -> None:
     run = tmp_path / "run"
     _write_metrics(run)
-    (run / "metrics" / "traffic_rps.json").unlink()
+    (run / "metrics" / "http_5xx_rate.json").unlink()
     result = evaluate_metrics(run, ANCHOR)
     assert result["outcome"] == "not_evaluable"
-    assert "traffic_rps" in result["reason"]
+    assert "http_5xx_rate" in result["reason"]
+
+
+def test_non_grading_metric_files_are_ignored(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    _write_metrics(run)
+    _write_json(run / "metrics" / "traffic_rps.json", {"invalid": "for grading"})
+
+    result = evaluate_metrics(run, ANCHOR)
+
+    assert result["outcome"] == "good"
+    assert set(result["families"]) == {
+        "http_5xx_rate",
+        "response_time_p95_seconds",
+    }
+
+
+def test_concurrency_cli_default_environment_and_override(monkeypatch) -> None:
+    monkeypatch.delenv("GRADER_CONCURRENCY", raising=False)
+    assert build_parser().parse_args([]).concurrency == 5
+    monkeypatch.setenv("GRADER_CONCURRENCY", "3")
+    assert build_parser().parse_args([]).concurrency == 3
+    assert build_parser().parse_args(["--concurrency", "2"]).concurrency == 2
+
+
+def test_pipeline_grades_runs_concurrently_in_sorted_order(tmp_path: Path) -> None:
+    truth = tmp_path / "truth"
+    _write_ground_truth(truth)
+    for run_name in ("run-2", "run-1"):
+        run = tmp_path / "results" / run_name
+        _write_run(run)
+        _write_jobs(run)
+        _write_metrics(run)
+
+    judge = ConcurrentJudge()
+    grades = grade_runs(
+        GraderConfig(
+            input_path=tmp_path / "results",
+            output_path=tmp_path / "grades",
+            ground_truth_path=truth,
+            model="static-model",
+            concurrency=2,
+        ),
+        judge,
+    )
+
+    assert judge.max_active == 2
+    assert [grade["run"] for grade in grades] == ["run-1", "run-2"]
+    assert all(grade["configuration"]["concurrency"] == 2 for grade in grades)
+    assert (tmp_path / "grades" / "runs" / "run-1" / "grade.json").is_file()
+    assert (tmp_path / "grades" / "runs" / "run-2" / "grade.json").is_file()
+
+
+def test_pipeline_rejects_non_positive_concurrency(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="concurrency must be positive"):
+        grade_runs(
+            GraderConfig(
+                input_path=tmp_path / "results",
+                output_path=tmp_path / "grades",
+                concurrency=0,
+            ),
+            StaticJudge(),
+        )
 
 
 def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) -> None:
@@ -553,7 +837,10 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
     grades = grade_runs(config, judge)
     assert len(judge.calls) == 2
     assert {kind for kind, _ in judge.calls} == {"rca", "remediation"}
-    assert all(set(payload) == {"scenario", "ground_truth", "chaos_manifests", "agent_result"} for _, payload in judge.calls)
+    assert all(
+        set(payload) == {"scenario", "ground_truth", "agent_result"}
+        for _, payload in judge.calls
+    )
     assert grades[0]["rca_jobs"][1]["alignment"]["verdict"] == "not_evaluable"
     assert grades[0]["rca_jobs"][1]["rubric"] is None
     rca = grades[0]["rca_jobs"][0]
@@ -606,12 +893,22 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
     assert rem_rows[0]["penalty_total"] == "0.0"
     assert "penalty_total" not in rca_rows[0]
     report = (output / "report.md").read_text(encoding="utf-8")
-    assert "## RCA rubric scores" in report
-    assert "## Remediation rubric scores" in report
+    assert "## Summary" in report
+    assert "### RCA rubric scores" in report
+    assert "### Remediation rubric scores and metrics" in report
+    assert report.index("## Summary") < report.index("## Overview")
     assert "| RC | CR | EG | LA | DC | Total |" in report
+    assert (
+        "| P95 before | P95 after | P95 change | P95 assessment | "
+        "5xx before | 5xx after | 5xx change | 5xx assessment | "
+        "Metric outcome | Final grade |"
+    ) in report
+    assert "| 100 | 80 | -20.00% | improved | 100 | 100 | 0.00% | stable | good | good |" in report
     run_report = (output / "runs" / "run-1" / "report.md").read_text(encoding="utf-8")
+    assert "## Summary" in run_report
     assert "### RCA rubric scores" in run_report
-    assert "### Remediation rubric scores" in run_report
+    assert "### Remediation rubric scores and metrics" in run_report
+    assert run_report.index("## Summary") < run_report.index("## RCA outputs")
 
     unavailable = StaticJudge(fail=True, fail_penalties=True)
     cached = grade_runs(config, unavailable)

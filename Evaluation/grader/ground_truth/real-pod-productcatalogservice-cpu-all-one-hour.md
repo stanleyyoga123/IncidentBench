@@ -2,31 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Product listing, search, and product-detail requests
-  become slow or fail, with secondary impact on services that require catalog
-  data.
-- **Affected scope:** All running `productcatalogservice` replicas are CPU
-  constrained, leaving no healthy catalog endpoint for frontend and downstream
-  callers.
-- **Root cause:** An abnormal CPU-intensive execution path or runaway process in
-  `productcatalogservice` is consuming its available CPU and causing sustained
-  service CPU saturation.
-- **Corroborating evidence:** High CPU usage or throttling across every catalog
-  pod, elevated catalog RPC latency or errors, and failures in catalog-dependent
-  paths support a service-wide CPU problem rather than a single node, HPA, or
-  network issue.
+### Expected incident condition
+
+- Every Running `productcatalogservice` replica experiences a recurring increase in CPU usage leading to saturation, creating service-wide compute contention rather than a single-node or version issue.
+- `productcatalogservice` serves product lists, searches, and details to the frontend, recommendation, and checkout paths.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring service-wide CPU saturation affects all `productcatalogservice` replicas in namespace `online-boutique`.
+- **Corroboration:** CPU usage must rise to saturation across all `productcatalogservice` replicas without a single-node concentration; node memory and unrelated workloads should remain comparatively healthy.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Prefer vertical scaling when the existing replicas can safely handle the
-  workload: increase `productcatalogservice` CPU requests and limits using
-  measured usage, throttling, and available node capacity as the sizing basis.
-- Alternatively, use horizontal scaling with an explicit, capacity-tested HPA
-  maximum so `productcatalogservice` gains enough replicas to recover without
-  growing to an excessive instance count or exhausting cluster capacity.
-- Apply either scaling change as a controlled rollout that preserves catalog
-  availability, and confirm that frontend and recommendation callers can
-  retrieve catalog data.
-- Verify that CPU usage and throttling fall across `productcatalogservice` and
-  that catalog latency, errors, traffic, endpoint health, search, and product
-  retrieval recover.
+### Fully correct
+
+- Increase only `productcatalogservice` CPU capacity using measured evidence: either vertically raise request and limit within eligible-node capacity, or use bounded horizontal scaling with an explicit capacity-tested HPA maximum. Do not combine aggressive replica growth with oversized requests.
+
+### Helpful but incomplete
+
+- A conservative one-dimensional CPU change or bounded temporary scale-out can reduce pressure and earns partial credit when it is safe, but it is incomplete without coherent sizing, bounds, and rollout verification.
+
+### Rejected approaches
+
+- Restart-only treatment is transient because replacement pods experience the same unresolved service-wide CPU pressure. Node isolation and unrelated-service mutations do not address pressure affecting every replica.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

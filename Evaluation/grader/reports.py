@@ -81,17 +81,21 @@ def write_run_report(path: Path, grade: dict[str, Any], rubric: Rubric) -> None:
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return
 
+    lines.extend(["", "## Summary"])
+    lines.extend(_score_matrix_section(grade, rubric.kind("rca"), "RCA rubric scores"))
+    lines.extend(
+        _combined_remediation_section(
+            [grade],
+            rubric.kind("remediation"),
+            "Remediation rubric scores and metrics",
+            heading="###",
+        )
+    )
     lines.extend(["", "## RCA outputs", ""])
     lines.extend(_job_table(grade.get("rca_jobs") or [], remediation=False))
-    lines.extend(_score_matrix_section(grade, rubric.kind("rca"), "RCA rubric scores"))
     lines.extend(_criterion_sections(grade.get("rca_jobs") or [], "RCA"))
     lines.extend(["", "## Remediation outputs", ""])
     lines.extend(_job_table(grade.get("remediation_jobs") or [], remediation=True))
-    lines.extend(
-        _score_matrix_section(
-            grade, rubric.kind("remediation"), "Remediation rubric scores"
-        )
-    )
     lines.extend(_criterion_sections(grade.get("remediation_jobs") or [], "Remediation"))
     lines.extend(_penalty_sections(grade.get("remediation_jobs") or []))
 
@@ -153,6 +157,22 @@ def write_global_report(
     lines = [
         "# Grader report",
         "",
+        "## Summary",
+    ]
+    lines.extend(_score_table_section(grades, rca_kind, "RCA rubric scores", heading="###"))
+    lines.extend(
+        _combined_remediation_section(
+            grades,
+            remediation_kind,
+            "Remediation rubric scores and metrics",
+            heading="###",
+        )
+    )
+    lines.extend(
+        [
+        "",
+        "## Overview",
+        "",
         f"- Runs discovered: {len(grades)}",
         f"- Runs graded: {len(graded)}",
         f"- Runs skipped: {len(skipped)}",
@@ -180,10 +200,7 @@ def write_global_report(
         f"{_count(remediation, 'final_grade', 'not_good')}",
         f"- Final non-evaluable remediations: "
         f"{_count(remediation, 'final_grade', 'not_evaluable')}",
-    ]
-    lines.extend(_score_table_section(grades, rca_kind, "RCA rubric scores"))
-    lines.extend(
-        _score_table_section(grades, remediation_kind, "Remediation rubric scores")
+        ]
     )
     lines.extend(_global_penalty_section(grades))
     if skipped:
@@ -263,12 +280,93 @@ def _score_matrix_section(
 
 
 def _score_table_section(
-    grades: list[dict[str, Any]], kind_rubric: KindRubric, title: str
+    grades: list[dict[str, Any]],
+    kind_rubric: KindRubric,
+    title: str,
+    *,
+    heading: str = "##",
 ) -> list[str]:
     rows = rubric_score_rows(grades, kind_rubric)
     if not rows:
         return []
-    return ["", f"## {title}", ""] + _score_markdown_table(rows, kind_rubric)
+    return ["", f"{heading} {title}", ""] + _score_markdown_table(rows, kind_rubric)
+
+
+def _combined_remediation_section(
+    grades: list[dict[str, Any]],
+    kind_rubric: KindRubric,
+    title: str,
+    *,
+    heading: str,
+) -> list[str]:
+    jobs = [
+        (grade, job)
+        for grade in grades
+        for job in grade.get("remediation_jobs") or []
+    ]
+    if not jobs:
+        return []
+    headers = ["Run", "Job", *[item.symbol for item in kind_rubric.criteria]]
+    headers.extend(
+        [
+            "Rubric",
+            "Penalty",
+            "Total",
+            "P95 before",
+            "P95 after",
+            "P95 change",
+            "P95 assessment",
+            "5xx before",
+            "5xx after",
+            "5xx change",
+            "5xx assessment",
+            "Metric outcome",
+            "Final grade",
+        ]
+    )
+    alignments = [" --- ", " --- "]
+    alignments.extend(" ---: " for _ in kind_rubric.criteria)
+    alignments.extend(
+        [
+            " ---: ", " ---: ", " ---: ",
+            " ---: ", " ---: ", " ---: ", " --- ",
+            " ---: ", " ---: ", " ---: ", " --- ",
+            " --- ", " --- ",
+        ]
+    )
+    lines = [
+        "",
+        f"{heading} {title}",
+        "",
+        "| " + " | ".join(headers) + " |",
+        "|" + "|".join(alignments) + "|",
+    ]
+    for grade, job in jobs:
+        row = _rubric_score_row(grade, job, kind_rubric)
+        families = (job.get("metrics") or {}).get("families") or {}
+        p95 = families.get("response_time_p95_seconds") or {}
+        http_5xx = families.get("http_5xx_rate") or {}
+        values = [_cell(row.get("run")), _cell(row.get("job_id"))]
+        values.extend(_score(row.get(item.id)) for item in kind_rubric.criteria)
+        values.extend(
+            [
+                _score(row.get("rubric_score")),
+                _score(row.get("penalty_total")),
+                _score(row.get("overall_score")),
+                _number(p95.get("before_median")),
+                _number(p95.get("after_median")),
+                _percent(p95.get("relative_change")),
+                _cell(p95.get("assessment")),
+                _number(http_5xx.get("before_median")),
+                _number(http_5xx.get("after_median")),
+                _percent(http_5xx.get("relative_change")),
+                _cell(http_5xx.get("assessment")),
+                _cell((job.get("metrics") or {}).get("outcome")),
+                _cell(job.get("final_grade")),
+            ]
+        )
+        lines.append("| " + " | ".join(values) + " |")
+    return lines
 
 
 def _score_markdown_table(

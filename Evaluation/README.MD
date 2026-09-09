@@ -5,6 +5,11 @@ predefined Chaos Mesh Schedules. Each scenario selects an application profile;
 the profile owns installation, runtime defaults, placement discovery, and its
 Locust user journey.
 
+For TeaStore, first follow [healthy baseline calibration](docs/healthy-baseline.md).
+Its baseline now validates HTTP and semantic request failures before agents or
+chaos start. Use at least ten baseline minutes; a dedicated no-chaos scenario
+is available in `collections/baseline/01-teastore.json`.
+
 Evaluation owns its runner deployment: `deploy.sh`,
 `kubernetes/secret.example.yml`, and `kubernetes/pod.yaml`. Copy
 the example to ignored `kubernetes/secret.yml` and replace the
@@ -186,6 +191,9 @@ every scenario and aborts the remaining batch if the final verification fails.
 
 See [docs/architecture.md](docs/architecture.md) for collection validation,
 execution, cleanup, metadata, and reporting behavior.
+See [docs/result.md](docs/result.md) for the complete run artifact layout,
+extracted metric families and units, derived calculations, grading outputs,
+and result-validity checks.
 
 Grade local run artifacts (default `results/`):
 
@@ -196,8 +204,9 @@ PYTHONPATH=. python -m grader --input results --output grades
 The grader uses the manually maintained scenario answer keys in
 [`grader/ground_truth/`](grader/ground_truth/) and the exact Chaos Mesh
 manifests archived with each run. It grades final RCA and remediation results,
-applies the configured rubric and remediation penalties, and compares the
-five-minute Prometheus windows around completed remediation jobs. See
+applies the configured rubric and remediation penalties, and compares only
+the five-minute response-time P95 and HTTP 5xx-rate windows around completed
+remediation jobs. Other collected metric families are not graded. See
 [`grader/README.md`](grader/README.md) for judge configuration, scoring rules,
 cache behavior, and generated artifacts.
 

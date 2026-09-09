@@ -148,6 +148,9 @@ CLI -> bootstrap -> orchestration -> chaos execution -> Kubernetes client
 
 ## Results
 
+See [result.md](result.md) for the complete artifact layout, metric catalog,
+units, derived calculations, grading products, and validity checklist.
+
 Metadata schema version 2 stores the normalized scenario, placement definition,
 render hash, node preflight, observed placement and fingerprint, archived
 Schedule definitions, content hashes, per-Schedule command results,
@@ -157,20 +160,23 @@ inputs are copied to `inputs/scenario.json`, `inputs/chaos/`, and
 remediation, and workflow rows.
 
 `grader/` compares each succeeded `rca_job.result` and
-`remediation_job.result` independently with the manually maintained
-scenario-named Markdown ground truth and the exact manifests archived under
-`inputs/chaos/`. `grader/rubric.json` supplies the criterion ids, class labels,
-scores, and weights. The judge returns only classifications; Python converts
+`remediation_job.result` independently with the manually maintained,
+production-style scenario ground truth. Archived manifests under
+`inputs/chaos/` are validated and retained for provenance but are supplied only
+to the separate remediation-penalty judge. `grader/rubric.json` supplies the
+criterion ids, class labels, scores, and weights. The judge returns only
+classifications; Python converts
 those classes into 0–1 scores and a weighted overall score. Alignment for the
 metric gate is derived from the correctness criterion score. For remediation
 only, scenario JSON arrays under `grader/penalties/` list harmful actions; the
 judge marks which apply and Python subtracts those amounts from the overall
 score, floored at 0. It does not read
 requests, raw output, tool calls, reasoning, anomalies, or learning records.
-For each completed remediation, it also reports
-per-series and family medians for all 13 Prometheus files over the specified
-five-minute before and after windows anchored at `completed_at`, applies the
-configured 15% direction policy and core-health gate, and writes per-run JSON,
+For each completed remediation, it also reports per-series and family medians
+for `response_time_p95_seconds` and `http_5xx_rate` over the specified
+five-minute before and after windows anchored at `completed_at`. The other 11
+collected families are ignored by grading. It applies the configured 15%
+lower-is-better policy and health gate, and writes per-run JSON,
 Markdown, judge checkpoints, a flat summary CSV, per-kind rubric score CSVs,
 and an aggregate report under `grades/`. Missing archived inputs make only the
 affected run `ungraded`.

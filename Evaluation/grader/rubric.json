@@ -8,7 +8,7 @@
           "symbol": "RC",
           "name": "Root Cause Correctness",
           "weight": 0.3,
-          "definition": "Measures whether the agent correctly identifies the actual underlying cause of the incident relative to the known ground-truth fault.",
+          "definition": "Measures whether the agent correctly identifies the production-observable incident condition and affected component described by the ground truth.",
           "evaluation_note": "",
           "classes": [
             {
@@ -79,7 +79,7 @@
           "name": "Evidence Grounding",
           "weight": 0.2,
           "definition": "Measures the extent to which the agent's diagnosis and supporting claims are grounded in the telemetry, observations, logs, metrics, traces, or other evidence available during the incident.",
-          "evaluation_note": "Technical plausibility alone does not constitute evidence grounding. A claim must be supported by evidence actually available to the agent. Judge only claims inside AGENT_RESULT against GROUND_TRUTH and CHAOS_MANIFESTS; tool traces are not supplied.",
+          "evaluation_note": "Technical plausibility alone does not constitute evidence grounding. A claim must be supported by evidence stated in the agent result. Judge only claims inside AGENT_RESULT against GROUND_TRUTH; tool traces are not supplied.",
           "classes": [
             {
               "id": "UNGROUNDED",
@@ -188,7 +188,7 @@
           "name": "Remediation Correctness",
           "weight": 0.3,
           "definition": "Measures whether the proposed remediation appropriately addresses the identified or ground-truth root cause and is expected to mitigate or resolve the incident.",
-          "evaluation_note": "A remediation that only treats an observed symptom should not receive the highest classification when a feasible action addressing the underlying cause is available.",
+          "evaluation_note": "A remediation that only treats a downstream symptom should not receive the highest classification when a feasible action addressing the diagnosed incident condition is available.",
           "classes": [
             {
               "id": "INCORRECT",

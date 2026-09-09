@@ -3,6 +3,10 @@
 `grader` is an offline grading path for archived Evaluation runs. It does not
 inspect agent reasoning or tool calls, or contact a Kubernetes cluster.
 
+See [scenario-policy.md](scenario-policy.md) for the audited fault-family
+expectations, partial-credit rules, universal simulation exclusions, and
+penalty weights applied across all 50 scenarios.
+
 ## Run it
 
 From `Evaluation/`:
@@ -14,6 +18,17 @@ PYTHONPATH=. python -m grader --input results --output grades
 The semantic judge defaults to the local OpenAI-compatible vLLM endpoint at
 `http://localhost:8000/v1` and model `Qwen/Qwen3.6-35B-A3B`. The environment
 variables `JUDGE_URL`, `JUDGE_MODEL`, and `JUDGE_TOKEN` remain supported.
+Run folders are graded concurrently, with five workers by default. Set
+`--concurrency` or `GRADER_CONCURRENCY` to tune the number of simultaneous
+judge requests for the available model-server capacity. Jobs within each run
+remain sequential.
+
+The repository helper forwards additional arguments, so either form works:
+
+```bash
+./grade.sh --concurrency 10
+GRADER_CONCURRENCY=10 ./grade.sh
+```
 
 ```bash
 PYTHONPATH=. python -m grader \
@@ -27,6 +42,7 @@ PYTHONPATH=. python -m grader \
   --token EMPTY \
   --judge-timeout-seconds 600 \
   --judge-max-tokens 8192 \
+  --concurrency 5 \
   --window-minutes 5 \
   --threshold 0.15 \
   --verbose
@@ -62,7 +78,9 @@ Each run is discovered through `metadata.json` and must contain:
 
 Ground truth is never generated or overwritten. A missing ground-truth file,
 archived scenario, or archived chaos manifest marks only that run `ungraded`;
-other runs continue.
+other runs continue. Archived manifests remain required for reproducibility,
+input validation, and remediation-penalty judging, but are not supplied to the
+normal RCA or remediation rubric judge.
 
 ## Rubric classification
 
@@ -75,12 +93,18 @@ criterion. Python converts those classes into 0–1 scores and the weighted
 overall score. Editing the JSON changes both the prompt and the numeric scale
 without code changes.
 
-The RCA payload contains exactly the scenario name, RCA ground truth,
-normalized archived chaos manifests, and `rca_job.result`. The remediation
-payload uses the remediation ground-truth section and `remediation_job.result`.
+The RCA payload contains exactly the scenario name, production-style RCA
+ground truth, and `rca_job.result`. The remediation payload contains the
+scenario name, remediation ground truth, and `remediation_job.result`.
 Evidence-grounding and causal-reasoning are judged from claims inside that
-final result against ground truth and the injected manifests. Tool traces are
-not supplied.
+final result against the production-observable condition in ground truth. Tool
+traces and archived manifests are not supplied to this semantic call.
+
+Naming Chaos Mesh, fault injection, or another synthetic mechanism is neither
+required nor rewarded. If an agent uses that terminology, the judge treats the
+words themselves as neutral and independently grades whether the result names
+the correct observable condition, target, scope, evidence, causal impact, and
+remediation.
 
 Requests, raw model output, anomalies, tool calls, reasoning, session traces,
 learning records, and remediation-session exports are not read. The judge runs
@@ -105,7 +129,9 @@ does not use penalty results.
 
 Remediation-only. After rubric classification, if
 `grader/penalties/<scenario-name>.json` exists and is non-empty, the judge
-makes a second structured call. Each file is a JSON array:
+makes a second structured call. That penalty-only call receives the archived
+manifests so it can detect evaluation tampering and target-specific harmful
+actions. Each file is a JSON array:
 
 ```json
 [
@@ -124,10 +150,11 @@ editing a penalty JSON does not redo rubric classifications.
 
 Each successful classification is cached immediately and atomically by SHA-256
 over the prompt version, rubric hash, model, job kind, selected ground truth,
-normalized manifests, and final result JSON. Editing `rubric.json` therefore
-invalidates old rubric checkpoints. `JUDGE_MAX_TOKENS` or `--judge-max-tokens`
-controls the response allowance; the 8,192-token default accommodates local
-reasoning models.
+and final result JSON. Penalty cache keys additionally include normalized
+manifests and the penalty-file hash. Editing `rubric.json` therefore invalidates
+old rubric checkpoints. `JUDGE_MAX_TOKENS` or `--judge-max-tokens` controls the
+response allowance; the 8,192-token default accommodates local reasoning
+models.
 
 ## Five-minute metric comparison
 
@@ -138,13 +165,13 @@ configurable. The grader computes the median of valid samples in each window
 for every Prometheus series, followed by a median across evaluable series for
 the family.
 
-All 13 collected families are evaluated:
+Only two of the 13 collected families are evaluated. All other Prometheus
+families are ignored by grading, although they remain available to reporting
+and visualization:
 
 | Policy | Metric families |
 | --- | --- |
-| Lower is better | `response_time_p95_seconds`, `http_5xx_rate`, `deployment_cpu_usage`, `deployment_cpu_request_utilization_percent`, `deployment_memory_request_utilization_percent`, `node_cpu_utilization_percent`, `node_memory_utilization_percent` |
-| Higher is better | `traffic_rps` |
-| Stability is better | `app_instance_count`, `deployment_disk_io_bytes_per_second`, `deployment_network_io_bytes_per_second`, `node_disk_io_bytes_per_second`, `node_network_io_bytes_per_second` |
+| Lower is better | `response_time_p95_seconds`, `http_5xx_rate` |
 
 At the default inclusive 15% boundary, an expected-direction change is
 `improved`, an opposite-direction change is `worsened`, and a smaller change is
@@ -152,12 +179,11 @@ At the default inclusive 15% boundary, an expected-direction change is
 more. Zero-to-zero is stable; zero-to-positive and positive-to-zero use the
 family direction. Missing or nonnumeric windows are `not_evaluable`.
 
-The core-health gate comprises response-time P95, 5xx rate, traffic RPS, and
-instance count. The metric outcome is:
+Both evaluated families are required. The metric outcome is:
 
-- `good` when no core family worsens and at least one evaluable family improves;
-- `not_good` when a core family worsens or no family measurably improves;
-- `not_evaluable` when any required core family lacks both windows.
+- `good` when neither family worsens and at least one improves;
+- `not_good` when either family worsens or neither measurably improves;
+- `not_evaluable` when either family lacks both windows.
 
 The final remediation grade is `good` only when derived alignment is `aligned`
 and the metric outcome is `good`. An evaluable mismatch is `not_good`; an
@@ -179,9 +205,12 @@ It also writes `grades/summary.csv`, one row per RCA/remediation job;
 row per session with each criterion class/score plus `overall_score`;
 remediation score CSV also has `rubric_score` and `penalty_total`; and
 `grades/report.md`, with aggregate counts, mean overall and per-criterion
-scores, per-session rubric tables, applied penalties, skipped runs, and
-non-evaluable jobs. These output files are deterministic apart from newly
-returned judge reasons.
+scores, applied penalties, skipped runs, and non-evaluable jobs. The report
+opens with an RCA rubric table followed by a single remediation table combining
+rubric scores with the before/after values, percentage changes, and assessments
+for response-time P95 and HTTP 5xx rate. Per-run reports use the same summary
+layout before their detailed sections. These output files are deterministic
+apart from newly returned judge reasons.
 
 The per-run JSON has this stable top-level shape (nested manifests, results,
 and metric series are retained in full):

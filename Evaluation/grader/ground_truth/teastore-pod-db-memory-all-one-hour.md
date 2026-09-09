@@ -2,14 +2,32 @@
 
 ## RCA
 
-- **Incident pattern:** Database-backed store operations slow, fail, or disappear while other TeaStore functions may remain available.
-- **Affected scope:** All running `teastore-db` replicas exhibit elevated memory use, so traffic cannot be routed to an unaffected instance.
-- **Root cause:** `teastore-db` is vertically under-sized for a sustained increase in its normal working set, causing every replica to approach its container memory limit.
-- **Corroborating evidence:** High working-set and memory-limit utilization across every `teastore-db` pod, OOM termination evidence, and service-specific latency or errors distinguish the issue from node-wide pressure or a WebUI defect.
+### Expected incident condition
+
+- Every Running `teastore-db` replica experiences recurring per-pod memory pressure, exhausting container memory headroom rather than causing node-wide memory exhaustion.
+- `teastore-db` is the singleton MySQL data tier; degradation affects durable product, user, and order operations and horizontal replicas are not safe.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring per-pod memory pressure affects all `teastore-db` replicas in namespace `teastore`.
+- **Corroboration:** Working-set and limit utilization, OOM/restart evidence, and memory pressure must affect all `teastore-db` pods while nodes and unrelated services retain memory headroom.
+- A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
 ## Recommended remediation
 
-- Vertically right-size the workload with `kubectl set resources deployment/teastore-db -n teastore`, increasing memory requests and limits using observed working-set growth and available node capacity as the sizing basis.
-- Preserve the existing CPU settings unless current evidence also justifies a CPU change.
-- Confirm the increased memory request fits eligible-node capacity and does not make required replicas unschedulable.
-- Verify stable memory headroom without new OOM kills, healthy replicas, restored latency and errors, and normal storefront traffic.
+### Fully correct
+
+- Vertically right-size only `teastore-db` memory request and limit using working-set, OOM, and eligible-node-capacity evidence. Preserve CPU and unrelated settings and complete a controlled rollout.
+
+### Helpful but incomplete
+
+- A safe limit-only increase or one controlled restart after memory pressure has cleared can restore service and earns partial credit, but request/QoS or recurring headroom remains unresolved.
+
+### Rejected approaches
+
+- Horizontal scaling does not remove per-pod memory pressure affecting every replica. Horizontal replicas are additionally unsafe for this stateful singleton. Repeated restart-only treatment while memory pressure persists, node isolation, or oversized unschedulable memory values are not safe fixes.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify the applied spec and rollout, desired versus Ready replicas, schedulability and capacity, condition-specific evidence, dependent-path health, and recovery of response-time P95 and HTTP 5xx rate. Do not infer recovery from a successful mutation command alone.

@@ -125,6 +125,11 @@ commands, snapshots, metric data, `sessions/` database export, and failure
 outputs together. Do not compare runs by copying only charts or aggregate CSV
 rows.
 
+The detailed [Evaluation result reference](../Evaluation/docs/result.md)
+documents every artifact category, all extracted Prometheus and Locust
+metrics, units and calculations, session exports, derived reports, grading,
+visualization, and the validity checklist.
+
 The reporting pipeline accepts metadata schema version 2 and emits per-step
 summaries plus paired agent/no-agent comparisons. Application id is part of the
 pairing key, so runs from different microservice systems cannot be compared as a
@@ -136,7 +141,8 @@ At minimum, assess:
 
 - detection latency from chaos active time to anomaly row;
 - investigation and remediation completion latency;
-- precision of identified resource/cause against scenario ground truth;
+- precision of the identified resource condition and target against
+  production-style scenario ground truth;
 - whether actions were necessary, bounded, and relevant;
 - recovery in latency, error rate, throughput, saturation, and replicas;
 - collateral impact and persistent cluster changes;

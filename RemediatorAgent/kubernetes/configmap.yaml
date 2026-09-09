@@ -15,6 +15,7 @@ data:
     client.model=Qwen/Qwen3.6-35B-A3B
     client.url=${CLIENT_URL}
     client.token=${CLIENT_TOKEN}
+    client.timeout_seconds=600
     worker.poll_interval_seconds=2
     worker.lease_seconds=1800
     manager.max_rounds=50
