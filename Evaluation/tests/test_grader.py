@@ -364,9 +364,9 @@ def test_special_service_and_fault_policies_are_consistent() -> None:
         "real-pod-emailservice-cpu-headroom-all-one-hour": "250m",
         "real-pod-checkoutservice-cpu-headroom-all-one-hour": "250m",
         "real-pod-productcatalogservice-cpu-headroom-all-one-hour": "250m",
-        "teastore-pod-webui-cpu-headroom-all-one-hour": "1500m",
-        "teastore-pod-persistence-cpu-headroom-all-one-hour": "1000m",
-        "teastore-pod-image-cpu-headroom-all-one-hour": "1000m",
+        "teastore-pod-webui-cpu-headroom-all-one-hour": "500m",
+        "teastore-pod-persistence-cpu-headroom-all-one-hour": "500m",
+        "teastore-pod-image-cpu-headroom-all-one-hour": "750m",
     }
     for name, cpu in expected_headroom.items():
         assert cpu in truth[name]["rca"]

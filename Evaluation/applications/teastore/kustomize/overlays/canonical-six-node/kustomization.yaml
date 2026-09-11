@@ -130,7 +130,7 @@ patches:
     patch: |-
       - op: add
         path: /spec/replicas
-        value: 3
+        value: 6
       - op: add
         path: /spec/template/spec/topologySpreadConstraints
         value:

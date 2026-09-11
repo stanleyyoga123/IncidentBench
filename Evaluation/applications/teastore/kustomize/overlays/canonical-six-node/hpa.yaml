@@ -88,8 +88,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: teastore-webui
-  minReplicas: 3
-  maxReplicas: 3
+  minReplicas: 6
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:

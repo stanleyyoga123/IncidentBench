@@ -4,12 +4,12 @@
 
 ### Expected incident condition
 
-- The `teastore-image` Deployment configures CPU request and limit both `1000m`. Recurring CPU demand reaches this hard limit, leaving no burst headroom and driving CPU saturation across the workload.
+- The `teastore-image` Deployment configures CPU request and limit both `750m`. Recurring CPU demand reaches this hard limit, leaving no burst headroom and driving CPU saturation across the workload.
 - `teastore-image` serves product images; degradation slows or removes image-heavy storefront content.
 
 ### Expected diagnosis and evidence
 
-- **Root cause:** Insufficient per-pod CPU headroom on `teastore-image` in namespace `teastore`: request and limit are both `1000m`, so demand cannot burst above the requested CPU.
+- **Root cause:** Insufficient per-pod CPU headroom on `teastore-image` in namespace `teastore`: request and limit are both `750m`, so demand cannot burst above the requested CPU.
 - **Corroboration:** CPU usage must rise to saturation across all `teastore-image` replicas without a single-node concentration; node memory and unrelated workloads should remain comparatively healthy.
 - A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
@@ -17,7 +17,7 @@
 
 ### Fully correct
 
-- Vertically right-size only `teastore-image` in namespace `teastore`. Increase both CPU request and limit from `1000m` using observed sustained demand and eligible-node capacity, keep `request < limit`, preserve memory and unrelated settings, and complete a controlled rollout.
+- Vertically right-size only `teastore-image` in namespace `teastore`. Increase both CPU request and limit from `750m` using observed sustained demand and eligible-node capacity, keep `request < limit`, preserve memory and unrelated settings, and complete a controlled rollout.
 
 ### Helpful but incomplete
 

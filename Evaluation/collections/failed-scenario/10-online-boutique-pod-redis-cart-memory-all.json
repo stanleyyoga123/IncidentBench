@@ -1,0 +1,17 @@
+{
+  "name": "real-pod-redis-cart-memory-all-one-hour",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-redis-cart-memory-pressure-all",
+      "chaos": ["single-redis-cart-memory"],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

@@ -127,7 +127,7 @@ selector. The canonical profile starts every Deployment at two replicas except
 `frontend`, which starts at six. Matching HPA minima are 2 and 6, and every HPA
 maximum is 30.
 TeaStore follows the same scheduling contract for its seven Deployments. The
-canonical profile uses ClusterIP Services, starts `teastore-webui` at three
+canonical profile uses ClusterIP Services, starts `teastore-webui` at six
 replicas, `teastore-db` and `teastore-registry` at one replica, and the
 remaining services at two. `teastore-db` has no HPA because the bundled MySQL
 image is not clustered. `teastore-registry` has no HPA because its catalog is

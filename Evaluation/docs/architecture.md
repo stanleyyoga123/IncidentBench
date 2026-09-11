@@ -54,25 +54,29 @@ labelled `role=services`. It controls distribution instead of node identity:
 | all other application Deployments | 2 | 2 / 30 | soft spread across service nodes |
 
 TeaStore's `canonical-six-node` overlay uses the same `role: services` spread
-contract for seven Deployments. `teastore-webui` starts at three replicas with
-HPA 3/3, `teastore-db` and `teastore-registry` stay at one replica without an
+contract for seven Deployments. `teastore-webui` starts at six replicas with
+HPA 6/30, `teastore-db` and `teastore-registry` stay at one replica without an
 HPA, and the remaining services start at two replicas with HPA 2/30.
-The web UI requests 1500m CPU and 2Gi memory, may burst to two CPU cores and
-3Gi memory, and uses the lower HPA maximum to keep recovery within cluster
-capacity. Across TeaStore, canonical requests use conventional rounded
-quantities while keeping the existing limits as anchors.
+Application containers request 250m, 500m, or 750m CPU. The storefront and
+persistence services request 500m CPU and 1Gi memory and may burst to one CPU
+core and 2Gi. Image requests 750m and may burst to 1500m because product-image
+workloads spike during JVM warmup. Auth and recommender request 250m CPU and
+1Gi. Registry and MySQL request 250m CPU and 512Mi. These sizes were measured
+against live traffic so six web UI pods plus Istio sidecars still fit on the
+2-core service nodes without HPA scale-out during a 10-user baseline.
 
 The `role: services` selector defines eligibility. The spread rule asks the
 scheduler to balance matching replicas across hostnames but deliberately does
 not leave a pod Pending solely because perfect balance is unavailable.
 
 The `cpu-constrained-six-node` profile inherits the complete canonical profile
-and changes only application CPU limits. For all 11 Deployments, the rendered
-CPU limit equals the existing request. This models a restrictive resource
-policy with no burst headroom while retaining identical replicas, HPA targets,
-node eligibility, and topology spreading. The email, checkout, and
-product-catalog CPU-headroom scenarios use this profile and each expects one
-scoped Deployment resource correction.
+and changes only application CPU limits. For every application Deployment, the
+rendered CPU limit equals the existing request. This models a restrictive
+resource policy with no burst headroom while retaining identical replicas, HPA
+targets, node eligibility, and topology spreading. Online Boutique's email,
+checkout, and product-catalog CPU-headroom scenarios, and TeaStore's web UI,
+persistence, and image CPU-headroom scenarios, each expect one scoped
+Deployment resource correction.
 
 Pod-targeted chaos Schedules use an `app In (...)` expression and omit node
 selectors. Resource-saturation scenarios follow every Running replica so

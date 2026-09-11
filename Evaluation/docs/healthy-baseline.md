@@ -90,9 +90,9 @@ above is appropriate when a reset has not been authorized.
 
 ## Scheduling and remaining validation
 
-The archived canonical TeaStore pods request about 14.2 CPU cores and 22.5 GiB
-including native Istio sidecars. Worker capacities differ, and five archived
-runs could not schedule the third 1.6-core web UI pod. Lower traffic does not
+The archived canonical TeaStore pods request about 8.5 CPU cores and 17 GiB
+including native Istio sidecars. Worker capacities differ: two service nodes
+have only two allocatable cores. Lower traffic does not
 reduce CPU requests. Before calibration all desired pods must fit and become
 Ready; budget platform reservations and per-node fit. Measure before lowering
 requests or increasing replica limits. Resource sizing and live health are not

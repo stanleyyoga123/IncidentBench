@@ -96,10 +96,12 @@ preserves canonical placement while setting every application CPU limit equal
 to its request. Each scenario right-sizes only its affected Deployment's CPU
 request and limit.
 
-TeaStore's web UI baseline uses three replicas with an HPA maximum of 3. Each
-replica requests 1500m CPU and 2Gi memory, with limits of 2000m CPU and 3Gi
-memory. Canonical TeaStore requests use conventional rounded quantities while
-keeping the existing limits as anchors.
+TeaStore's web UI baseline uses six replicas with HPA 6–30. Each replica
+requests 500m CPU and 1Gi memory, with limits of 1000m CPU and 2Gi memory.
+Persistence uses the same CPU size; image requests 750m; auth and
+recommender request 250m; registry and MySQL request 250m CPU and 512Mi
+memory. Canonical TeaStore requests stay below their limits so the six-node
+service pool can schedule the full placement.
 
 Run a short TeaStore smoke:
 

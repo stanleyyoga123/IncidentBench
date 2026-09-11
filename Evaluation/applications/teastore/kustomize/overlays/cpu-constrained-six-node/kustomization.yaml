@@ -15,7 +15,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 750m
+        value: 250m
   - target:
       group: apps
       version: v1
@@ -24,7 +24,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 750m
+        value: 250m
   - target:
       group: apps
       version: v1
@@ -33,7 +33,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 1000m
+        value: 500m
   - target:
       group: apps
       version: v1
@@ -42,7 +42,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 750m
+        value: 250m
   - target:
       group: apps
       version: v1
@@ -51,7 +51,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 1000m
+        value: 750m
   - target:
       group: apps
       version: v1
@@ -60,7 +60,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 750m
+        value: 250m
   - target:
       group: apps
       version: v1
@@ -69,4 +69,4 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 1500m
+        value: 500m

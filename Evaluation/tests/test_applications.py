@@ -128,7 +128,7 @@ def test_teastore_uses_clusterip_and_unique_app_labels():
         for document in documents
         if document.get("kind") == "Deployment"
     }
-    assert deployments["teastore-webui"]["spec"]["replicas"] == 3
+    assert deployments["teastore-webui"]["spec"]["replicas"] == 6
     assert deployments["teastore-db"]["spec"]["replicas"] == 1
     assert deployments["teastore-registry"]["spec"]["replicas"] == 1
     assert deployments["teastore-db"]["spec"]["template"]["metadata"]["annotations"][
@@ -142,13 +142,13 @@ def test_teastore_uses_clusterip_and_unique_app_labels():
     assert "teastore-registry-hpa" not in hpas
     assert "teastore-db-hpa" not in hpas
     expected_resources = {
-        "teastore-webui": (("1500m", "2Gi"), ("2000m", "3Gi")),
-        "teastore-auth": (("750m", "1536Mi"), ("1000m", "2Gi")),
-        "teastore-registry": (("750m", "1536Mi"), ("1000m", "2Gi")),
-        "teastore-db": (("750m", "1536Mi"), ("1000m", "2Gi")),
-        "teastore-persistence": (("1000m", "1536Mi"), ("1500m", "2Gi")),
-        "teastore-image": (("1000m", "1536Mi"), ("1500m", "2Gi")),
-        "teastore-recommender": (("750m", "1536Mi"), ("1000m", "2Gi")),
+        "teastore-webui": (("500m", "1Gi"), ("1000m", "2Gi")),
+        "teastore-auth": (("250m", "1Gi"), ("500m", "2Gi")),
+        "teastore-registry": (("250m", "512Mi"), ("500m", "1Gi")),
+        "teastore-db": (("250m", "512Mi"), ("500m", "1Gi")),
+        "teastore-persistence": (("500m", "1Gi"), ("1000m", "2Gi")),
+        "teastore-image": (("750m", "1Gi"), ("1500m", "2Gi")),
+        "teastore-recommender": (("250m", "1Gi"), ("500m", "2Gi")),
     }
     for name, ((cpu_req, mem_req), (cpu_lim, mem_lim)) in expected_resources.items():
         resources = deployments[name]["spec"]["template"]["spec"]["containers"][0][
@@ -163,8 +163,8 @@ def test_teastore_uses_clusterip_and_unique_app_labels():
         if document.get("kind") == "HorizontalPodAutoscaler"
         and document["metadata"]["name"] == "teastore-webui-hpa"
     )
-    assert webui_hpa["spec"]["minReplicas"] == 3
-    assert webui_hpa["spec"]["maxReplicas"] == 3
+    assert webui_hpa["spec"]["minReplicas"] == 6
+    assert webui_hpa["spec"]["maxReplicas"] == 30
 
 
 

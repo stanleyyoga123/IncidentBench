@@ -16,5 +16,5 @@ spec:
         chaos-mesh:
         - worker-node-3
     stress-mem:
-      size: 75%
+      size: 12GiB
     duration: 25s

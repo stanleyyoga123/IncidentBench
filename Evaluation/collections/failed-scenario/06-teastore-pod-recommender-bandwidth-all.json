@@ -1,0 +1,19 @@
+{
+  "name": "teastore-pod-recommender-bandwidth-all-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-recommender-bandwidth-all",
+      "chaos": [
+        "teastore-recommender-bandwidth"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

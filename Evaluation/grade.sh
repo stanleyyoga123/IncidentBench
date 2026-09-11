@@ -5,8 +5,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$SCRIPT_DIR"
 
 exec python -m grader \
-    --input results/result-5 \
-    --output grades/result-5 \
+    --input results/combined \
+    --output grades/combined \
     --ground-truth grader/ground_truth \
     --rubric grader/rubric.json \
     --penalties grader/penalties \

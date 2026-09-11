@@ -31,13 +31,19 @@ spec:
               value: "8080"
             - name: SERVICE_PORT
               value: "8080"
+            # TeaStore trains once at startup. If that fetch hits a persistence
+            # replica whose WAR is not up, SlopeOne stays untrained forever.
+            # Loop time is milliseconds; 60s lets training retry after MySQL
+            # and persistence have actually finished.
+            - name: RECOMMENDER_RETRAIN_LOOP_TIME
+              value: "60000"
           resources:
             requests:
-              cpu: 750m
-              memory: 1536Mi
+              cpu: 250m
+              memory: 1Gi
             limits:
-              cpu: 1000m
-              memory: 2Gi
+              cpu: 500m
+              memory: 3Gi
           startupProbe:
             exec:
               command: ["/bin/bash", "-lc", "exec 3<>/dev/tcp/127.0.0.1/8080"]
