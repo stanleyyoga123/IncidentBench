@@ -59,3 +59,21 @@ The `upload` post-run hook syncs available inputs and progress records. It does
 not stream live progress and runs before its own completion and final release/
 status writes. Local final records are authoritative. Rerun the hook after
 completion to refresh S3; see [S3 sync](../hooks/postrun/upload/README.md).
+
+## Final node cleanup
+
+Before node normalization, the engine archives the selected placement's node
+names in `inputs/placement/nodes.json`. After the final evidence snapshot, the
+outer finalizer stops workers, removes chaos, then uncordons only those nodes
+and checks their schedulability. Results and command output are saved in
+`node-cleanup.json` before post-run export/upload. This runs after failures and
+interruptions too, provided ownership is held, workers stop, and chaos cleanup
+succeeds. A failed uncordon or verification marks cleanup unsafe and prevents
+release/continuation to the next batch run. Other placement nodes are still
+attempted when one fails.
+
+If preparation failed before placement resolution, no node normalization ran;
+uncordoning is skipped with a recorded reason. Worker-stop or chaos-cleanup
+failure also skips uncordoning, leaving cleanup unsafe. This restores the
+experiment's schedulable baseline; it does not restore pre-existing cordon flags,
+remove taints, or certify general node health.

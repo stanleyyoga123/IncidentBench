@@ -6,6 +6,7 @@ from .artifacts.artifact_layout import ArtifactLayout
 from .artifacts.input_artifact_archiver import InputArtifactArchiver
 from .artifacts.metadata_factory import MetadataFactory
 from .artifacts.metadata_repository import MetadataRepository
+from .artifacts.run_journal import write_json
 from .applications import ApplicationCatalog
 from .chaos.execution.chaos_phase_executor import ChaosPhaseExecutor
 from .chaos.execution.cluster_chaos_state_cleaner import ClusterChaosStateCleaner
@@ -123,6 +124,8 @@ def build_and_run(
         output_dir = repo_root / output_dir
     artifacts = ArtifactLayout(output_dir)
     artifacts.ensure_root()
+    artifacts.archived_placement.mkdir(parents=True, exist_ok=True)
+    write_json(artifacts.archived_placement / "nodes.json", list(placement.referenced_nodes))
     command_logger = CommandLogger()
     cluster_chaos_cleaner = ClusterChaosStateCleaner(
         command_runner,

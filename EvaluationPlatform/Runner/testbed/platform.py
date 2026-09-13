@@ -13,6 +13,7 @@ from .configuration import ROOT, environment, read_json, resolve_scenario, valid
 from hooks.lifecycle import Lifecycle, run_script
 from .artifacts.run_journal import event, timestamp, write_json
 from .artifacts.configuration_snapshot import capture, archive
+from .kubernetes.node_cleanup import uncordon_placement_nodes
 
 
 def preflight(spec, env=None):
@@ -108,6 +109,24 @@ def run_one(spec, env, output, execute, *, snapshot=None, invocation=None):
                         status['errors'].append('final chaos cleanup failed; see cleanup.log')
                 except Exception as exc:
                     status['errors'].append(str(exc))
+                if stopped and status['cleanup_safe']:
+                    event(output, 'node_cleanup_started')
+                    try:
+                        nodes = uncordon_placement_nodes(output)
+                        status['node_cleanup'] = nodes['status']
+                        if nodes['returncode']:
+                            status['cleanup_safe'] = False
+                            status['errors'].append('final node uncordon failed; see node-cleanup.json')
+                    except Exception as exc:
+                        status['cleanup_safe'] = False
+                        status['errors'].append(f'final node uncordon failed: {exc}')
+                    event(output, 'node_cleanup_finished', cleanup_safe=status['cleanup_safe'])
+                else:
+                    status['cleanup_safe'] = False
+                    status['node_cleanup'] = 'skipped'
+                    write_json(output / 'node-cleanup.json', {
+                        'status': 'skipped', 'reason': 'workers did not stop or chaos cleanup did not succeed',
+                    })
                 # Metadata precedes upload and is rewritten after post-run errors.
                 progress('postrun')
                 status['errors'].extend(lifecycle.hooks('postrun', continue_on_error=True))
