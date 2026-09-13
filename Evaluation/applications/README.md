@@ -14,6 +14,10 @@ applications/
 │   ├── profile.yaml
 │   └── kustomize/
 ├── online_boutique.py
+├── sock-shop/
+│   ├── profile.yaml
+│   └── kustomize/
+├── sock_shop.py
 ├── teastore/
 │   ├── profile.yaml
 │   └── kustomize/

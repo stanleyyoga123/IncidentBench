@@ -88,7 +88,7 @@ class CollectionValidationTests(unittest.TestCase):
             )
         ]
         scenarios = boutique_scenarios + teastore_scenarios
-        self.assertEqual(len(catalog.schedules), 39)
+        self.assertEqual(len(catalog.schedules), 40)
         self.assertEqual(len(boutique_scenarios), 23)
         self.assertEqual(len(teastore_scenarios), 23)
         self.assertEqual(
@@ -243,6 +243,8 @@ class CollectionValidationTests(unittest.TestCase):
                 expected_namespace = (
                     "teastore"
                     if schedule.reference.startswith("teastore-")
+                    else "sock-shop"
+                    if schedule.reference.startswith("sock-shop-")
                     else "online-boutique"
                 )
                 self.assertEqual(selector["namespaces"], [expected_namespace])
@@ -253,9 +255,11 @@ class CollectionValidationTests(unittest.TestCase):
                 self.assertTrue(
                     schedule.reference.startswith("single-")
                     or schedule.reference.startswith("teastore-")
+                    or schedule.reference.startswith("sock-shop-")
                 )
                 self.assertEqual(len(expressions[0]["values"]), 1)
                 self.assertNotIn("frontend", expressions[0]["values"])
+
         schedules_by_reference = {
             schedule.reference: schedule for schedule in catalog.schedules
         }
@@ -345,6 +349,41 @@ class CollectionValidationTests(unittest.TestCase):
                 self.assertEqual(scenario.application, "teastore")
             else:
                 self.assertEqual(scenario.application, "online-boutique")
+
+    def test_sock_shop_scenario_is_exactly_ten_minutes_and_targets_catalogue(self):
+        root = Path(__file__).resolve().parents[1]
+        catalog = ChaosCatalog(root / "collections" / "chaos")
+        profile = ApplicationCatalog(root / "applications", root.parent).resolve(
+            "sock-shop"
+        )
+        placements = PlacementCatalog(
+            root / "applications" / "sock-shop" / "kustomize" / "overlays"
+        )
+        paths = sorted((root / "collections" / "sock-shop-scenario").glob("*.json"))
+        self.assertEqual(
+            [path.name for path in paths],
+            ["01-pod-catalogue-cpu-all-ten-minutes.json"],
+        )
+        scenario = ScenarioLoader(root, catalog, placements).load(paths[0])
+        self.assertEqual(scenario.application, "sock-shop")
+        self.assertEqual(sum(step.duration for step in scenario.steps), 600)
+        self.assertEqual(
+            [(step.duration, step.chaos) for step in scenario.steps],
+            [(300, ("sock-shop-catalogue-cpu",)), (300, ())],
+        )
+        placement = PlacementRenderer(
+            CommandRunner(), root, application_profile=profile
+        ).render("canonical-six-node", placements.resolve("canonical-six-node"))
+        schedule = catalog.resolve("sock-shop-catalogue-cpu")
+        validate_pod_chaos_selectors(placement, (schedule,), profile.placement.label_key)
+        child = schedule.manifest["spec"]["stressChaos"]
+        self.assertEqual(child["mode"], "all")
+        self.assertEqual(child["selector"]["namespaces"], ["sock-shop"])
+        self.assertEqual(
+            child["selector"]["expressionSelectors"][0]["values"],
+            ["catalogue"],
+        )
+        self.assertEqual(child["stressors"], {"cpu": {"workers": 1, "load": 60}})
 
     def test_long_scenario_collection_is_a_one_day_multi_fault(self):
         root = Path(__file__).resolve().parents[1]

@@ -1,7 +1,7 @@
 # Scenario ground-truth and penalty policy
 
-This policy governs the 50 scenario-specific files under `ground_truth/` and
-`penalties/`. The 46 active Online Boutique and TeaStore ground truths describe
+This policy governs the 51 scenario-specific files under `ground_truth/` and
+`penalties/`. The 47 active Online Boutique, TeaStore, and Sock Shop ground truths describe
 only the production-observable incident condition, target, affected scope,
 evidence, operational impact, and safe response. Application manifests and
 profiles define service topology, resources, replica constraints, and

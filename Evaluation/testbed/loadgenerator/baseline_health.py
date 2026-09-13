@@ -1,4 +1,4 @@
-"""Fail closed on missing, stale, or unhealthy TeaStore baseline traffic."""
+"""Fail closed on missing, stale, or unhealthy application baseline traffic."""
 
 import csv
 import math

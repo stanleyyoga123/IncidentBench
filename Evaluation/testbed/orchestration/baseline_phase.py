@@ -45,7 +45,7 @@ class BaselinePhase(PhaseSupport):
             message += " before agents start"
         self.log(message)
         self.wait_until(context.config.baseline_seconds, started_at)
-        if context.config.application == "teastore":
+        if context.config.application in {"teastore", "sock-shop"}:
             health = assess_baseline(
                 context.config.output_dir / "loadgenerator"
                 / f"{context.config.loadgenerator}_stats_history.csv",
@@ -56,6 +56,9 @@ class BaselinePhase(PhaseSupport):
                 health["errors"].append("load generator exited before baseline validation")
             context.metadata["baseline_health"] = health
             if not health["passed"]:
-                self.log("TeaStore baseline rejected: " + "; ".join(health["errors"]))
+                self.log(
+                    f"{context.config.application} baseline rejected: "
+                    + "; ".join(health["errors"])
+                )
                 return self.record(context, PhaseResult.failure(self.name, health=health))
         return self.record(context, PhaseResult.success(self.name))

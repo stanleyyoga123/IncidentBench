@@ -64,6 +64,7 @@ def _scenario_catalog() -> dict[str, dict]:
     for folder in (
         "online-boutique-scenario",
         "teastore-scenario",
+        "sock-shop-scenario",
         "e2e-smoke",
         "long-scenario",
     ):
@@ -75,7 +76,7 @@ def _scenario_catalog() -> dict[str, dict]:
 
 def _active_scenario_catalog() -> dict[str, dict]:
     scenarios = {}
-    for folder in ("online-boutique-scenario", "teastore-scenario"):
+    for folder in ("online-boutique-scenario", "teastore-scenario", "sock-shop-scenario"):
         for path in sorted((EVALUATION_ROOT / "collections" / folder).glob("*.json")):
             payload = json.loads(path.read_text(encoding="utf-8"))
             scenarios[payload["name"]] = payload
@@ -299,10 +300,10 @@ def _write_metrics(run: Path) -> None:
         _write_json(run / "metrics" / f"{metric}.json", payload)
 
 
-def test_all_50_scenarios_have_valid_ground_truth() -> None:
+def test_all_51_scenarios_have_valid_ground_truth() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     scenarios = _scenario_catalog()
-    assert len(scenarios) == 50
+    assert len(scenarios) == 51
     assert set(scenarios) == set(truth)
     assert all(truth[name]["rca"] and truth[name]["remediation"] for name in scenarios)
 
@@ -310,7 +311,7 @@ def test_all_50_scenarios_have_valid_ground_truth() -> None:
 def test_ground_truth_policy_and_targets_match_scenarios() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     scenarios = _active_scenario_catalog()
-    assert len(scenarios) == 46
+    assert len(scenarios) == 47
     assert set(_scenario_catalog()) - set(scenarios) == EXCLUDED_PAPER_SCENARIOS
     for name, scenario in scenarios.items():
         entry = truth[name]

@@ -366,7 +366,7 @@ def calculate_evaluation(
     grades_path: Path,
     *,
     score_threshold: float = 0.75,
-    planned_scenarios: int = 46,
+    planned_scenarios: int = 47,
     confidence_level: float = 0.95,
     bootstrap_samples: int = 10_000,
     random_seed: int = 20260905,

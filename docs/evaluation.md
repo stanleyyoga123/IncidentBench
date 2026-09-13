@@ -3,8 +3,8 @@
 ## Goal
 
 Evaluation measures the end-to-end effect of detection, RCA, and remediation
-under repeatable application workloads and controlled faults. Online Boutique
-and TeaStore are the supported systems. Evaluation captures raw
+under repeatable application workloads and controlled faults. Online Boutique,
+TeaStore, and Sock Shop are the supported systems. Evaluation captures raw
 evidence for later analysis; it does not declare success solely because an agent
 produced a remediation message.
 
@@ -32,8 +32,9 @@ selected application profile; batch runs normally use its in-cluster service.
 
 Each scenario contains an `application` and a `placement`. Online Boutique
 placements are Kustomize overlays under
-`applications/online-boutique/kustomize`. TeaStore placements are ClusterIP
-Kustomize overlays under `applications/teastore/kustomize`. The Online Boutique profile
+`applications/online-boutique/kustomize`. TeaStore and Sock Shop placements are
+Kustomize overlays under `applications/teastore/kustomize` and
+`applications/sock-shop/kustomize`. The Online Boutique profile
 must cover all 11 application Deployments, preserve `role=services`, and define
 one soft hostname topology-spread constraint per Deployment. Required hostname
 affinity is forbidden. The canonical profile uses `maxSkew: 1` and
@@ -41,6 +42,10 @@ affinity is forbidden. The canonical profile uses `maxSkew: 1` and
 six, and configures matching HPA minima with a maximum of 30. TeaStore uses
 the same scheduling contract for seven Deployments: `teastore-webui` starts at
 six replicas, `teastore-db` at one, and the remaining services at two.
+Sock Shop covers all 14 upstream Deployments. Stateful data and coordination
+services remain singletons, stateless APIs start at two replicas, `front-end`
+starts at six, and only the fault-targeted `catalogue` service receives a
+rate-limited, bounded HPA.
 
 The runner archives the selected definition and exact rendered or live workload
 manifest, then verifies Ready pod placement and records a fingerprint.
@@ -51,6 +56,12 @@ Scenarios refer to complete YAML files under `collections/chaos` by filename
 stem. Multiple references in one step begin together. The catalog contains the
 node CPU, delay, loss, and pod CPU Schedules used by
 `collections/online-boutique-scenario` and `collections/teastore-scenario`.
+
+The Sock Shop collection adds one exact ten-minute scenario: five minutes of
+recurring service-wide `catalogue` CPU pressure and five minutes of recovery.
+Its baseline and setup occur before this scenario window.
+Use at least a six-minute Sock Shop baseline so sampled history spans the
+admission gate's complete 300-second window.
 
 Each application collection contains 23 one-hour faults with a 10-minute
 recovery step: node delay/loss/CPU/memory incidents plus service-wide CPU,
@@ -70,8 +81,8 @@ worker-5 isolation delay. `collections/chaos` is the shared Schedule catalog.
   namespace through the application installer, and wipes agent workflow
   tables. It reapplies MCPTools' namespace-scoped remediation RoleBinding
   after recreating the namespace. Sibling applications must not remain on
-  service nodes; their CPU requests would make canonical TeaStore or Online
-  Boutique rollouts unschedulable.
+  service nodes; their CPU requests would make canonical TeaStore, Online
+  Boutique, or Sock Shop rollouts unschedulable.
 - Application reset uncordons only placement-referenced nodes; it does not
   change labels, taints, or tolerations. Prerun namespace recreation reapplies
   the canonical replica counts and HPAs.
@@ -97,8 +108,8 @@ cd Evaluation
 ./run_all.sh
 ```
 
-`run_all.sh` runs the Online Boutique collection, then the TeaStore collection,
-once with agents and constant load, then runs each long scenario once with
+`run_all.sh` runs the Online Boutique, TeaStore, and Sock Shop collections once
+with agents and constant load, then runs each long scenario once with
 agents and the daily load generator. It uses
 the same cleanup, result upload, baseline, and inter-run settings as
 `run_single.sh`, and stops before the next batch if a failure is reported.

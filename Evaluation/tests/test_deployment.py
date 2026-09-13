@@ -48,6 +48,7 @@ def test_evaluation_owns_runner_secrets_playbook_and_deploy_script():
     assert env["INFRASTRUCTURE_ROOT"] == "/infrastructure"
     assert env["ONLINE_BOUTIQUE_ROOT"] == "/app/applications/online-boutique"
     assert env["TEASTORE_ROOT"] == "/app/applications/teastore"
+    assert env["SOCK_SHOP_ROOT"] == "/app/applications/sock-shop"
     assert "TRAIN_TICKET_ROOT" not in env
     assert env["CHAOS_NODE_SSH_USER"] == "chaos-cleaner"
     assert env["CHAOS_NODE_SSH_IDENTITY_FILE"] == (

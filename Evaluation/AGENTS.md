@@ -1,6 +1,6 @@
 This project evaluates the Anomaly Detection and Kubernetes RCA & Remediation
 Agent against microservice systems. Application profiles currently cover
-Online Boutique and TeaStore.
+Online Boutique, TeaStore, and Sock Shop.
 
 The runner is collection-driven:
 
@@ -10,12 +10,13 @@ The runner is collection-driven:
   Boutique base, components, and pre-authored placement overlays.
 - `applications/teastore/kustomize/` contains the TeaStore ClusterIP base and
   placement overlays.
-- `applications/online_boutique.py` and `applications/teastore.py` own the
-  application-specific Locust journeys; reusable traffic shapes stay under
-  `testbed/loadgenerator/`.
+- `applications/online_boutique.py`, `applications/teastore.py`, and
+  `applications/sock_shop.py` own the application-specific Locust journeys;
+  reusable traffic shapes stay under `testbed/loadgenerator/`.
 - `collections/online-boutique-scenario/` contains Online Boutique node and
   service incidents.
 - `collections/teastore-scenario/` contains the matching TeaStore incidents.
+- `collections/sock-shop-scenario/` contains the ten-minute Sock Shop incident.
 - `collections/e2e-smoke/` contains short smoke scenarios for both applications.
 - `collections/long-scenario/` contains one 24-hour multi-fault scenario.
 - `applications/*/profile.yaml` owns installer, source, namespace, endpoint,
@@ -28,11 +29,12 @@ Example commands:
 ```bash
 ./run.sh --loadgenerator constant --scenario ./collections/online-boutique-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
 ./run.sh --loadgenerator constant --scenario ./collections/teastore-scenario/01-node-delay-worker-3.json --baseline-minutes 5 --prometheus-url http://localhost:9090
+./run.sh --loadgenerator constant --scenario ./collections/sock-shop-scenario/01-pod-catalogue-cpu-all-ten-minutes.json --baseline-minutes 6 --prometheus-url http://localhost:9090
 ./run.sh --loadgenerator daily --scenario ./collections/long-scenario/01-multi-fault-one-day.json
 ./run_all.sh
 ```
 
-`run_all.sh` runs the Online Boutique collection, then the TeaStore collection,
+`run_all.sh` runs the Online Boutique, TeaStore, and Sock Shop collections
 through `run_single.sh` with constant load, followed by the long-scenario
 collection with daily load.
 It stops if either batch fails. `run_single.sh` accepts an optional explicit
@@ -132,6 +134,12 @@ replicas, `teastore-db` and `teastore-registry` at one replica, and the
 remaining services at two. `teastore-db` has no HPA because the bundled MySQL
 image is not clustered. `teastore-registry` has no HPA because its catalog is
 in-memory and extra replicas do not share registrations.
+Sock Shop covers all 14 Deployments. The seven stateful or coordination
+Deployments remain singletons, the stateless APIs start at two replicas, and
+`front-end` starts at six. Only the fault-targeted `catalogue` Deployment has a
+rate-limited HPA (minimum 2, maximum 6); the other replicas stay fixed to avoid
+JVM cold-start scaling. Use at least a six-minute baseline for Sock Shop so the
+Locust CSV sample span satisfies the 300-second admission window.
 The runner explicitly uncordons referenced nodes to clear scheduling state left
 by earlier remediation, but does not modify labels, taints, tolerations,
 replica counts, or HPAs. After prerun recreates the namespace, a referenced

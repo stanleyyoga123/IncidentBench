@@ -1,6 +1,6 @@
 # Multi-application Kubernetes Chaos Evaluation
 
-Run scenario-driven evaluations against Online Boutique or TeaStore using
+Run scenario-driven evaluations against Online Boutique, TeaStore, or Sock Shop using
 predefined Chaos Mesh Schedules. Each scenario selects an application profile;
 the profile owns installation, runtime defaults, placement discovery, and its
 Locust user journey.
@@ -24,6 +24,7 @@ collections/
 ├── chaos/                       # Complete Schedule YAML resources
 ├── online-boutique-scenario/    # Online Boutique node and service incidents
 ├── teastore-scenario/           # Matching TeaStore incidents
+├── sock-shop-scenario/          # Ten-minute Sock Shop catalogue CPU incident
 ├── e2e-smoke/                   # Short smoke scenarios for both applications
 └── long-scenario/               # One 24-hour multi-fault day
 ```
@@ -31,9 +32,11 @@ collections/
 All application-owned definitions and deployment inputs live under
 `applications/<application>/`. Online Boutique's complete Kustomize tree is
 under `applications/online-boutique/kustomize`. TeaStore's ClusterIP Kustomize
-tree is under `applications/teastore/kustomize`.
+tree is under `applications/teastore/kustomize`. Sock Shop's bounded-resource
+Kustomize tree is under `applications/sock-shop/kustomize`.
 The corresponding Locust journeys are `applications/online_boutique.py` and
-`applications/teastore.py`; `testbed/loadgenerator/` contains only reusable
+`applications/teastore.py`, and `applications/sock_shop.py`;
+`testbed/loadgenerator/` contains only reusable
 traffic shapes and launch mechanics.
 The runner archives the selected placement and verifies the live pod-to-node
 mapping before baseline collection. Runs with different placement-definition
@@ -111,6 +114,15 @@ Run a short TeaStore smoke:
   --baseline-minutes 5
 ```
 
+Run the ten-minute Sock Shop catalogue CPU scenario after a six-minute
+baseline (installation and the 60-second warm-up are additional setup time):
+
+```bash
+./run.sh --loadgenerator constant \
+  --scenario ./collections/sock-shop-scenario/01-pod-catalogue-cpu-all-ten-minutes.json \
+  --baseline-minutes 6
+```
+
 Run the 24-hour compounding-incident day with the daily traffic curve:
 
 ```bash
@@ -122,8 +134,8 @@ Times in that scenario are on the daily load clock (locust start = 00:00). A
 02:00–04:00.
 
 Traffic shapes and application behavior are separate. The reusable shapes are
-`constant`, `burst`, `sinus`, and `daily`; Online Boutique and TeaStore user
-journeys live under `applications/`. Edit the stage table
+`constant`, `burst`, `sinus`, and `daily`; Online Boutique, TeaStore, and Sock
+Shop user journeys live under `applications/`. Edit the stage table
 in `testbed/loadgenerator/daily.py`. Each stage's
 `percentage_users` is a percent of `DAILY_BASE_USERS` (or `DAILY_BASE_USER`);
 20 with a base of 600 is 120 users.

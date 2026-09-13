@@ -15,10 +15,16 @@ echo "Running Online Boutique scenarios with the constant load generator"
     constant
 
 echo
+echo "Running Sock Shop scenarios with the constant load generator"
+BASELINE_MINUTES="${SOCK_SHOP_BASELINE_MINUTES:-6}" "$RUN_SINGLE_SCRIPT" \
+    "$SCRIPT_DIR/collections/sock-shop-scenario" \
+    constant
+
+echo
 echo "Running long scenarios with the daily load generator"
 "$RUN_SINGLE_SCRIPT" \
     "$SCRIPT_DIR/collections/long-scenario" \
     daily
 
 echo
-echo "Completed Online Boutique, TeaStore, and long scenarios."
+echo "Completed Online Boutique, TeaStore, Sock Shop, and long scenarios."

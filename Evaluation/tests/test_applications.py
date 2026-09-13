@@ -70,9 +70,9 @@ def _script_profile(tmp: Path, required_files=("chart/Chart.yaml",)) -> Applicat
     )
 
 
-def test_application_catalog_exposes_online_boutique_and_teastore():
+def test_application_catalog_exposes_all_supported_applications():
     catalog = ApplicationCatalog(ROOT / "applications", WORKSPACE)
-    assert catalog.references == ("online-boutique", "teastore")
+    assert catalog.references == ("online-boutique", "sock-shop", "teastore")
     boutique = catalog.resolve("online-boutique")
     assert boutique.installer.type == "kustomize"
     assert boutique.installer.source_root(WORKSPACE) == (
@@ -89,6 +89,66 @@ def test_application_catalog_exposes_online_boutique_and_teastore():
     assert teastore.installer.source_root(WORKSPACE) == (
         ROOT / "applications" / "teastore"
     )
+    sock_shop = catalog.resolve("sock-shop")
+    assert sock_shop.namespace == "sock-shop"
+    assert sock_shop.port_forward_service == "front-end"
+    assert sock_shop.loadgenerator_module == "applications.sock_shop"
+    assert sock_shop.startup_delay_seconds == 60
+    assert sock_shop.installer.source_root(WORKSPACE) == (
+        ROOT / "applications" / "sock-shop"
+    )
+
+
+def test_sock_shop_has_bounded_resources_replicas_and_hpas():
+    from testbed.command.command_runner import CommandRunner
+    from testbed.placement import PlacementRenderer
+
+    catalog = ApplicationCatalog(ROOT / "applications", WORKSPACE)
+    profile = catalog.resolve("sock-shop")
+    overlay = (
+        ROOT / "applications" / "sock-shop" / "kustomize" / "overlays"
+        / "canonical-six-node"
+    )
+    placement = PlacementRenderer(
+        CommandRunner(), ROOT, application_profile=profile
+    ).render("canonical-six-node", overlay)
+    documents = [
+        document
+        for document in yaml.safe_load_all(placement.rendered_manifest)
+        if document
+    ]
+    deployments = {
+        document["metadata"]["name"]: document
+        for document in documents
+        if document.get("kind") == "Deployment"
+    }
+    assert set(deployments) == set(profile.placement.workload_names)
+    singleton = {
+        "carts-db", "catalogue-db", "orders-db", "queue-master",
+        "rabbitmq", "session-db", "user-db",
+    }
+    for name, deployment in deployments.items():
+        expected = 6 if name == "front-end" else 1 if name in singleton else 2
+        assert deployment["spec"]["replicas"] == expected
+        pod = deployment["spec"]["template"]
+        assert pod["metadata"]["labels"]["app"] == name
+        assert pod["spec"]["nodeSelector"] == {"role": "services"}
+        for container in pod["spec"]["containers"]:
+            resources = container["resources"]
+            assert set(resources) == {"requests", "limits"}
+            assert set(resources["requests"]) == {"cpu", "memory"}
+            assert set(resources["limits"]) == {"cpu", "memory"}
+    hpas = {
+        document["spec"]["scaleTargetRef"]["name"]: document
+        for document in documents
+        if document.get("kind") == "HorizontalPodAutoscaler"
+    }
+    assert set(hpas) == {"catalogue"}
+    assert hpas["catalogue"]["spec"]["minReplicas"] == 2
+    assert hpas["catalogue"]["spec"]["maxReplicas"] == 6
+    assert hpas["catalogue"]["spec"]["behavior"]["scaleUp"][
+        "stabilizationWindowSeconds"
+    ] == 60
 
 
 def test_teastore_uses_clusterip_and_unique_app_labels():
@@ -313,8 +373,9 @@ def test_kustomize_installs_the_scenario_selected_overlay():
 
 def test_catalog_other_namespaces_excludes_the_selected_application():
     catalog = ApplicationCatalog(ROOT / "applications", WORKSPACE)
-    assert catalog.other_namespaces("teastore") == ("online-boutique",)
-    assert catalog.other_namespaces("online-boutique") == ("teastore",)
+    assert catalog.other_namespaces("teastore") == ("online-boutique", "sock-shop")
+    assert catalog.other_namespaces("online-boutique") == ("sock-shop", "teastore")
+    assert catalog.other_namespaces("sock-shop") == ("online-boutique", "teastore")
 
 
 def test_kustomize_install_deletes_sibling_application_namespaces_first():

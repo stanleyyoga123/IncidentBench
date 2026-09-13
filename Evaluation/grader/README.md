@@ -5,7 +5,7 @@ inspect agent reasoning or tool calls, or contact a Kubernetes cluster.
 
 See [scenario-policy.md](scenario-policy.md) for the audited fault-family
 expectations, partial-credit rules, universal simulation exclusions, and
-penalty weights applied across all 50 scenarios.
+penalty weights applied across all 51 scenarios.
 
 ## Run it
 

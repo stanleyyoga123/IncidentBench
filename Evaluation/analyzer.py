@@ -14,7 +14,11 @@ from statistics import NormalDist
 from typing import Iterable
 
 
-DATASETS = {"TeaStore": "teastore-1", "Online Boutique": "online-boutique-1"}
+DATASETS = {
+    "TeaStore": "teastore-1",
+    "Online Boutique": "online-boutique-1",
+    "Sock Shop": "sock-shop-1",
+}
 RCA_DIMENSIONS = (
     "root_cause_correctness",
     "causal_reasoning_quality",
@@ -84,6 +88,8 @@ def application_label(reference: object) -> str:
         return "TeaStore"
     if normalized == "online-boutique":
         return "Online Boutique"
+    if normalized == "sock-shop":
+        return "Sock Shop"
     return str(reference or "Unknown")
 
 

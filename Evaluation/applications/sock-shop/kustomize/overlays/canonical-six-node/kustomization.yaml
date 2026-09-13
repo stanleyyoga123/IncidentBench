@@ -1,0 +1,260 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: sock-shop
+resources:
+  - ../../base
+  - hpa.yaml
+images:
+  - name: mongo
+    newTag: "3.4"
+  - name: redis
+    newTag: "4.0-alpine"
+  - name: kbudde/rabbitmq-exporter
+    newTag: v0.29.0
+patches:
+  - path: node-placement.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+  - path: runtime-carts-db.yaml
+  - path: runtime-catalogue-db.yaml
+  - path: runtime-orders-db.yaml
+  - path: runtime-rabbitmq.yaml
+  - path: runtime-session-db.yaml
+  - path: runtime-user-db.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: carts-db
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: catalogue-db
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: front-end
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 6
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: orders-db
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: queue-master
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: rabbitmq
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: session-db
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: user-db
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+replacements:
+  - source:
+      kind: Deployment
+      name: carts
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: carts
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: carts-db
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: carts-db
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: catalogue
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: catalogue
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: catalogue-db
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: catalogue-db
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: front-end
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: front-end
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: orders
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: orders
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: orders-db
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: orders-db
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: payment
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: payment
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: queue-master
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: queue-master
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: rabbitmq
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: rabbitmq
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: session-db
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: session-db
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: shipping
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: shipping
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: user
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: user
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app
+  - source:
+      kind: Deployment
+      name: user-db
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+          name: user-db
+        fieldPaths:
+          - spec.template.metadata.labels.app
+          - spec.template.spec.topologySpreadConstraints.0.labelSelector.matchLabels.app

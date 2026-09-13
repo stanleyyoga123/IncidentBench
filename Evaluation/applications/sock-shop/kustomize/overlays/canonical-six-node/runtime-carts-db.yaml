@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carts-db
+  namespace: sock-shop
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: carts-db
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 768Mi}
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+            - name: data
+              mountPath: /data/db
+      volumes:
+        - name: tmp-volume
+          emptyDir: {medium: Memory, sizeLimit: 64Mi}
+        - name: data
+          emptyDir: {sizeLimit: 1Gi}

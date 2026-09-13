@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: sock-shop-catalogue-cpu
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+        - sock-shop
+      podPhaseSelectors:
+        - Running
+      expressionSelectors:
+        - key: app
+          operator: In
+          values:
+            - catalogue
+    stressors:
+      cpu:
+        workers: 1
+        # The 60% worker exceeds the 200m catalogue limit without consuming memory.
+        load: 60
+    duration: 25s

@@ -1,8 +1,8 @@
 # Paper evaluation plan
 
-This plan defines the two headline numbers used to summarize the 46 currently
-planned evaluation scenarios: 23 Online Boutique scenarios and 23 TeaStore
-scenarios. The scenario catalogue is documented in
+This plan defines the two headline numbers used to summarize the 47 currently
+planned evaluation scenarios: 23 Online Boutique scenarios, 23 TeaStore
+scenarios, and one Sock Shop scenario. The scenario catalogue is documented in
 [`scenario.md`](scenario.md).
 
 The calculations are implemented in
@@ -123,10 +123,10 @@ more attempts has an unfairly higher chance of eventually passing.
 Always publish the evaluated coverage beside the two headline rates:
 
 ```text
-Scenario coverage = evaluated scenarios / 46 planned scenarios
+Scenario coverage = evaluated scenarios / 47 planned scenarios
 ```
 
-Do not describe a result as covering all scenarios until all 46 have an
+Do not describe a result as covering all scenarios until all 47 have an
 evaluable run. RCA and remediation can have different evaluable denominators,
 so state each denominator explicitly.
 
@@ -191,7 +191,7 @@ Use a compact headline table such as:
 Immediately below it, report:
 
 ```text
-Coverage: evaluated scenarios / 46 planned scenarios
+Coverage: evaluated scenarios / 47 planned scenarios
 RCA efficiency: median attempts and median time to first qualifying RCA
 Recovery efficiency: median attempts and median time to first qualifying remediation
 Safety: scenarios with an applied penalty / remediation-evaluable scenarios

@@ -1,11 +1,13 @@
 # Collection-Driven Evaluation Architecture
 
 The runner consumes scenario JSON from `collections/online-boutique-scenario`,
-`collections/teastore-scenario`, or `collections/long-scenario`, complete Chaos Mesh
+`collections/teastore-scenario`, `collections/sock-shop-scenario`, or
+`collections/long-scenario`, complete Chaos Mesh
 `Schedule` resources from `collections/chaos`, and application-owned deployment
 and placement inputs from `applications/`. Online Boutique's Kustomize tree is
 under `applications/online-boutique/kustomize`. TeaStore's ClusterIP tree is
-under `applications/teastore/kustomize`. The runner never renders a
+under `applications/teastore/kustomize`. Sock Shop's bounded-resource tree is
+under `applications/sock-shop/kustomize`. The runner never renders a
 chaos resource or monitors recurrence children in Python.
 
 The root runner establishes exclusive ownership of agent lifecycle before
@@ -64,6 +66,14 @@ workloads spike during JVM warmup. Auth and recommender request 250m CPU and
 1Gi. Registry and MySQL request 250m CPU and 512Mi. These sizes were measured
 against live traffic so six web UI pods plus Istio sidecars still fit on the
 2-core service nodes without HPA scale-out during a 10-user baseline.
+
+Sock Shop's canonical overlay covers its 14 Deployments. The seven stateful or
+coordination workloads stay at one replica, stateless APIs start at two, and
+`front-end` starts at six. Only `catalogue` has an HPA, rate-limited and
+bounded at six, so unrelated JVM cold starts cannot amplify baseline resource
+use. Previously
+unbounded upstream database, broker, exporter, and session containers receive
+explicit CPU and memory requests and limits plus bounded ephemeral storage.
 
 The `role: services` selector defines eligibility. The spread rule asks the
 scheduler to balance matching replicas across hostnames but deliberately does

@@ -1,0 +1,16 @@
+- op: replace
+  path: /spec/template/spec/nodeSelector
+  value:
+    role: services
+- op: add
+  path: /spec/template/metadata/labels/app
+  value: placeholder
+- op: add
+  path: /spec/template/spec/topologySpreadConstraints
+  value:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: placeholder

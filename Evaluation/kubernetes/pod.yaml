@@ -48,6 +48,8 @@ spec:
           value: /app/applications/online-boutique
         - name: TEASTORE_ROOT
           value: /app/applications/teastore
+        - name: SOCK_SHOP_ROOT
+          value: /app/applications/sock-shop
         - name: CHAOS_NODE_INVENTORY
           value: /infrastructure/ansible/inventory.ini
         - name: CHAOS_NODE_SSH_USER

@@ -1,8 +1,8 @@
 # Evaluation scenarios
 
-This document summarizes the 46 currently planned scenarios in
-`Evaluation/collections`: 23 Online Boutique scenarios and 23 TeaStore
-scenarios. The collection JSON and referenced Chaos Mesh manifests remain
+This document summarizes the 47 currently planned scenarios in
+`Evaluation/collections`: 23 Online Boutique scenarios, 23 TeaStore scenarios,
+and one Sock Shop scenario. The collection JSON and referenced Chaos Mesh manifests remain
 evaluator-only inputs for exact execution timing and reproducibility; the
 catalogue below describes only the production-observable incident condition.
 The remediation descriptions match the grader ground-truth policy in
@@ -91,6 +91,16 @@ not only pod health. `redis-cart` remediation must preserve cart state.
 TeaStore registry scenarios must preserve its single non-shared in-memory
 registry. Horizontal registry scaling can split service-discovery state.
 Database remediation must preserve database state and remain vertical-only.
+
+## Sock Shop scenario
+
+| # | Scenario | Fault type | Target | Remediation type |
+| ---: | --- | --- | --- | --- |
+| 1 | `sock-shop-pod-catalogue-cpu-all-ten-minutes` | Service-wide pod CPU pressure | `catalogue` | Service CPU capacity |
+
+The Sock Shop scenario window is exactly 600 seconds: 300 seconds of recurring
+CPU pressure followed by 300 seconds of recovery. Setup, the 60-second
+application warm-up, and baseline collection happen before this window.
 
 ## Recovery checks
 
