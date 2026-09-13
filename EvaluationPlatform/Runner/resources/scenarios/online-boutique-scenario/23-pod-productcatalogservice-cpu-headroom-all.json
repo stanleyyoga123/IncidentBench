@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "real-pod-productcatalogservice-cpu-headroom-all-one-hour",
+  "application": "online-boutique",
+  "placement": "cpu-constrained-six-node",
+  "steps": [
+    {
+      "name": "01-productcatalogservice-cpu-headroom-exhaustion-all",
+      "chaos": [
+        "single-productcatalogservice-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "load": {
+    "type": "constant"
+  },
+  "timing": {
+    "baseline_seconds": 3600,
+    "grace_seconds": 60
+  },
+  "integration": "bundled",
+  "agents_enabled": true,
+  "deployments": [
+    {
+      "namespace": "agents",
+      "name": "anomaly-detector",
+      "replicas": 1
+    },
+    {
+      "namespace": "agents",
+      "name": "learning-agent",
+      "replicas": 1
+    },
+    {
+      "namespace": "agents",
+      "name": "rca-agent",
+      "replicas": 1
+    },
+    {
+      "namespace": "agents",
+      "name": "remediator-agent",
+      "replicas": 1
+    },
+    {
+      "namespace": "agents",
+      "name": "mcp-tools-investigation",
+      "replicas": 1
+    },
+    {
+      "namespace": "agents",
+      "name": "mcp-tools-remediation",
+      "replicas": 1
+    }
+  ],
+  "prerun": [
+    "reset-solution",
+    "install-application",
+    "grant-remediation"
+  ],
+  "postrun": [
+    "export-sessions",
+    "upload"
+  ]
+}

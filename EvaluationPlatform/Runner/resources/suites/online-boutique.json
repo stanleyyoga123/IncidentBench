@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "name": "online-boutique",
+  "inter_run_seconds": 60,
+  "runs": [
+    {
+      "scenario": "../scenarios/online-boutique-scenario/01-node-delay-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/02-node-delay-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/03-node-delay-worker-5.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/04-node-loss-worker-1.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/05-node-loss-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/06-node-loss-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/07-pod-cartservice-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/08-pod-checkoutservice-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/09-pod-recommendationservice-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/10-pod-productcatalogservice-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/11-pod-paymentservice-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/12-node-cpu-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/13-node-memory-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/14-pod-adservice-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/15-pod-checkoutservice-capacity-loss-one.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/16-pod-productcatalogservice-bandwidth-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/17-pod-redis-cart-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/18-pod-currencyservice-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/19-pod-shippingservice-bandwidth-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/20-pod-paymentservice-capacity-loss-one.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/21-pod-emailservice-cpu-headroom-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/22-pod-checkoutservice-cpu-headroom-all.json"
+    },
+    {
+      "scenario": "../scenarios/online-boutique-scenario/23-pod-productcatalogservice-cpu-headroom-all.json"
+    }
+  ]
+}

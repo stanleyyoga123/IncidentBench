@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-pod-catalogue-cpu-all-ten-minutes",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-catalogue-cpu",
+      "chaos": [
+        "sock-shop-catalogue-cpu"
+      ],
+      "duration": 300
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 300
+    }
+  ],
+  "timing": {
+    "baseline_seconds": 360
+  }
+}

@@ -56,3 +56,13 @@ token, RCA/investigation MCP, and remediator/remediation MCP. The two MCP
 tokens and AgentOrchestrator's control token remain distinct. DatabaseJob
 separately owns the PostgreSQL identity used to construct AgentOrchestrator's
 `DATABASE_DSN`. RCAAgent, RemediatorAgent, and LearningAgent have no database credentials.
+
+## Evaluation interface
+
+Versioned scenario/global/suite JSON resolves experiment behavior; environment JSON
+contains endpoints and token-variable names. The shell-hook context contains the
+resolved scenario, run ID, scenario path and non-secret environment configuration.
+`evaluation_control` persists serial ownership, maintenance, and reset idempotency.
+[Evaluation API](../EvaluationPlatform/Orchestrator/docs/evaluation-api.md) documents
+authentication, transitions and the version-1 export envelope. Existing session
+arrays and metadata version 2 remain compatible with the offline grader.

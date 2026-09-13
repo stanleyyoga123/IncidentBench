@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "teastore-healthy-baseline",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "observe-without-chaos",
+      "chaos": [],
+      "duration": 600
+    }
+  ],
+  "load": {
+    "type": "constant",
+    "parameters": {
+      "users": 10,
+      "bias_users": 0,
+      "spawn_rate": 2
+    }
+  },
+  "timing": {
+    "baseline_seconds": 600
+  },
+  "agents_enabled": false
+}

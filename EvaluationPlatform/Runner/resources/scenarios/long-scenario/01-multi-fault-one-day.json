@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "long-multi-fault-one-day",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-idle-until-02-00",
+      "chaos": [],
+      "duration": 3600
+    },
+    {
+      "name": "02-worker-node-3-isolation-delay",
+      "chaos": [
+        "node-delay-worker-3",
+        "node-delay-peers-to-worker-3"
+      ],
+      "duration": 7200
+    },
+    {
+      "name": "03-idle-until-07-00",
+      "chaos": [],
+      "duration": 10800
+    },
+    {
+      "name": "04-worker-node-3-loss",
+      "chaos": [
+        "node-loss-worker-3"
+      ],
+      "duration": 1800
+    },
+    {
+      "name": "05-idle-until-14-00",
+      "chaos": [],
+      "duration": 23400
+    },
+    {
+      "name": "06-productcatalogservice-cpu-all",
+      "chaos": [
+        "single-productcatalogservice-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "07-idle-until-20-00",
+      "chaos": [],
+      "duration": 18000
+    },
+    {
+      "name": "08-worker-node-5-isolation-delay",
+      "chaos": [
+        "node-delay-worker-5",
+        "node-delay-peers-to-worker-5"
+      ],
+      "duration": 7200
+    },
+    {
+      "name": "09-idle-until-24-00",
+      "chaos": [],
+      "duration": 7200
+    }
+  ],
+  "load": {
+    "type": "daily"
+  }
+}

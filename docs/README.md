@@ -15,17 +15,17 @@ Read in this order:
 6. [Infrastructure](infrastructure.md)
 7. [Operations and rollout](operations.md)
 8. [Evaluation](evaluation.md)
-9. [Detector adaptation API](../AnomalyDetector/docs/agent-api.md)
+9. [Detector adaptation API](../Agents/AnomalyDetector/docs/agent-api.md)
 
 Detailed component internals:
 
-- [AgentOrchestrator flow](../AgentOrchestrator/docs/architecture-and-flow.md)
-- [AnomalyDetector flow](../AnomalyDetector/docs/architecture-and-flow.md)
-- [RCAAgent flow](../RCAAgent/docs/architecture-and-flow.md)
-- [RemediatorAgent flow](../RemediatorAgent/docs/architecture-and-flow.md)
-- [LearningAgent flow](../LearningAgent/docs/architecture-and-flow.md)
-- [MCPTools flow](../MCPTools/docs/architecture-and-flow.md)
-- [DatabaseJob schema and migration flow](../DatabaseJob/docs/architecture-and-flow.md)
+- [AgentOrchestrator flow](../EvaluationPlatform/Orchestrator/docs/architecture-and-flow.md)
+- [AnomalyDetector flow](../Agents/AnomalyDetector/docs/architecture-and-flow.md)
+- [RCAAgent flow](../Agents/RCAAgent/docs/architecture-and-flow.md)
+- [RemediatorAgent flow](../Agents/RemediatorAgent/docs/architecture-and-flow.md)
+- [LearningAgent flow](../Agents/LearningAgent/docs/architecture-and-flow.md)
+- [MCPTools flow](../Agents/MCPTools/docs/architecture-and-flow.md)
+- [DatabaseJob schema and migration flow](../EvaluationPlatform/Orchestrator/Database/docs/architecture-and-flow.md)
 
 The legacy KubernetesCloudAgent monolith has been removed. Each component owns
 its Kubernetes resources, placeholder Secret, and deployment. DatabaseJob owns

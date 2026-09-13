@@ -1,0 +1,80 @@
+{
+  "constant": {
+    "users": 50,
+    "bias_users": 3,
+    "spawn_rate": 10,
+    "seed": 1
+  },
+  "burst": {
+    "baseline_users": 300,
+    "peak_users": 1200,
+    "baseline_seconds": 360,
+    "peak_seconds": 240,
+    "spawn_rate": 200,
+    "bias_users": 20,
+    "seed": 1
+  },
+  "sinus": {
+    "min_users": 20,
+    "max_users": 150,
+    "period_seconds": 300,
+    "spawn_rate": 25,
+    "bias_users": 0,
+    "seed": 1
+  },
+  "daily": {
+    "base_users": 600,
+    "stages": [
+      {
+        "duration": 21600,
+        "percentage_users": 20,
+        "spawn_rate": 2
+      },
+      {
+        "duration": 28800,
+        "percentage_users": 40,
+        "spawn_rate": 3
+      },
+      {
+        "duration": 36000,
+        "percentage_users": 80,
+        "spawn_rate": 5
+      },
+      {
+        "duration": 36900,
+        "percentage_users": 200,
+        "spawn_rate": 15
+      },
+      {
+        "duration": 46800,
+        "percentage_users": 75,
+        "spawn_rate": 10
+      },
+      {
+        "duration": 47700,
+        "percentage_users": 250,
+        "spawn_rate": 20
+      },
+      {
+        "duration": 61200,
+        "percentage_users": 90,
+        "spawn_rate": 8
+      },
+      {
+        "duration": 62100,
+        "percentage_users": 150,
+        "spawn_rate": 20
+      },
+      {
+        "duration": 75600,
+        "percentage_users": 60,
+        "spawn_rate": 6
+      },
+      {
+        "duration": 86400,
+        "percentage_users": 25,
+        "spawn_rate": 3
+      }
+    ]
+  }
+}

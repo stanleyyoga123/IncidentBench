@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-  E[Evaluation] --> K[Kubernetes workload and faults]
+  E[EvaluationPlatform Runner] --> K[Kubernetes workload and faults]
   K --> P[Prometheus / Loki / Jaeger]
   P --> D[AnomalyDetector]
   D -->|bearer HTTP batch| O[AgentOrchestrator]
@@ -48,3 +48,8 @@ ConfigMap, placeholder Secret, manifests, and a deploy script that uses
 kubectl's current context. AgentOrchestrator owns the shared ingress
 NetworkPolicy. DatabaseJob owns PostgreSQL and migration resources.
 Infrastructure installs platform tools and namespaces only.
+
+Evaluation reset/export also travels through Orchestrator HTTP APIs. The durable
+`evaluation_control` singleton gates dispatch during maintenance and owns one
+serial run. Database DDL is isolated under Orchestrator/Database. Lifecycle
+integrations and ordered pre/post shell hooks keep the Runner solution-agnostic.

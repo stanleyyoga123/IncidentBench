@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "load": {
+    "type": "constant"
+  },
+  "timing": {
+    "baseline_seconds": 3600,
+    "grace_seconds": 60
+  },
+  "integration": "none",
+  "agents_enabled": false,
+  "deployments": [],
+  "prerun": [
+    "install-application"
+  ],
+  "postrun": [
+    "upload"
+  ]
+}

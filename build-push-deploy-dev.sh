@@ -16,12 +16,12 @@ if (( $# != 0 )); then
 fi
 
 declare -ar COMPONENTS=(
-  "MCPTools"
-  "LearningAgent"
-  "RCAAgent"
-  "RemediatorAgent"
-  "AgentOrchestrator"
-  "AnomalyDetector"
+  "Agents/MCPTools"
+  "Agents/LearningAgent"
+  "Agents/RCAAgent"
+  "Agents/RemediatorAgent"
+  "EvaluationPlatform/Orchestrator"
+  "Agents/AnomalyDetector"
 )
 
 for command in docker kubectl; do

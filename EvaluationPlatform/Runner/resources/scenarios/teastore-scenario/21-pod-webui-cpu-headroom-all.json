@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "teastore-pod-webui-cpu-headroom-all-one-hour",
+  "application": "teastore",
+  "placement": "cpu-constrained-six-node",
+  "steps": [
+    {
+      "name": "01-webui-cpu-headroom-exhaustion-all",
+      "chaos": [
+        "teastore-webui-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

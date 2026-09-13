@@ -1,0 +1,29 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: node-delay-peers-to-worker-5
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PhysicalMachineChaos
+  physicalmachineChaos:
+    action: network-delay
+    mode: all
+    selector:
+      physicalMachines:
+        chaos-mesh:
+        - worker-node-1
+        - worker-node-2
+        - worker-node-3
+        - worker-node-4
+        - worker-node-6
+    network-delay:
+      device: eth0
+      ip-address: ${node_ip:worker-node-5}
+      ip-protocol: all
+      latency: 250ms
+      jitter: 50ms
+      correlation: '25'
+    duration: 25s

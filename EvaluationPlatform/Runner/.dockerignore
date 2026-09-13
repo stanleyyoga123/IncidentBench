@@ -1,0 +1,12 @@
+results/
+backup/
+tmp/
+ansible/
+node-preparation/evaluation-runner-known_hosts
+cloud-data/
+
+config/environment.json
+.env
+.env.*
+.venv/
+__pycache__/

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "name": "sock-shop",
+  "inter_run_seconds": 60,
+  "runs": [
+    {
+      "scenario": "../scenarios/sock-shop-scenario/01-pod-catalogue-cpu-all-ten-minutes.json"
+    }
+  ]
+}

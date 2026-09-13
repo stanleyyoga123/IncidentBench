@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "teastore-pod-db-memory-all-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-db-memory-pressure-all",
+      "chaos": [
+        "teastore-db-memory"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

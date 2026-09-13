@@ -3,12 +3,12 @@ set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 declare -ar COMPONENTS=(
-  "MCPTools"
-  "LearningAgent"
-  "RCAAgent"
-  "RemediatorAgent"
-  "AgentOrchestrator"
-  "AnomalyDetector"
+  "Agents/MCPTools"
+  "Agents/LearningAgent"
+  "Agents/RCAAgent"
+  "Agents/RemediatorAgent"
+  "EvaluationPlatform/Orchestrator"
+  "Agents/AnomalyDetector"
 )
 
 usage() {

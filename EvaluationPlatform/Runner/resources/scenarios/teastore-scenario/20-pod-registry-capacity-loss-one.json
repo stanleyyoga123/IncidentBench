@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "teastore-pod-registry-capacity-loss-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-registry-single-replica-capacity-loss",
+      "chaos": [
+        "teastore-registry-capacity-loss"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

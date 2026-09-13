@@ -5,13 +5,13 @@
 1. Back up anything that must survive. Legacy agent workflow rows are deleted.
 2. Scale the old CloudAgent and AnomalyDetector down.
 3. Install platform prerequisites with Infrastructure `site.yml`.
-4. Copy `DatabaseJob/kubernetes/secret.example.yml` to ignored
+4. Copy `EvaluationPlatform/Orchestrator/Database/kubernetes/secret.example.yml` to ignored
    `kubernetes/secret.yml`, replace every `++++++++` placeholder, and run
-   `ALLOW_AGENT_WORKFLOW_RESET=true ./DatabaseJob/deploy.sh`. Migration
+   `ALLOW_AGENT_WORKFLOW_RESET=true ./EvaluationPlatform/Orchestrator/Database/deploy.sh`. Migration
    Alembic head `20260831_0004` must finish before any service starts.
 5. Copy each component `secret.example.yml` to ignored `secret.yml`, replace
    placeholders while keeping the pairwise token matrix matching, then deploy
-   MCPTools, LearningAgent, RCAAgent/RemediatorAgent, AgentOrchestrator, and
+   MCPTools, LearningAgent, Agents/RCAAgent/RemediatorAgent, AgentOrchestrator, and
    AnomalyDetector in that order. `AGENT_STORE_TOKEN` must match across
    Orchestrator and all three job services.
 6. Verify `/health` for both MCP profiles, all three job services, and the
@@ -24,7 +24,7 @@ For every supported application, keep `collector.metadata.namespaces` in
 AnomalyDetector and `workloads.namespaces` in RCAAgent aligned. MCPTools
 `APPLICATION_NAMESPACES` binds namespaces that already exist during its
 deployment; any installer that deletes and recreates an application namespace
-must then reapply `MCPTools/kubernetes/application-role-binding.yaml` and verify
+must then reapply `Agents/MCPTools/kubernetes/application-role-binding.yaml` and verify
 the remediation service account's intended namespaced permission. Evaluation's
 application installer performs both steps automatically.
 MCPTools does not create or catalog application namespaces. Evaluation creates

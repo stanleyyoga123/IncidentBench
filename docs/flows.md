@@ -56,8 +56,11 @@ idempotency key.
 
 ## Evaluation
 
-Evaluation remains unchanged by LearningAgent in this rollout. It injects
-workload/faults, captures evidence, and finalizes cleanup. Service restart logic remains in
-Evaluation. Evaluation also owns its runner Secret, Ansible role/playbook, and
-deploy script. MCPTools owns the network-probe DaemonSets; Infrastructure owns
-only the prerequisite cluster platform and namespaces.
+The Runner resolves JSON configuration, claims the bundled Orchestrator's evaluation
+ownership and maintenance state, and invokes named pre-run shell hooks. The full
+reset and post-run session export use authenticated Orchestrator APIs. Configured
+worker deployments stop before reset and baseline; Orchestrator remains online.
+After baseline, the integration starts workers and resumes dispatch. Finalization
+stops workers, removes chaos and captures evidence before post-run exports.
+Failures remain recorded and unsafe cleanup prevents subsequent runs. See the
+[Runner interface](../EvaluationPlatform/Runner/README.md).

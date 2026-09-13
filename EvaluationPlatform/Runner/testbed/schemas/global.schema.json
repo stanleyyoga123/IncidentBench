@@ -1,0 +1,164 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "load": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "constant",
+            "burst",
+            "sinus",
+            "daily"
+          ]
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "bias_users": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "spawn_rate": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "baseline_users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "peak_users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "baseline_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "peak_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "period_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "base_users": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "stages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "duration": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "percentage_users": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "spawn_rate": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "duration",
+                  "percentage_users",
+                  "spawn_rate"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "properties": {
+        "baseline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "grace_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "integration": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "agents_enabled": {
+      "type": "boolean"
+    },
+    "deployments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "prerun": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      }
+    },
+    "postrun": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "required": [
+    "schema_version"
+  ]
+}

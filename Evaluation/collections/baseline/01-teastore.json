@@ -1,8 +1,0 @@
-{
-  "name": "teastore-healthy-baseline",
-  "application": "teastore",
-  "placement": "canonical-six-node",
-  "steps": [
-    {"name": "observe-without-chaos", "chaos": [], "duration": 600}
-  ]
-}

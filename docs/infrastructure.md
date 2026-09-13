@@ -1,6 +1,6 @@
 # Infrastructure
 
-`Infrastructure/ansible/site.yml` is the authoritative installation entrypoint.
+`EvaluationPlatform/Initialization/ansible/site.yml` is the authoritative installation entrypoint.
 It provisions k3s/node roles, platform namespaces, observability, Istio,
 Chaos Mesh/chaosd, and the restricted node cleaner. It does not deploy
 PostgreSQL, migrations, agents, network probes, application Secrets, or the
@@ -15,7 +15,7 @@ RBAC, remediation artifact PVC, and overlay/underlay probe DaemonSets.
 Operators preserve this deployment order:
 
 1. run Infrastructure `site.yml` for platform prerequisites;
-2. replace DatabaseJob placeholders and run `DatabaseJob/deploy.sh`, using
+2. replace DatabaseJob placeholders and run `EvaluationPlatform/Orchestrator/Database/deploy.sh`, using
    `ALLOW_AGENT_WORKFLOW_RESET=true` only for the coordinated destructive reset;
 3. replace placeholders and deploy MCPTools;
 4. deploy RCAAgent and RemediatorAgent;
@@ -35,7 +35,7 @@ are pinned to the tested release in `ansible/group_vars/all.yml`; an empty or
 floating Istio version is rejected. Use `playbooks/istio.yml` for an Istio-only
 reconciliation so unrelated platform charts are not upgraded.
 
-After rotating the DatabaseJob password, rerun `DatabaseJob/deploy.sh`.
+After rotating the DatabaseJob password, rerun `EvaluationPlatform/Orchestrator/Database/deploy.sh`.
 PostgreSQL stores its role password in the persistent data volume, so the
 script rolls the StatefulSet and synchronizes that role over its local socket
 before migration.

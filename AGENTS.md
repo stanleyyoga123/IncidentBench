@@ -17,34 +17,33 @@ overrides this file for local implementation details.
 
 ## Service ownership
 
-- `AnomalyDetector/`: Prometheus collection, adaptive statistical detection,
+- `Agents/AnomalyDetector/`: Prometheus collection, adaptive statistical detection,
   deterministic event envelopes, authenticated HTTP delivery, and its
   ConfigMap, Secret, Deployment/Service manifest, and deploy script.
-- `AgentOrchestrator/`: anomaly ingestion, idempotency, workflow state,
+- `EvaluationPlatform/Orchestrator/`: anomaly ingestion, idempotency, workflow state,
   job/slot/audit/artifact DML, batching, reconciliation, automatic remediation
   submission after RCA, decline/retry, downstream submission, and its ConfigMap,
   Secret, NetworkPolicy, Deployment/Service, and deploy script.
-- `RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
+- `Agents/RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
   its ConfigMap, Secret, Deployment/Service, and deploy script.
-- `RemediatorAgent/`: approved asynchronous remediation and verification jobs,
+- `Agents/RemediatorAgent/`: approved asynchronous remediation and verification jobs,
   plus its ConfigMap, Secret, Deployment/Service, and deploy script.
-- `LearningAgent/`: asynchronous evidence-linked lesson generation after
+- `Agents/LearningAgent/`: asynchronous evidence-linked lesson generation after
   successful workflows, with no tools or database credentials.
-- `MCPTools/`: Kubernetes, observability, network, profiling, and remediation
+- `Agents/MCPTools/`: Kubernetes, observability, network, profiling, and remediation
   tools and their Kubernetes RBAC, deployments, PVC, Services, and network
   probe DaemonSets, Secrets, and deploy script. Investigation and remediation
   use separate profiles.
-- `DatabaseJob/`: Alembic migrations, sole ownership of database DDL,
+- `EvaluationPlatform/Orchestrator/Database/`: Alembic migrations, sole ownership of database DDL,
   PostgreSQL/Secret/migration manifests, local Compose, and deploy script.
-- `Infrastructure/`: Ansible inventory, cluster/node setup, platform
+- `EvaluationPlatform/Initialization/`: Ansible inventory, cluster/node setup, platform
   namespaces and tools, and Helm values. It does not deploy applications,
   PostgreSQL, migrations, or application Secrets.
-- `Evaluation/`: workload/fault execution, service restarts, scaling/waiting,
+- `EvaluationPlatform/Runner/`: workload/fault execution, service restarts, scaling/waiting,
   capture, cleanup, comparison, runner Secrets, runner Ansible role/playbook,
   and deploy script.
 
-The root is not one Git repository. Some components are independent dirty Git
-worktrees. Never discard unrelated modified or untracked files.
+The workspace is a Git repository. Components may contain unrelated local changes. Never discard unrelated modified or untracked files.
 
 ## Runtime invariants
 
@@ -89,7 +88,7 @@ Secrets as sensitive. Never log, quote, commit, or duplicate their values.
 
 ## Database rules
 
-Only `DatabaseJob/` may create or alter tables. Only `AgentOrchestrator/`
+Only `EvaluationPlatform/Orchestrator/Database/` may create or alter tables. Only `EvaluationPlatform/Orchestrator/`
 performs application DML. The active schema is:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`, `learning_job`;
@@ -122,10 +121,12 @@ Downgrade restores table structure only; deleted records cannot be recovered.
 Run focused tests, then component suites. At minimum:
 
 ```bash
-cd AnomalyDetector && PYTHONPATH=src pytest -q
-cd ../DatabaseJob && pytest -q
-cd ../Evaluation && pytest -q
-python -m compileall -q ../AgentOrchestrator ../LearningAgent ../RCAAgent ../RemediatorAgent ../MCPTools
+(cd Agents/AnomalyDetector && PYTHONPATH=src pytest -q)
+(cd EvaluationPlatform/Orchestrator/Database && pytest -q)
+(cd EvaluationPlatform/Orchestrator && pytest -q)
+(cd EvaluationPlatform/Runner && pytest -q)
+(cd EvaluationPlatform/Grader && pytest -q)
+python -m compileall -q Agents EvaluationPlatform
 ```
 
 Also parse every Kubernetes YAML document and run Ansible syntax checks without
@@ -135,10 +136,20 @@ services.
 ## Coordinated rollout
 
 1. Scale the old agent and detector down.
-2. Replace DatabaseJob Secret placeholders and run `DatabaseJob/deploy.sh`
+2. Replace DatabaseJob Secret placeholders and run `EvaluationPlatform/Orchestrator/Database/deploy.sh`
    with `ALLOW_AGENT_WORKFLOW_RESET=true` for the destructive reset.
 3. Deploy and verify both MCPTools profiles.
 4. Deploy and verify LearningAgent, RCAAgent, and RemediatorAgent.
 5. Deploy and verify AgentOrchestrator.
 6. Deploy AnomalyDetector and enable ingestion.
 7. Verify API health, MCP discovery, lesson generation, and one end-to-end flow.
+
+## Evaluation platform boundary
+
+Runner experiments are resolved from versioned scenario/global/suite JSON. Named
+pre/post shell folders and lifecycle integrations own solution-specific behavior.
+Runner never has workflow SQL or database credentials. Orchestrator's authenticated
+evaluation API owns reset/export and durable serial evaluation ownership.
+Orchestrator stays running during baseline; deployments to scale are in JSON.
+Maintenance transitions serialize against dispatch and mutating store requests.
+The migration job under Orchestrator/Database remains the sole DDL owner.

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "prometheus_url": "http://prometheus-server.monitoring.svc.cluster.local",
+  "orchestrator_url": "http://agent-orchestrator.agents.svc.cluster.local:8080",
+  "control_token_env": "ORCHESTRATOR_CONTROL_TOKEN",
+  "inventory": "../../Initialization/ansible/inventory.ini",
+  "host": null,
+  "port_forward": false,
+  "port_forward_port": 8888,
+  "s3_results_uri": null,
+  "node_ips": {
+    "worker-node-1": "192.0.2.11",
+    "worker-node-2": "192.0.2.12",
+    "worker-node-3": "192.0.2.13",
+    "worker-node-4": "192.0.2.14",
+    "worker-node-5": "192.0.2.15",
+    "worker-node-6": "192.0.2.16"
+  }
+}

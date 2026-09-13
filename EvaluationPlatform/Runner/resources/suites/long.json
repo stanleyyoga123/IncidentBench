@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "name": "long",
+  "inter_run_seconds": 60,
+  "runs": [
+    {
+      "scenario": "../scenarios/long-scenario/01-multi-fault-one-day.json"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "constant": {
+    "module": "testbed.loadgenerator.constant",
+    "class": "ConstantLoadShape"
+  },
+  "burst": {
+    "module": "testbed.loadgenerator.burst",
+    "class": "BurstLoadShape"
+  },
+  "sinus": {
+    "module": "testbed.loadgenerator.sinus",
+    "class": "SinusLoadShape"
+  },
+  "daily": {
+    "module": "testbed.loadgenerator.daily",
+    "class": "DailyTrafficShape"
+  }
+}

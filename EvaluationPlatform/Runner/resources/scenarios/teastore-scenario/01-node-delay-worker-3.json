@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "teastore-node-delay-worker-3-one-hour",
+  "application": "teastore",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-worker-node-3-remote-location-chaos",
+      "chaos": [
+        "node-delay-worker-3",
+        "node-delay-peers-to-worker-3"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

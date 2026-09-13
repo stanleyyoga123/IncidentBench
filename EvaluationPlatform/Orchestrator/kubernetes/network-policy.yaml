@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: agent-platform-ingress, namespace: agents}
+spec:
+  podSelector: {matchExpressions: [{key: agent-platform, operator: Exists}]}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: agent-orchestrator}}
+        - podSelector: {matchLabels: {app: rca-agent}}
+        - podSelector: {matchLabels: {app: remediator-agent}}
+        - podSelector: {matchLabels: {app: learning-agent}}
+        - podSelector: {matchLabels: {app.kubernetes.io/name: anomaly-detector}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: evaluation-orchestrator-ingress
+  namespace: agents
+spec:
+  podSelector:
+    matchLabels:
+      app: agent-orchestrator
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: evaluation-runner
+      ports:
+        - protocol: TCP
+          port: 8080

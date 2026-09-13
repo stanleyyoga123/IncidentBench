@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "prometheus_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "orchestrator_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "control_token_env": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "inventory": {
+      "type": "string"
+    },
+    "host": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "port_forward": {
+      "type": "boolean"
+    },
+    "port_forward_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "s3_results_uri": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "node_ips": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version"
+  ],
+  "additionalProperties": false
+}
