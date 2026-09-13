@@ -88,7 +88,7 @@ class CollectionValidationTests(unittest.TestCase):
             )
         ]
         scenarios = boutique_scenarios + teastore_scenarios
-        self.assertEqual(len(catalog.schedules), 42)
+        self.assertEqual(len(catalog.schedules), 54)
         self.assertEqual(len(boutique_scenarios), 23)
         self.assertEqual(len(teastore_scenarios), 23)
         self.assertEqual(
@@ -234,6 +234,8 @@ class CollectionValidationTests(unittest.TestCase):
                     in {
                         "single-checkoutservice-capacity-loss",
                         "single-paymentservice-capacity-loss",
+                        "sock-shop-orders-capacity-loss",
+                        "sock-shop-payment-capacity-loss",
                         "teastore-persistence-capacity-loss",
                         "teastore-registry-capacity-loss",
                     }
@@ -359,7 +361,7 @@ class CollectionValidationTests(unittest.TestCase):
         placements = PlacementCatalog(
             root / "resources/applications" / "sock-shop" / "kustomize" / "overlays"
         )
-        paths = sorted((root / "resources/scenarios" / "sock-shop-scenario").glob("*.json"))
+        paths = sorted((root / "resources/scenarios" / "sock-shop-scenario").glob("*ten-minutes.json"))
         self.assertEqual(
             [path.name for path in paths],
             ["01-pod-catalogue-cpu-all-ten-minutes.json"],

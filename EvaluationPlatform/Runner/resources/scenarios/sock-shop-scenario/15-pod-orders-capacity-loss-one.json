@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-pod-orders-capacity-loss-one-hour",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-orders-single-replica-capacity-loss",
+      "chaos": [
+        "sock-shop-orders-capacity-loss"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

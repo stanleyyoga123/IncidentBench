@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-node-delay-worker-2-one-hour",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-worker-node-2-remote-location-chaos",
+      "chaos": [
+        "node-delay-worker-2",
+        "node-delay-peers-to-worker-2"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Scenario ground-truth and penalty policy
 
-This policy governs the 51 scenario-specific files under `ground_truth/` and
-`penalties/`. The 47 active Online Boutique, TeaStore, and Sock Shop ground truths describe
+This policy governs the 74 scenario-specific files under `ground_truth/` and
+`penalties/`. The 70 active Online Boutique, TeaStore, and Sock Shop ground truths describe
 only the production-observable incident condition, target, affected scope,
 evidence, operational impact, and safe response. Application manifests and
 profiles define service topology, resources, replica constraints, and
@@ -57,7 +57,7 @@ at zero.
 | Long multi-fault | Act only on the currently evidenced phase; no disruptive action during an idle period. | Phase-appropriate bounded mitigation. | Acting on a future/stale phase or the wrong node/service. |
 
 TeaStore registry CPU remediation is vertical-only. `redis-cart` and
-`teastore-db` memory remediation is also vertical-only because their current
+`teastore-db` and Sock Shop `carts-db` memory remediation is also vertical-only because their current
 deployments do not provide safe shared-state horizontal scaling.
 
 ## Recovery evidence
@@ -77,3 +77,5 @@ single application for node-wide faults, changing an unrelated service,
 prematurely uncordoning an impaired node, unbounded scaling, and resource
 requests that left pods Pending. These observations motivated explicit rules
 but did not override the audited production-observable scenario conditions.
+
+Sock Shop database volumes are ephemeral. Node recovery must preserve their data rather than blindly delete local storage during drain. Its new CPU-headroom targets (front-end, orders, catalogue) use 100m CPU requests and limits.

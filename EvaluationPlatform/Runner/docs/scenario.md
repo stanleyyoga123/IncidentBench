@@ -1,8 +1,8 @@
 # Evaluation scenarios
 
-This document summarizes the 47 currently planned scenarios in
+This document summarizes the 70 application-specific scenarios in
 `EvaluationPlatform/Runner/resources/scenarios`: 23 Online Boutique scenarios, 23 TeaStore scenarios,
-and one Sock Shop scenario. The collection JSON and referenced Chaos Mesh manifests remain
+23 full-length Sock Shop scenarios, and one retained short Sock Shop scenario. The collection JSON and referenced Chaos Mesh manifests remain
 evaluator-only inputs for exact execution timing and reproducibility; the
 catalogue below describes only the production-observable incident condition.
 The remediation descriptions match the grader ground-truth policy in
@@ -92,15 +92,73 @@ TeaStore registry scenarios must preserve its single non-shared in-memory
 registry. Horizontal registry scaling can split service-discovery state.
 Database remediation must preserve database state and remain vertical-only.
 
-## Sock Shop scenario
+## Sock Shop scenarios
 
-| # | Scenario | Fault type | Target | Remediation type |
-| ---: | --- | --- | --- | --- |
-| 1 | `sock-shop-pod-catalogue-cpu-all-ten-minutes` | Service-wide pod CPU pressure | `catalogue` | Service CPU capacity |
+The full suite mirrors Online Boutique's 23 fault families and ordering, mapped
+to Sock Shop services. Each full-length case uses the global 3,600-second baseline,
+a 3,600-second incident window and 600-second recovery. Baseline, 60-second application
+warm-up, and activation grace are additional to the incident/recovery window.
 
-The Sock Shop scenario window is exactly 600 seconds: 300 seconds of recurring
-CPU pressure followed by 300 seconds of recovery. Setup, the 60-second
-application warm-up, and baseline collection happen before this window.
+| # | Scenario | Target / fault |
+| ---: | --- | --- |
+| 1 | `sock-shop-node-delay-worker-3-one-hour` | node-delay-worker-3 |
+| 2 | `sock-shop-node-delay-worker-2-one-hour` | node-delay-worker-2 |
+| 3 | `sock-shop-node-delay-worker-5-one-hour` | node-delay-worker-5 |
+| 4 | `sock-shop-node-loss-worker-1-one-hour` | node-loss-worker-1 |
+| 5 | `sock-shop-node-loss-worker-2-one-hour` | node-loss-worker-2 |
+| 6 | `sock-shop-node-loss-worker-3-one-hour` | node-loss-worker-3 |
+| 7 | `sock-shop-pod-carts-cpu-all-one-hour` | pod-carts-cpu-all |
+| 8 | `sock-shop-pod-orders-cpu-all-one-hour` | pod-orders-cpu-all |
+| 9 | `sock-shop-pod-user-cpu-all-one-hour` | pod-user-cpu-all |
+| 10 | `sock-shop-pod-catalogue-cpu-all-one-hour` | pod-catalogue-cpu-all |
+| 11 | `sock-shop-pod-payment-cpu-all-one-hour` | pod-payment-cpu-all |
+| 12 | `sock-shop-node-cpu-worker-2-one-hour` | node-cpu-worker-2 |
+| 13 | `sock-shop-node-memory-worker-3-one-hour` | node-memory-worker-3 |
+| 14 | `sock-shop-pod-shipping-memory-all-one-hour` | pod-shipping-memory-all |
+| 15 | `sock-shop-pod-orders-capacity-loss-one-hour` | pod-orders-capacity-loss-one |
+| 16 | `sock-shop-pod-catalogue-bandwidth-all-one-hour` | pod-catalogue-bandwidth-all |
+| 17 | `sock-shop-pod-carts-db-memory-all-one-hour` | pod-carts-db-memory-all |
+| 18 | `sock-shop-pod-user-memory-all-one-hour` | pod-user-memory-all |
+| 19 | `sock-shop-pod-shipping-bandwidth-all-one-hour` | pod-shipping-bandwidth-all |
+| 20 | `sock-shop-pod-payment-capacity-loss-one-hour` | pod-payment-capacity-loss-one |
+| 21 | `sock-shop-pod-front-end-cpu-headroom-all-one-hour` | pod-front-end-cpu-headroom-all |
+| 22 | `sock-shop-pod-orders-cpu-headroom-all-one-hour` | pod-orders-cpu-headroom-all |
+| 23 | `sock-shop-pod-catalogue-cpu-headroom-all-one-hour` | pod-catalogue-cpu-headroom-all |
+
+The three CPU-headroom scenarios use `cpu-constrained-six-node`: front-end,
+orders and catalogue each have CPU request and limit set to 100m. Topology and
+singleton database replicas stay inherited from the canonical profile. Bounded
+HPAs (minimum 2, maximum 6) cover catalogue, orders, payment and shipping,
+providing editable bounds for capacity-loss and bandwidth remediation. CPU
+loads and fixed memory allocations are adapted to Sock Shop container limits;
+actual fault strength must be measured on the target cluster before comparing
+experimental outcomes.
+
+The Locust journey uses isolated synthetic users, registration, login, addresses,
+cards, cart operations and order creation, exercising payment and shipping
+through checkout. Existing users retain setup state across recoverable failures.
+Only synthetic demo payment details are supplied. This extends the old browse/
+cart traffic profile; new measurements are not directly comparable to archives
+collected with the old journey without accounting for this change.
+
+MongoDB stores use ephemeral local volumes. Memory remediation for `carts-db`
+is vertical-only and must preserve cart data. Node evacuation must not blindly
+discard database volumes. Validate data-preserving recovery before moving state.
+
+The existing `sock-shop-pod-catalogue-cpu-all-ten-minutes` scenario remains at
+`01-pod-catalogue-cpu-all-ten-minutes.json`, with its 360-second baseline and
+300-second incident plus 300-second recovery. It remains in `all.json`; the
+`sock-shop.json` suite selects the 23 full-length cases. `paired.json` includes
+both agent-enabled and agent-disabled variants of those 23 cases.
+
+From Runner, validate without cluster calls:
+
+```bash
+python -m testbed.main --suite resources/suites/sock-shop.json --environment config/environment.example.json --validate-only
+```
+
+Use your local `config/environment.json` and omit `--validate-only` only when
+ready to execute against the intended evaluation deployment.
 
 ## Recovery checks
 

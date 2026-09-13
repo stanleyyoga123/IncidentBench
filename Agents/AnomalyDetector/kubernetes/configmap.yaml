@@ -5,7 +5,7 @@ metadata:
   namespace: agents
 data:
   .env: |
-    collector.metadata.namespaces=["online-boutique","teastore"]
+    collector.metadata.namespaces=["online-boutique","teastore","sock-shop"]
     collector.metadata.excluded_nodes=["tools-node"]
     collector.metrics.base_url=http://prometheus-server.monitoring.svc.cluster.local
     collector.metrics.timeout=10

@@ -33,3 +33,9 @@ Installer `source_default` paths are relative to the workspace root; bundled
 paths begin with `EvaluationPlatform/Runner/resources/applications/`. Relative
 `placement.root` paths are resolved from `resources/`, for example
 `applications/teastore/placements`.
+
+Sock Shop's journey covers isolated customer registration/login, address/card
+setup, browsing, carts and checkout. The endpoint contract follows the upstream
+[user API](https://github.com/microservices-demo/front-end/blob/master/api/user/index.js)
+and [order API](https://github.com/microservices-demo/front-end/blob/master/api/orders/index.js).
+Credentials and card values created by this workload are synthetic demo data.

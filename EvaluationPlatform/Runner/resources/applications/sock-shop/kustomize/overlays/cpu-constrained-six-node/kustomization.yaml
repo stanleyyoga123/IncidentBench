@@ -1,0 +1,34 @@
+# Preserve canonical placement; remove CPU burst headroom on the three targets.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: sock-shop
+resources:
+- ../canonical-six-node
+patches:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: front-end
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 100m
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: orders
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 100m
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: catalogue
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 100m

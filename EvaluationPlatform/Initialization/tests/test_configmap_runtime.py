@@ -19,7 +19,7 @@ CASES = [
         WORKSPACE / "Agents/AnomalyDetector/kubernetes/configmap.yaml",
         "anomaly-detector-config",
         WORKSPACE / "Agents/AnomalyDetector/src",
-        "from config import SETTINGS",
+        "from config import SETTINGS; assert set(SETTINGS.collector.metadata.namespaces) == {'online-boutique', 'teastore', 'sock-shop'}",
     ),
     (
         WORKSPACE / "Agents/MCPTools/kubernetes/configmap.yaml",
@@ -37,7 +37,7 @@ CASES = [
         WORKSPACE / "Agents/RCAAgent/kubernetes/configmap.yaml",
         "rca-agent-config",
         WORKSPACE / "Agents/RCAAgent",
-        "from app.config import get_settings; get_settings()",
+        "from app.config import get_settings; assert set(get_settings().workloads.namespaces) == {'online-boutique', 'teastore', 'sock-shop'}",
     ),
     (
         WORKSPACE / "Agents/RemediatorAgent/kubernetes/configmap.yaml",

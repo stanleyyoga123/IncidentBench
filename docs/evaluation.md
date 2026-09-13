@@ -11,3 +11,9 @@ Start with the [workspace quickstart](../README.md), then the
 Configuration replaces experiment CLI overrides. Pre/post scripts use Orchestrator
 HTTP endpoints for full reset and session export. No runner database credentials
 are required. The current solution remains a bundled, replaceable integration.
+
+The bundled AnomalyDetector and RCAAgent ConfigMaps include `sock-shop` alongside
+`online-boutique` and `teastore`. Keep `collector.metadata.namespaces` (detection)
+and `workloads.namespaces` (RCA, including cluster-scoped incident profiling) in
+sync when adding applications. Existing pods need a restart after ConfigMap
+updates because configuration is read at process startup.

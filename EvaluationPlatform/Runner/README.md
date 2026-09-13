@@ -130,3 +130,5 @@ The bundled post-run list already includes `upload` after `export-sessions`. Set
 ## Track an experiment
 
 Every new run saves resolved settings and original configuration layers before preparation, with a hashed source manifest under `inputs/`. `run-status.json`, `hooks.json`, and `events.jsonl` expose lifecycle progress; `runner.log` and `metadata.json` expose engine progress. See [input capture and live tracking](docs/experiment-visibility.md) for commands, artifact timing, exclusions and S3 visibility.
+
+The [Sock Shop scenario set](docs/scenario.md#sock-shop-scenarios) mirrors all 23 Online Boutique fault families, with a dedicated `resources/suites/sock-shop.json` suite and paired agent/no-agent entries.

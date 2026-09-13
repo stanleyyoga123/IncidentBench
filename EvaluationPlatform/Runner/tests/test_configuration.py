@@ -49,7 +49,7 @@ def test_suite_validation_never_executes_run_or_cluster_commands(tmp_path):
 
 def test_all_committed_scenarios_resolve():
     paths = list((ROOT/'resources/scenarios').rglob('*.json'))
-    assert len(paths) == 49
+    assert len(paths) == 72
     for path in paths:
         resolve_scenario(path)
 

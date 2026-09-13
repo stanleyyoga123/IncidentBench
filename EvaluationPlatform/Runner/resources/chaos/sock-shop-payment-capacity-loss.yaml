@@ -1,0 +1,24 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: sock-shop-payment-capacity-loss
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: PodChaos
+  podChaos:
+    action: pod-failure
+    mode: one
+    selector:
+      namespaces:
+      - sock-shop
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - payment
+    duration: 25s

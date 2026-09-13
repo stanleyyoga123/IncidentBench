@@ -225,7 +225,7 @@ mutation is allowed, retry is considered safe.
 | `worker.lease_seconds` | `1200` |
 | `worker.max_attempts` | `3` |
 | `manager.max_rounds` | `10` top-level model rounds. |
-| `workloads.namespaces` | Application namespaces eligible for incident profiling. |
+| `workloads.namespaces` | Application namespaces eligible for incident profiling; bundled deployment includes `online-boutique`, `teastore`, and `sock-shop`. |
 
 Langfuse credentials are supplied through the component Secret and correlated
 with `session_id=<rca-job-id>`, trace name `rca`.

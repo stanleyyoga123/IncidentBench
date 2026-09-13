@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-pod-front-end-cpu-headroom-all-one-hour",
+  "application": "sock-shop",
+  "placement": "cpu-constrained-six-node",
+  "steps": [
+    {
+      "name": "01-front-end-cpu-headroom-exhaustion-all",
+      "chaos": [
+        "sock-shop-front-end-cpu"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

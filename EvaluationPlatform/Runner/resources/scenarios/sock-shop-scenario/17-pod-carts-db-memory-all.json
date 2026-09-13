@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-pod-carts-db-memory-all-one-hour",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "steps": [
+    {
+      "name": "01-carts-db-memory-pressure-all",
+      "chaos": [
+        "sock-shop-carts-db-memory"
+      ],
+      "duration": 3600
+    },
+    {
+      "name": "02-recovery",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

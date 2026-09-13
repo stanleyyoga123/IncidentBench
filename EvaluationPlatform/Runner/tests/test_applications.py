@@ -143,7 +143,7 @@ def test_sock_shop_has_bounded_resources_replicas_and_hpas():
         for document in documents
         if document.get("kind") == "HorizontalPodAutoscaler"
     }
-    assert set(hpas) == {"catalogue"}
+    assert set(hpas) == {"catalogue", "orders", "payment", "shipping"}
     assert hpas["catalogue"]["spec"]["minReplicas"] == 2
     assert hpas["catalogue"]["spec"]["maxReplicas"] == 6
     assert hpas["catalogue"]["spec"]["behavior"]["scaleUp"][

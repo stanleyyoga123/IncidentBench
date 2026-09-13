@@ -145,6 +145,75 @@
       "scenario": "../scenarios/sock-shop-scenario/01-pod-catalogue-cpu-all-ten-minutes.json"
     },
     {
+      "scenario": "../scenarios/sock-shop-scenario/01-node-delay-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/02-node-delay-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/03-node-delay-worker-5.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/04-node-loss-worker-1.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/05-node-loss-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/06-node-loss-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/07-pod-carts-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/08-pod-orders-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/09-pod-user-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/10-pod-catalogue-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/11-pod-payment-cpu-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/12-node-cpu-worker-2.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/13-node-memory-worker-3.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/14-pod-shipping-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/15-pod-orders-capacity-loss-one.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/16-pod-catalogue-bandwidth-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/17-pod-carts-db-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/18-pod-user-memory-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/19-pod-shipping-bandwidth-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/20-pod-payment-capacity-loss-one.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/21-pod-front-end-cpu-headroom-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/22-pod-orders-cpu-headroom-all.json"
+    },
+    {
+      "scenario": "../scenarios/sock-shop-scenario/23-pod-catalogue-cpu-headroom-all.json"
+    },
+    {
       "scenario": "../scenarios/long-scenario/01-multi-fault-one-day.json"
     }
   ]

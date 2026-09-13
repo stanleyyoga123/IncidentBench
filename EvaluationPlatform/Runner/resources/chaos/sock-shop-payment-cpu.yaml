@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: sock-shop-payment-cpu
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - sock-shop
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - payment
+    stressors:
+      cpu:
+        workers: 1
+        load: 15
+    duration: 25s

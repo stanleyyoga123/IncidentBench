@@ -302,7 +302,7 @@ def _write_metrics(run: Path) -> None:
 def test_current_and_historical_scenarios_have_valid_ground_truth() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     scenarios = _scenario_catalog()
-    assert len(scenarios) == 48
+    assert len(scenarios) == 71
     assert set(scenarios) <= set(truth)
     assert set(truth) - set(scenarios) == EXCLUDED_PAPER_SCENARIOS - {"long-multi-fault-one-day"}
     assert all(truth[name]["rca"] and truth[name]["remediation"] for name in scenarios)
@@ -311,7 +311,7 @@ def test_current_and_historical_scenarios_have_valid_ground_truth() -> None:
 def test_ground_truth_policy_and_targets_match_scenarios() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     scenarios = _active_scenario_catalog()
-    assert len(scenarios) == 47
+    assert len(scenarios) == 70
     assert set(_scenario_catalog()) - set(scenarios) == {"long-multi-fault-one-day"}
     for name, scenario in scenarios.items():
         entry = truth[name]

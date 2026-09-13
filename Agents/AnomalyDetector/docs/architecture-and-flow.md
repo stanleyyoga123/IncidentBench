@@ -199,7 +199,7 @@ lessons do not automatically change detector profiles.
 
 | Setting | Cluster default | Effect |
 | --- | --- | --- |
-| `collector.metadata.namespaces` | `online-boutique`, `teastore` | Allow-listed deployment metric scopes; add application namespaces here. |
+| `collector.metadata.namespaces` | `online-boutique`, `teastore`, `sock-shop` | Allow-listed deployment metric scopes; add application namespaces here. |
 | `collector.metadata.excluded_nodes` | `tools-node` | Node signals omitted from detection. |
 | `collector.metrics.base_url` | Prometheus service DNS | Query/rule API. |
 | `collector.metrics.timeout` | `10` seconds | HTTP timeout. |
