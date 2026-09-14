@@ -60,7 +60,7 @@ def test_suite_validation_never_executes_run_or_cluster_commands(tmp_path):
 
 def test_all_committed_scenarios_resolve():
     paths = list((ROOT/'resources/scenarios').rglob('*.json'))
-    assert len(paths) == 75
+    assert len(paths) == 76
     for path in paths:
         spec = resolve_scenario(path)
         if spec['load']['type'] == 'constant':

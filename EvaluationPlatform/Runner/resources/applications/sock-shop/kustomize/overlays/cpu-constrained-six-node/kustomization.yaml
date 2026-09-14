@@ -12,6 +12,9 @@ patches:
     name: front-end
   patch: |-
     - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 100m
+    - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
       value: 100m
 - target:
@@ -21,6 +24,9 @@ patches:
     name: orders
   patch: |-
     - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 100m
+    - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
       value: 100m
 - target:
@@ -29,6 +35,9 @@ patches:
     kind: Deployment
     name: catalogue
   patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 100m
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
       value: 100m

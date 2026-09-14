@@ -23,6 +23,15 @@ patches:
   - path: runtime-rabbitmq.yaml
   - path: runtime-session-db.yaml
   - path: runtime-user-db.yaml
+  - path: load-resources/carts.yaml
+  - path: load-resources/front-end.yaml
+  - path: load-resources/orders.yaml
+  - path: load-resources/shipping.yaml
+  - path: load-resources/queue-master.yaml
+  - path: load-resources/user.yaml
+  - path: load-resources/carts-db.yaml
+  - path: load-resources/user-db.yaml
+  - path: load-resources/session-db.yaml
   - target:
       group: apps
       version: v1

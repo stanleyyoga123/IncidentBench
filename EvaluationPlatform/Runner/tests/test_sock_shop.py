@@ -170,6 +170,17 @@ def test_sock_shop_full_suite_matches_boutique_fault_families_and_valid_targets(
         validate_pod_chaos_selectors(rendered[scenario['placement']], schedules, 'app')
         assert scenario['placement'] == ('cpu-constrained-six-node' if index >= 21 else 'canonical-six-node')
     assert len(names) == 23
+    canonical = list(yaml.safe_load_all(rendered['canonical-six-node'].rendered_manifest))
+    front_hpa = next(doc for doc in canonical if doc['kind'] == 'HorizontalPodAutoscaler' and doc['metadata']['name'] == 'front-end-hpa')
+    assert front_hpa['spec']['scaleTargetRef']['name'] == 'front-end'
+    assert (front_hpa['spec']['minReplicas'], front_hpa['spec']['maxReplicas']) == (6, 30)
+    assert front_hpa['spec']['metrics'][0]['containerResource']['container'] == 'front-end'
+    for doc in canonical:
+        if doc['kind'] == 'Deployment' and doc['metadata']['name'] in ('carts', 'orders', 'shipping'):
+            container = doc['spec']['template']['spec']['containers'][0]
+            assert container['readinessProbe']['httpGet']['path'] == '/health'
+            assert container['startupProbe']['httpGet']['path'] == '/health'
+            assert doc['spec']['strategy']['rollingUpdate']['maxUnavailable'] == 0
     docs = list(yaml.safe_load_all(rendered['cpu-constrained-six-node'].rendered_manifest))
     deployments = {doc['metadata']['name']: doc for doc in docs if doc['kind'] == 'Deployment'}
     for name in ('front-end', 'orders', 'catalogue'):

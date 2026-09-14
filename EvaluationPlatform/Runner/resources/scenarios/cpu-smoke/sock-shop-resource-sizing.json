@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-resource-sizing",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "timing": {
+    "baseline_seconds": 360,
+    "grace_seconds": 0
+  },
+  "agents_enabled": false,
+  "load": {
+    "type": "constant",
+    "parameters": {
+      "users": 100,
+      "bias_users": 10,
+      "spawn_rate": 10
+    }
+  },
+  "steps": [
+    {
+      "name": "observe-resource-headroom",
+      "chaos": [],
+      "duration": 600
+    }
+  ]
+}

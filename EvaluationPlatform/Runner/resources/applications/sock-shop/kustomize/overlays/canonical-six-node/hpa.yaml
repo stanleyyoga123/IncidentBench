@@ -8,7 +8,7 @@ spec:
     kind: Deployment
     name: catalogue
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -42,7 +42,7 @@ spec:
     kind: Deployment
     name: orders
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -76,7 +76,7 @@ spec:
     kind: Deployment
     name: payment
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -110,7 +110,7 @@ spec:
     kind: Deployment
     name: shipping
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 30
   metrics:
   - type: Resource
     resource:
@@ -131,5 +131,40 @@ spec:
       policies:
       - type: Percent
         value: 50
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: front-end-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: front-end
+  minReplicas: 6
+  maxReplicas: 30
+  metrics:
+  - type: ContainerResource
+    containerResource:
+      name: cpu
+      container: front-end
+      target:
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
         periodSeconds: 60
       selectPolicy: Min
