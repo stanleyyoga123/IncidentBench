@@ -20,5 +20,12 @@
   ],
   "timing": {
     "baseline_seconds": 360
+  },
+  "load": {
+    "type": "constant",
+    "parameters": {
+      "users": 100,
+      "bias_users": 10
+    }
   }
 }

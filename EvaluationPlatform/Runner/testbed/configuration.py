@@ -34,6 +34,10 @@ def validate(value, schema):
 def merge(base, override):
     result = deepcopy(base)
     for key, value in override.items():
+        if key == 'load' and isinstance(value, dict) and 'type' in value and value['type'] != result.get(key, {}).get('type'):
+            # A new shape must not inherit parameters belonging to the old one.
+            result[key] = deepcopy(value)
+            continue
         result[key] = merge(result[key], value) if isinstance(value, dict) and isinstance(result.get(key), dict) else deepcopy(value)
     return result
 

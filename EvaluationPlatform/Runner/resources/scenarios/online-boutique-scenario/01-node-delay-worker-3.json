@@ -18,5 +18,12 @@
       "chaos": [],
       "duration": 600
     }
-  ]
+  ],
+  "load": {
+    "type": "constant",
+    "parameters": {
+      "users": 600,
+      "bias_users": 60
+    }
+  }
 }

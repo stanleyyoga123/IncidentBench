@@ -14,8 +14,8 @@
   "load": {
     "type": "constant",
     "parameters": {
-      "users": 10,
-      "bias_users": 0,
+      "users": 200,
+      "bias_users": 20,
       "spawn_rate": 2
     }
   },

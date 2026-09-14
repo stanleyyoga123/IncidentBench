@@ -79,7 +79,7 @@ Traffic parameters:
 | `sinus` | `min_users`, `max_users`, `period_seconds`, `bias_users`, `spawn_rate`, `seed` |
 | `daily` | `base_users`, `stages` containing cumulative `duration`, `percentage_users`, and `spawn_rate` |
 
-Defaults are fixed in `testbed/loadgenerator/defaults.json` and materialized into the resolved scenario. A daily curve repeats after its final stage. Its clock starts with Locust, including the baseline. Traffic runs through baseline, worker activation, activation grace, and every scenario step until finalization stops it. Activation and transition waits add to the planned baseline + grace + step durations; a fixed Locust timer must not truncate recovery. Global defaults use only a load type so changing shape does not inherit incompatible parameters; if you add global shape parameters, scenario overrides must remain compatible with that shape.
+Defaults are fixed in `testbed/loadgenerator/defaults.json` and materialized into the resolved scenario. A daily curve repeats after its final stage. Its clock starts with Locust, including the baseline. Traffic runs through baseline, worker activation, activation grace, and every scenario step until finalization stops it. Activation and transition waits add to the planned baseline + grace + step durations; a fixed Locust timer must not truncate recovery. Changing the load type replaces parameters from the previous shape; overrides of the same shape merge individual parameters.
 
 Suites list ordered `{ "scenario": "...", "overrides": { ... } }` entries and `inter_run_seconds`. `resources/suites/paired.json` runs matching scenarios with `agents_enabled` true and false. Both variants use the bundled preparation/reset; false leaves workers stopped after baseline. `config/none.json` selects no external solution at all.
 
@@ -132,6 +132,21 @@ credential discovery. A denied or missing permission result fails preparation.
 Install `requirements.txt` plus kubectl, Helm and SSH. The pod image uses the same workspace hierarchy under `/workspace`. `scripts/deploy.sh` applies runner Secrets and mounts an inventory ConfigMap built from `../Initialization/ansible/inventory.ini`. Fill the required SSH and `ORCHESTRATOR_CONTROL_TOKEN` placeholders; optional AWS credentials may remain unset. The S3 destination comes from environment JSON. The optional upload hook uploads artifacts available at that phase; final local status remains authoritative if upload or release fails.
 
 Legacy `.env` load files are not loaded and have been removed. Experiment settings come from JSON; `config/environment.json` remains required for machine settings, and credential environment variables remain required for the selected integration. Keep secrets outside JSON and consult the root quickstart for token pairing and deployment order.
+
+## Application load targets
+
+Constant-load scenarios explicitly set `load.parameters.users` to **200** for
+TeaStore, **600** for Online Boutique, and **100** for Sock Shop, with
+`bias_users` set to 10% of the target (20, 60, and 10 respectively). The random
+bias is added above the base, giving target ranges of 200–220, 600–660, and
+100–110 users. This includes the smoke and healthy-baseline scenarios. Adjust
+these values in the scenario JSON, or override them in a suite entry.
+Spawn rates retain their existing defaults or explicit scenario settings.
+Sock Shop's 100 users is an initial estimate based on its higher observed request
+rate per user; it has not been calibrated at this load. Concurrent-user counts
+are not equivalent request rates across applications.
+The long Online Boutique scenario retains its daily curve with a base of 600
+users; its stages vary the actual user count around that base.
 
 ## S3 result sync
 

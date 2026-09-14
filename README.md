@@ -89,6 +89,11 @@ Standard scenarios use a 30-minute baseline; AnomalyDetector queries the latest
 30 minutes at 30-second spacing. Explicit short test scenarios keep their own
 baseline durations.
 
+Constant-load scenarios target 200 concurrent users for TeaStore, 600 for
+Online Boutique, and an initial 100 for Sock Shop, with an upward random bias
+of up to 10% (20, 60, and 10 users respectively). These targets and bias values
+are configured in each scenario's `load.parameters`.
+
 Online Boutique's 23 standard scenario names use the `online-boutique-` prefix,
 matching the application prefixes used by TeaStore and Sock Shop. Their JSON
 file paths are unchanged; the grader also retains the historical `real-` names.

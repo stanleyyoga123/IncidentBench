@@ -29,11 +29,13 @@ def test_recursive_merge_replaces_lists_without_changing_inputs():
 
 def test_shape_defaults_are_explicit_in_resolved_archive():
     spec = resolve_scenario(SOURCE)
-    assert spec['load']['parameters']['users'] == 50
+    assert spec['load']['parameters']['users'] == 600
+    assert spec['load']['parameters']['bias_users'] == 60
     assert 'global_config' not in spec
     burst = resolve_scenario(SOURCE, {'schema_version':1,'load':{'type':'burst','parameters':{'peak_users':900}}})
     assert burst['load']['parameters']['baseline_users'] == 300
     assert burst['load']['parameters']['peak_users'] == 900
+    assert 'users' not in burst['load']['parameters']
 
 
 @pytest.mark.parametrize('override', [
@@ -60,7 +62,12 @@ def test_all_committed_scenarios_resolve():
     paths = list((ROOT/'resources/scenarios').rglob('*.json'))
     assert len(paths) == 75
     for path in paths:
-        resolve_scenario(path)
+        spec = resolve_scenario(path)
+        if spec['load']['type'] == 'constant':
+            assert spec['load']['parameters']['users'] == {
+                'teastore': 200, 'online-boutique': 600, 'sock-shop': 100,
+            }[spec['application']]
+            assert spec['load']['parameters']['bias_users'] == spec['load']['parameters']['users'] // 10
 
 
 def test_partial_load_parameters_override_the_global_shape():
