@@ -13,7 +13,7 @@ class LoadGeneratorLauncher:
         scenario: str,
         application_module: str,
         host: str,
-        duration_seconds: int,
+        duration_seconds: int | None,
         parameters: dict | None = None,
     ):
         return start_locust(

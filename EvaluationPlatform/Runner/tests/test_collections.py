@@ -88,7 +88,7 @@ class CollectionValidationTests(unittest.TestCase):
             )
         ]
         scenarios = boutique_scenarios + teastore_scenarios
-        self.assertEqual(len(catalog.schedules), 54)
+        self.assertEqual(len(catalog.schedules), 55)
         self.assertEqual(len(boutique_scenarios), 23)
         self.assertEqual(len(teastore_scenarios), 23)
         self.assertEqual(
@@ -327,9 +327,9 @@ class CollectionValidationTests(unittest.TestCase):
         )
         for scenario in scenarios:
             constrained_scenarios = {
-                "real-pod-emailservice-cpu-headroom-all-one-hour",
-                "real-pod-checkoutservice-cpu-headroom-all-one-hour",
-                "real-pod-productcatalogservice-cpu-headroom-all-one-hour",
+                "online-boutique-pod-emailservice-cpu-headroom-all-one-hour",
+                "online-boutique-pod-checkoutservice-cpu-headroom-all-one-hour",
+                "online-boutique-pod-productcatalogservice-cpu-headroom-all-one-hour",
                 "teastore-pod-webui-cpu-headroom-all-one-hour",
                 "teastore-pod-persistence-cpu-headroom-all-one-hour",
                 "teastore-pod-image-cpu-headroom-all-one-hour",

@@ -8,6 +8,10 @@ Scoring, rubric classifications, penalties, metric windows, caches and report fo
 
 Every run folder supplies `metadata.json` (existing version 2), `inputs/scenario.json` with name/application/placement/steps, and `inputs/chaos/<reference>.yaml` for every referenced chaos resource. Placement definitions and their fingerprints remain necessary for comparable runs. Metrics retain the existing Prometheus JSON query-response layout documented by the runner collectors.
 
+Online Boutique's standard scenarios use `online-boutique-` names. Matching
+ground-truth and penalty files are provided; the historical `real-` files remain
+available so archived runs can still be graded without changing their inputs.
+
 Semantic grading reads these JSON arrays:
 
 - `sessions/rca_session.json`: objects with `id`, `workflow_id`, `status`, lifecycle timestamps including `created_at` and `completed_at`, and a non-empty `result` for successful jobs. The final result describes the diagnosis and evidence.

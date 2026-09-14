@@ -1,0 +1,28 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: teastore-image-cpu-saturation-smoke
+  namespace: chaos-mesh
+spec:
+  schedule: '@every 30s'
+  historyLimit: 1
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    mode: all
+    selector:
+      namespaces:
+      - teastore
+      podPhaseSelectors:
+      - Running
+      expressionSelectors:
+      - key: app
+        operator: In
+        values:
+        - teastore-image
+    stressors:
+      cpu:
+        # Two busy workers exceed the deployed image container's 1500m limit.
+        workers: 2
+        load: 100
+    duration: 25s

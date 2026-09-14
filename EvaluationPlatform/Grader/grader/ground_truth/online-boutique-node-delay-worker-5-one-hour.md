@@ -1,0 +1,37 @@
+# online-boutique-node-delay-worker-5-one-hour
+
+## RCA
+
+### Expected incident condition
+
+- `worker-node-5` has recurring bidirectional network latency of approximately 250 ms with about 50 ms jitter on paths to and from peer nodes.
+- The affected scope is the node and every application workload whose request path or placement depends on it, not one Deployment.
+
+### Expected diagnosis and evidence
+
+- **Root cause:** Recurring node-level network latency on `worker-node-5` degrades every request path that crosses that node.
+- **Incident pattern:** Requests whose paths cross `worker-node-5` become slow or time out while paths between healthy nodes remain comparatively normal. Pods can remain Running and Ready because Kubernetes readiness does not prove network-path health.
+- **Corroboration:** Bidirectional probe/RTT degradation involving `worker-node-5`, workload or trace latency correlated with pods on that node, and normal CPU, memory, and peer-node behavior distinguish this from service saturation.
+- Identifying only a degraded application is incomplete. A full RCA must localize the shared failure boundary to `worker-node-5` and distinguish node-level network latency from service CPU, memory, HPA, or version problems.
+
+## Recommended remediation
+
+### Fully correct
+
+- Validate `worker-node-5`, replacement capacity, resident workloads, PodDisruptionBudgets, local-data impact, and control-plane risk; then cordon `worker-node-5` and safely drain evictable workloads with a bounded timeout, `--ignore-daemonsets`, and `--delete-emptydir-data`, without `--force` or disabled eviction.
+- Keep `worker-node-5` unschedulable while current evidence shows that it remains impaired. Uncordon only after current node and application evidence demonstrates stable recovery.
+
+### Helpful but incomplete
+
+- Cordon without completing a safe drain prevents new exposure but leaves existing workloads affected.
+- A bounded pod-template relocation of one confirmed affected Deployment away from `worker-node-5` can improve that service but does not protect other workloads or isolate the node-wide fault.
+- A restart that happens to move a pod may provide transient relief, but it is uncontrolled and is not a durable node remediation.
+
+### Rejected approaches
+
+- Scaling or changing resources of an application does not remove the node-wide fault. Draining another node, prematurely uncordoning `worker-node-5`, force-draining through disruption safeguards, or repeatedly restarting workloads can increase harm.
+- Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
+
+### Verification
+
+- Verify `worker-node-5` schedulability and condition-specific node evidence, absence of evictable application pods on it, replacement pod readiness, and recovery of response-time P95 and HTTP 5xx rate. Preserve the node isolation if recovery is ambiguous.

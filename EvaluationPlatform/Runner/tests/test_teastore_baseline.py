@@ -54,7 +54,10 @@ def test_rejected_baseline_prevents_downstream_phases_and_still_finalizes(tmp_pa
         evaluator=SimpleNamespace(collect_snapshot=lambda _: {}),
     )
     process = SimpleNamespace(command=["locust"], process=SimpleNamespace(poll=lambda: None))
-    baseline = BaselinePhase(lambda **_: process, lambda *_: None, metadata, lambda _: None)
+    def launch(**kwargs):
+        assert kwargs['duration_seconds'] is None
+        return process
+    baseline = BaselinePhase(launch, lambda *_: None, metadata, lambda _: None)
     downstream = SimpleNamespace(execute=lambda _: events.append("agents-or-chaos"))
     finalizer = SimpleNamespace(execute=lambda _: events.append("finalization"))
     runner = ExperimentRunner([baseline, downstream], finalizer, metadata, lambda _: None)

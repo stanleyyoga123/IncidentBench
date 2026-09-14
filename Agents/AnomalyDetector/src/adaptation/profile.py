@@ -61,7 +61,7 @@ class DetectorProfile(BaseModel):
 def _z_score_defaults() -> dict[str, dict[str, Any]]:
     common = {
         "threshold": 4.0,
-        "lookback": 120,
+        "lookback": 60,
         "min_history": 30,
         "n_tail": 3,
         "epsilon": 1e-8,

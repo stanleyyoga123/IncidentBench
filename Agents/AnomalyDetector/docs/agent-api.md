@@ -378,7 +378,7 @@ Returns `200` with the reset revision, `404` if the ID is unknown/inactive, or
 | Parameter | Allowed value | Effect |
 | --- | --- | --- |
 | `threshold` | finite number, `2.5`–`8.0` | Required Z-score magnitude. Higher is less sensitive. |
-| `lookback` | integer, `30`–`120` | Maximum baseline points. |
+| `lookback` | integer, `30`–`120` | Maximum baseline points; default `60`, limited by collected history. |
 | `min_history` | integer, `30`–current `lookback` | Minimum baseline points before evaluation. |
 | `n_tail` | integer, `1`–`10` | Number of latest points evaluated. |
 | `consecutive_anomalies_required` | integer, `1`–`10`, not greater than `n_tail` | Persistence required before emission. |

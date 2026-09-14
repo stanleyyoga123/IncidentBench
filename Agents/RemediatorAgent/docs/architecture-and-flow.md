@@ -133,9 +133,22 @@ successful check record for the exact current playbook content. Changing the
 playbook, inventory, or extra variables changes the complete execution hash and
 invalidates the prior check. MCPTools also bounds filenames and session paths.
 
-At the engine level, completion is rejected unless at least one audited
-`remediator.run_ansible` result has `ok=true` and `check=false`. A model answer
-without a successful live run therefore becomes `needs_review`, not success.
+At the engine level, completion requires a successful live Ansible run, no
+observed failed live attempt, subsequent successful Kubernetes and non-empty
+Prometheus responses, and explicit `Automation: executed` / `Recovery: verified`
+status with verification text. Any further Ansible call invalidates prior
+verification observations. Missing evidence or an unverified result becomes
+`needs_review` and cannot enter successful-workflow learning.
+
+This is a minimum evidence gate, not an independent semantic recovery judge:
+the model still evaluates query relevance, freshness, thresholds, and all
+approved checks. Prompts require before/after symptom and condition-specific
+checks in addition to readiness. Check-mode success can reflect skipped command
+tasks and does not establish that a Kubernetes mutation is valid or safe.
+
+The agent must stop without mutation when the plan is stale, no longer needed,
+or unsafe. These validation-only outcomes use the existing `needs_review`
+state; they are not classified as successful remediation or retried automatically.
 
 ## 7. Mutation scopes
 
@@ -197,7 +210,7 @@ bounded RCA/remediation tool audit.
 | Live run error/timeout | Ambiguous mutation; `needs_review`. |
 | Missing successful live run | Engine rejects final answer; `needs_review`. |
 | Post-verification tool/engine exception | Worker records `needs_review`. |
-| Model omits verification text after a live success | Not yet hard-gated; inspect audits and treat as a review gap. |
+| Missing verification text, verified status, or post-action state/metric evidence | Engine rejects completion; `needs_review`. |
 | Lease expiry | `needs_review`; never automatically requeued. |
 
 ## Authentication and configuration

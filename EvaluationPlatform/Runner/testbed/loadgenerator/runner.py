@@ -50,7 +50,7 @@ def start_locust(
     scenario: str,
     application_module: str,
     host: str,
-    duration_seconds: int,
+    duration_seconds: int | None,
     parameters: dict | None = None,
 ) -> LoadGeneratorProcess:
     shape_file = scenario_file(repo_root, scenario)
@@ -63,7 +63,7 @@ def start_locust(
     locustfile = load_dir / "locustfile.py"
     from .settings import defaults
     import json
-    settings = {**defaults(scenario), **(parameters or {}), "run_time_seconds": duration_seconds}
+    settings = {**defaults(scenario), **(parameters or {}), "run_time_seconds": duration_seconds or 0}
     shape_class = SHAPES[scenario]["class"]
     locustfile.write_text(
         f"from {application_module} import *\n"
@@ -93,9 +93,9 @@ def start_locust(
         str(html_report),
         "--logfile",
         str(log_file),
-        "--run-time",
-        f"{duration_seconds}s",
     ]
+    if duration_seconds is not None:
+        command.extend(["--run-time", f"{duration_seconds}s"])
 
     env = os.environ.copy()
     stdout_handle = stdout_file.open("w")

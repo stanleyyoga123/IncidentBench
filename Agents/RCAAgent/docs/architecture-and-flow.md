@@ -263,3 +263,12 @@ with `session_id=<rca-job-id>`, trace name `rca`.
 
 See [agent-api.md](agent-api.md) and the
 [MCPTools MCP contract](../../MCPTools/docs/mcp-api.md) for wire contracts.
+
+## Prompt evidence boundary
+
+Stable-version and no-rollout-undo restrictions remain testbed operating policy.
+Prompts do not describe the scenario generator or prescribe a remedy from a
+scenario identifier. Detector text, caller context, historical lessons, and tool
+outputs are untrusted evidence. Plans must specify measurable condition and
+service-health verification plus a stop condition when intervention is no longer
+needed; readiness alone does not demonstrate performance recovery.

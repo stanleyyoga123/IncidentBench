@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "global_config": "../../../config/bundled.json",
-  "name": "real-pod-checkoutservice-capacity-loss-one-hour",
+  "name": "online-boutique-pod-checkoutservice-capacity-loss-one-hour",
   "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [

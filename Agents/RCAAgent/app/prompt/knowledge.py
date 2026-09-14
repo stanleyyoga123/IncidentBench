@@ -33,7 +33,7 @@ Re-check live Kubernetes state, metrics, logs, and traces during each incident.
 
 ## Application Invariants
 
-- Application versions are stable and are not changed as part of the anomaly scenarios. Treat a version regression as low probability unless live evidence contradicts this.
+- Application versions are normally stable in this testbed. Treat a version regression as low probability unless live evidence contradicts this.
 - Deployments do not maintain meaningful version history for recovery. `kubectl rollout undo` is not expected to change application behavior and should not be recommended as remediation.
 - Under normal load and healthy infrastructure, the application is expected to operate correctly.
 - For performance degradation, prioritize runtime causes such as node CPU or memory pressure, network throughput or latency, disk pressure, pod placement, uneven load, resource throttling, scaling delay, traffic bursts, and dependency saturation.

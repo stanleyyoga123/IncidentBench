@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "three-application-cpu-smoke",
+  "inter_run_seconds": 30,
+  "runs": [
+    {
+      "scenario": "../scenarios/cpu-smoke/sock-shop.json"
+    },
+    {
+      "scenario": "../scenarios/cpu-smoke/online-boutique.json"
+    },
+    {
+      "scenario": "../scenarios/cpu-smoke/teastore.json"
+    }
+  ]
+}

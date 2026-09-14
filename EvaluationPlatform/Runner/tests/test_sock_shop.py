@@ -34,6 +34,8 @@ def behavior():
 
 def test_journey_covers_catalogue_product_and_isolated_cart(behavior):
     module, instance = behavior
+    # Choosing the last candidate would select the expensive item without filtering.
+    module.random = SimpleNamespace(choice=lambda products: products[-1])
     calls = []
 
     class Response:
@@ -52,7 +54,7 @@ def test_journey_covers_catalogue_product_and_isolated_cart(behavior):
             raise AssertionError(message)
 
         def json(self):
-            return [{"id": "sock-1"}] if self.path == "/catalogue" else {"id": "result-1"}
+            return [{"id": "sock-1", "price": 18}, {"id": "declined-sock", "price": 99.99}] if self.path == "/catalogue" else {"id": "result-1"}
 
     def fake_request(_instance, method, path, **kwargs):
         calls.append((method, path, kwargs))
@@ -83,7 +85,9 @@ def test_journey_covers_catalogue_product_and_isolated_cart(behavior):
     assert any(path == "/orders" for _, path, _ in calls)
 
 
-def test_unusable_catalogue_is_a_recorded_failure(behavior):
+@pytest.mark.parametrize('products', [[], [{"id": "expensive", "price": 99.99}],
+                                     [{"id": "missing-price"}], [{"id": "invalid-price", "price": "cheap"}]])
+def test_unusable_catalogue_is_a_recorded_failure(behavior, products):
     module, instance = behavior
     failures = []
 
@@ -100,7 +104,7 @@ def test_unusable_catalogue_is_a_recorded_failure(behavior):
             failures.append(message)
 
         def json(self):
-            return []
+            return products
 
     module.request = lambda *_args, **_kwargs: Response()
     with pytest.raises(module.RescheduleTask):
@@ -160,7 +164,7 @@ def test_sock_shop_full_suite_matches_boutique_fault_families_and_valid_targets(
         scenario = resolve_scenario(root / 'resources/suites' / entry['scenario'])
         names.add(scenario['name'])
         assert scenario['application'] == 'sock-shop'
-        assert scenario['timing']['baseline_seconds'] == 3600
+        assert scenario['timing']['baseline_seconds'] == 1800
         assert [step['duration'] for step in scenario['steps']] == [3600, 600]
         schedules = catalogue.resolve_many(scenario['steps'][0]['chaos'])
         validate_pod_chaos_selectors(rendered[scenario['placement']], schedules, 'app')

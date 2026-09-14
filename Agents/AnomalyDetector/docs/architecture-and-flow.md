@@ -93,8 +93,12 @@ the expected matrix result shape. The adapter groups results by resource, name,
 and metric. Duplicate timestamps keep the last finite value; non-finite samples
 are removed; remaining points are sorted.
 
-Configuration validates that the history/step combination yields at least 123
-samples, enough for the maximum 120-point lookback plus a three-point tail.
+Configuration validates that the history/step combination yields at least 33
+samples, enough for the default minimum history of 30 points plus a three-point
+tail. The default 30-minute range at 30-second spacing yields 61 points. Default
+profiles cap lookback at 60, using the available 58–60 preceding points for the
+three tail evaluations. Custom profiles with larger minimum-history or tail
+requirements need a correspondingly larger collection window.
 
 ## 4. Profile resolution
 
@@ -203,7 +207,7 @@ lessons do not automatically change detector profiles.
 | `collector.metadata.excluded_nodes` | `tools-node` | Node signals omitted from detection. |
 | `collector.metrics.base_url` | Prometheus service DNS | Query/rule API. |
 | `collector.metrics.timeout` | `10` seconds | HTTP timeout. |
-| `collector.metrics.history_minutes` | `65` | Range window. |
+| `collector.metrics.history_minutes` | `30` | Range window. |
 | `collector.metrics.query_step_seconds` | `30` | Alignment and sample spacing. |
 | `collector.metrics.max_concurrency` | `4` | Concurrent Prometheus calls. |
 | `detector.interval_seconds` | `30` | Delay between cycles. |

@@ -44,7 +44,7 @@ from grader.rubric import (
 
 
 EVALUATION_ROOT = Path(__file__).resolve().parents[1]
-SCENARIO_NAME = "real-node-delay-worker-3-one-hour"
+SCENARIO_NAME = "online-boutique-node-delay-worker-3-one-hour"
 ANCHOR = "1970-01-01T00:16:40+00:00"
 EXCLUDED_PAPER_SCENARIOS = {
     "e2e-node-cpu-worker-1-twenty-minutes",
@@ -304,7 +304,15 @@ def test_current_and_historical_scenarios_have_valid_ground_truth() -> None:
     scenarios = _scenario_catalog()
     assert len(scenarios) == 71
     assert set(scenarios) <= set(truth)
-    assert set(truth) - set(scenarios) == EXCLUDED_PAPER_SCENARIOS - {"long-multi-fault-one-day"}
+    legacy_names = {
+        name.replace("online-boutique-", "real-", 1)
+        for name in scenarios
+        if name.startswith("online-boutique-")
+    }
+    assert len(legacy_names) == 23
+    assert set(truth) - set(scenarios) == (
+        EXCLUDED_PAPER_SCENARIOS - {"long-multi-fault-one-day"}
+    ) | legacy_names
     assert all(truth[name]["rca"] and truth[name]["remediation"] for name in scenarios)
 
 
@@ -345,7 +353,7 @@ def test_special_service_and_fault_policies_are_consistent() -> None:
     assert "after the fault ends does not count" in registry_penalties
 
     for name in (
-        "real-pod-redis-cart-memory-all-one-hour",
+        "online-boutique-pod-redis-cart-memory-all-one-hour",
         "teastore-pod-db-memory-all-one-hour",
     ):
         joined = " ".join(item.criteria for item in penalties[name].items)
@@ -362,9 +370,9 @@ def test_special_service_and_fault_policies_are_consistent() -> None:
             assert "safe limit-only increase is incomplete but is not penalized" in joined
 
     expected_headroom = {
-        "real-pod-emailservice-cpu-headroom-all-one-hour": "250m",
-        "real-pod-checkoutservice-cpu-headroom-all-one-hour": "250m",
-        "real-pod-productcatalogservice-cpu-headroom-all-one-hour": "250m",
+        "online-boutique-pod-emailservice-cpu-headroom-all-one-hour": "250m",
+        "online-boutique-pod-checkoutservice-cpu-headroom-all-one-hour": "250m",
+        "online-boutique-pod-productcatalogservice-cpu-headroom-all-one-hour": "250m",
         "teastore-pod-webui-cpu-headroom-all-one-hour": "500m",
         "teastore-pod-persistence-cpu-headroom-all-one-hour": "500m",
         "teastore-pod-image-cpu-headroom-all-one-hour": "750m",
@@ -405,13 +413,13 @@ def test_active_ground_truth_uses_expected_production_abstractions() -> None:
 def test_transactional_and_stateful_service_context_is_preserved() -> None:
     truth = load_ground_truth(DEFAULT_GROUND_TRUTH_DIR)
     assert "transaction completion" in truth[
-        "real-pod-checkoutservice-cpu-all-one-hour"
+        "online-boutique-pod-checkoutservice-cpu-all-one-hour"
     ]["rca"]
     assert "transaction-safe handling" in truth[
-        "real-pod-paymentservice-cpu-all-one-hour"
+        "online-boutique-pod-paymentservice-cpu-all-one-hour"
     ]["rca"]
     assert "non-sharded cart state store" in truth[
-        "real-pod-redis-cart-memory-all-one-hour"
+        "online-boutique-pod-redis-cart-memory-all-one-hour"
     ]["rca"]
     assert "singleton MySQL data tier" in truth[
         "teastore-pod-db-memory-all-one-hour"
@@ -588,7 +596,7 @@ def test_penalty_file_rejects_out_of_range_values(tmp_path: Path) -> None:
 
 
 def test_applied_penalties_subtract_and_floor_at_zero() -> None:
-    penalty_set = load_penalties()["real-node-delay-worker-3-one-hour"]
+    penalty_set = load_penalties()["online-boutique-node-delay-worker-3-one-hour"]
     judgements = {
         item.key: {
             "applied": item.key in {"p0", "p1"},

@@ -24,9 +24,13 @@ class RemediationEngine:
         self.settings = settings
         self.audit_callback = audit_callback
         self._live_ansible_succeeded = False
+        self._live_ansible_failed = False
+        self._post_action_checks = set()
 
     def run(self, job_id, request: RemediationJobRequest):
         self._live_ansible_succeeded = False
+        self._live_ansible_failed = False
+        self._post_action_checks = set()
         agent = Agent(
             name="remediator-agent",
             model=self.settings.client.model,
@@ -47,10 +51,18 @@ class RemediationEngine:
         with audit_tool_calls(callback):
             with propagate_attributes(session_id=str(job_id), trace_name="remediator"):
                 raw = agent.run(prompt)
-        self.require_live_ansible()
+        self.require_verified_recovery(raw)
         return self._parse(raw), raw
 
     def note_tool_result(self, name: str, result) -> None:
+        if name == "remediator.run_ansible":
+            # Invalidate earlier observations on every subsequent execution attempt,
+            # including ambiguous responses. A later success cannot erase failure.
+            self._post_action_checks.clear()
+            if not isinstance(result, dict):
+                self._live_ansible_failed = True
+            elif result.get("check") is not True and result.get("ok") is not True:
+                self._live_ansible_failed = True
         if (
             name == "remediator.run_ansible"
             and isinstance(result, dict)
@@ -58,6 +70,36 @@ class RemediationEngine:
             and result.get("check") is False
         ):
             self._live_ansible_succeeded = True
+        if name in {"kubectl", "prometheus"}:
+            self._post_action_checks.discard(name)
+        if not self._live_ansible_succeeded or not isinstance(result, dict):
+            return
+        if name == "kubectl" and result.get("ok") is True and result.get("stdout"):
+            self._post_action_checks.add("kubectl")
+        if name == "prometheus" and result.get("ok") is True:
+            payload = result.get("data")
+            if isinstance(payload, dict) and payload.get("status") == "success":
+                data = payload.get("data")
+                if isinstance(data, dict) and data.get("result"):
+                    self._post_action_checks.add("prometheus")
+
+    def require_verified_recovery(self, raw: str) -> None:
+        self.require_live_ansible()
+        if self._live_ansible_failed:
+            raise RuntimeError("live remediation failure requires review")
+        status = self._lines(self._section(raw, "Status"))
+        if (
+            status.count("Automation: executed") != 1
+            or status.count("Recovery: verified") != 1
+            or sum(line.startswith("Automation:") for line in status) != 1
+            or sum(line.startswith("Recovery:") for line in status) != 1
+            or not self._lines(self._section(raw, "Verification"))
+        ):
+            raise RuntimeError("remediation recovery is not explicitly verified")
+        if not {"kubectl", "prometheus"}.issubset(self._post_action_checks):
+            raise RuntimeError(
+                "recovery requires post-action Kubernetes and non-empty Prometheus evidence"
+            )
 
     def require_live_ansible(self) -> None:
         if not self._live_ansible_succeeded:

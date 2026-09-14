@@ -10,7 +10,7 @@ migrations in `../../EvaluationPlatform/Orchestrator/Database` before starting t
 ## Data flow
 
 Prometheus recording rules precompute the deployment and node aggregations every
-30 seconds. Each detector cycle requests one aligned 65-minute range from the
+30 seconds. Each detector cycle requests one aligned 30-minute range from the
 Prometheus HTTP API, converts the response to `MetricSeries`, runs every monitor
 against the same snapshot, and then discards the samples. The application does
 not maintain a local metric store or perform a startup backfill.
@@ -46,8 +46,10 @@ fatal configuration error.
 
 Copy `.env.example` to `.env` and set the Prometheus endpoint plus the
 AgentOrchestrator ingestion URL/token.
-The default query window is 65 minutes at a 30-second step, providing 131
-samples for the 120-point baseline and three-point detector tail.
+The default query window is 30 minutes at a 30-second step, providing 61
+samples. Default Z-score profiles cap the lookback at 60 preceding points and
+require at least 30; the three tail points use the available 58–60 preceding
+samples. Custom profiles requiring more history need a larger query window.
 
 Run continuously:
 

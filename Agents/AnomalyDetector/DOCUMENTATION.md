@@ -312,8 +312,8 @@ The important fields for agents are:
 `ZScoreMonitor` configures one `ZScoreLogic` per metric name. Shared defaults:
 
 ```text
-threshold = 5
-lookback = 120
+threshold = 4
+lookback = 60
 min_history = 30
 n_tail = 3
 consecutive_anomalies_required = 3

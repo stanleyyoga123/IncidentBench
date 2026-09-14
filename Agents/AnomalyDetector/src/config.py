@@ -18,7 +18,7 @@ class MetadataCollectorSettings(BaseModel):
 class MetricsCollectorSettings(BaseModel):
     base_url: str
     timeout: int
-    history_minutes: int = 65
+    history_minutes: int = 30
     query_step_seconds: int = 30
     max_concurrency: int = 4
 
@@ -32,10 +32,10 @@ class MetricsCollectorSettings(BaseModel):
             raise ValueError("max_concurrency must be positive")
 
         sample_count = (self.history_minutes * 60) // self.query_step_seconds + 1
-        if sample_count < 123:
+        if sample_count < 33:
             raise ValueError(
-                "Prometheus history window must provide at least 123 samples "
-                "for the 120-point detector lookback and 3-point tail"
+                "Prometheus history window must provide at least 33 samples "
+                "for the default 30-point minimum history and 3-point tail"
             )
         return self
 

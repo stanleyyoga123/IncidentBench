@@ -32,29 +32,29 @@ criteria and are not semantic ground truth.
 
 | # | Scenario | Fault type | Target | Remediation type |
 | ---: | --- | --- | --- | --- |
-| 1 | `real-node-delay-worker-3-one-hour` | Bidirectional node network delay | `worker-node-3` and traffic between it and peer nodes | Node isolation and evacuation |
-| 2 | `real-node-delay-worker-2-one-hour` | Bidirectional node network delay | `worker-node-2` and traffic between it and peer nodes | Node isolation and evacuation |
-| 3 | `real-node-delay-worker-5-one-hour` | Bidirectional node network delay | `worker-node-5` and traffic between it and peer nodes | Node isolation and evacuation |
-| 4 | `real-node-loss-worker-1-one-hour` | Node packet loss | `worker-node-1` | Node isolation and evacuation |
-| 5 | `real-node-loss-worker-2-one-hour` | Node packet loss | `worker-node-2` | Node isolation and evacuation |
-| 6 | `real-node-loss-worker-3-one-hour` | Node packet loss | `worker-node-3` | Node isolation and evacuation |
-| 7 | `real-pod-cartservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `cartservice` | Service CPU capacity |
-| 8 | `real-pod-checkoutservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `checkoutservice` | Service CPU capacity |
-| 9 | `real-pod-recommendationservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `recommendationservice` | Service CPU capacity |
-| 10 | `real-pod-productcatalogservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `productcatalogservice` | Service CPU capacity |
-| 11 | `real-pod-paymentservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `paymentservice` | Service CPU capacity |
-| 12 | `real-node-cpu-worker-2-one-hour` | Node CPU pressure | `worker-node-2` | Node isolation and evacuation |
-| 13 | `real-node-memory-worker-3-one-hour` | Node memory pressure | `worker-node-3` | Node isolation and evacuation |
-| 14 | `real-pod-adservice-memory-all-one-hour` | Service-wide pod memory pressure | `adservice` | Service memory capacity |
-| 15 | `real-pod-checkoutservice-capacity-loss-one-hour` | Recurring single-pod capacity loss | `checkoutservice` | N+1 capacity |
-| 16 | `real-pod-productcatalogservice-bandwidth-all-one-hour` | Per-pod bandwidth throttling | `productcatalogservice` | Bandwidth scale-out |
-| 17 | `real-pod-redis-cart-memory-all-one-hour` | Service-wide pod memory pressure | `redis-cart` | Service memory capacity; vertical-only for state safety |
-| 18 | `real-pod-currencyservice-memory-all-one-hour` | Service-wide pod memory pressure | `currencyservice` | Service memory capacity |
-| 19 | `real-pod-shippingservice-bandwidth-all-one-hour` | Per-pod bandwidth throttling | `shippingservice` | Bandwidth scale-out |
-| 20 | `real-pod-paymentservice-capacity-loss-one-hour` | Recurring single-pod capacity loss | `paymentservice` | N+1 capacity |
-| 21 | `real-pod-emailservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `emailservice` | CPU headroom |
-| 22 | `real-pod-checkoutservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `checkoutservice` | CPU headroom |
-| 23 | `real-pod-productcatalogservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `productcatalogservice` | CPU headroom |
+| 1 | `online-boutique-node-delay-worker-3-one-hour` | Bidirectional node network delay | `worker-node-3` and traffic between it and peer nodes | Node isolation and evacuation |
+| 2 | `online-boutique-node-delay-worker-2-one-hour` | Bidirectional node network delay | `worker-node-2` and traffic between it and peer nodes | Node isolation and evacuation |
+| 3 | `online-boutique-node-delay-worker-5-one-hour` | Bidirectional node network delay | `worker-node-5` and traffic between it and peer nodes | Node isolation and evacuation |
+| 4 | `online-boutique-node-loss-worker-1-one-hour` | Node packet loss | `worker-node-1` | Node isolation and evacuation |
+| 5 | `online-boutique-node-loss-worker-2-one-hour` | Node packet loss | `worker-node-2` | Node isolation and evacuation |
+| 6 | `online-boutique-node-loss-worker-3-one-hour` | Node packet loss | `worker-node-3` | Node isolation and evacuation |
+| 7 | `online-boutique-pod-cartservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `cartservice` | Service CPU capacity |
+| 8 | `online-boutique-pod-checkoutservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `checkoutservice` | Service CPU capacity |
+| 9 | `online-boutique-pod-recommendationservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `recommendationservice` | Service CPU capacity |
+| 10 | `online-boutique-pod-productcatalogservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `productcatalogservice` | Service CPU capacity |
+| 11 | `online-boutique-pod-paymentservice-cpu-all-one-hour` | Service-wide pod CPU pressure | `paymentservice` | Service CPU capacity |
+| 12 | `online-boutique-node-cpu-worker-2-one-hour` | Node CPU pressure | `worker-node-2` | Node isolation and evacuation |
+| 13 | `online-boutique-node-memory-worker-3-one-hour` | Node memory pressure | `worker-node-3` | Node isolation and evacuation |
+| 14 | `online-boutique-pod-adservice-memory-all-one-hour` | Service-wide pod memory pressure | `adservice` | Service memory capacity |
+| 15 | `online-boutique-pod-checkoutservice-capacity-loss-one-hour` | Recurring single-pod capacity loss | `checkoutservice` | N+1 capacity |
+| 16 | `online-boutique-pod-productcatalogservice-bandwidth-all-one-hour` | Per-pod bandwidth throttling | `productcatalogservice` | Bandwidth scale-out |
+| 17 | `online-boutique-pod-redis-cart-memory-all-one-hour` | Service-wide pod memory pressure | `redis-cart` | Service memory capacity; vertical-only for state safety |
+| 18 | `online-boutique-pod-currencyservice-memory-all-one-hour` | Service-wide pod memory pressure | `currencyservice` | Service memory capacity |
+| 19 | `online-boutique-pod-shippingservice-bandwidth-all-one-hour` | Per-pod bandwidth throttling | `shippingservice` | Bandwidth scale-out |
+| 20 | `online-boutique-pod-paymentservice-capacity-loss-one-hour` | Recurring single-pod capacity loss | `paymentservice` | N+1 capacity |
+| 21 | `online-boutique-pod-emailservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `emailservice` | CPU headroom |
+| 22 | `online-boutique-pod-checkoutservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `checkoutservice` | CPU headroom |
+| 23 | `online-boutique-pod-productcatalogservice-cpu-headroom-all-one-hour` | CPU headroom pressure | `productcatalogservice` | CPU headroom |
 
 Online Boutique checkout and payment targets sit on transactional paths, so
 recovery verification must include the affected checkout/payment workflow and

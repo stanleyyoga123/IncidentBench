@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "global_config": "../../../config/bundled.json",
-  "name": "real-pod-checkoutservice-cpu-headroom-all-one-hour",
+  "name": "online-boutique-pod-checkoutservice-cpu-headroom-all-one-hour",
   "application": "online-boutique",
   "placement": "cpu-constrained-six-node",
   "steps": [

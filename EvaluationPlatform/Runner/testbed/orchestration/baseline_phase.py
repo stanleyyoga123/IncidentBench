@@ -27,7 +27,8 @@ class BaselinePhase(PhaseSupport):
         context.metadata["snapshots"].append(context.evaluator.collect_snapshot("baseline-before-load"))
         self.log(
             f"spawning locust: scenario={context.config.loadgenerator}, "
-            f"host={context.config.host}, duration={context.total_load_duration}s"
+            f"host={context.config.host}, planned_duration={context.total_load_duration}s, "
+            "stop=finalization"
         )
         context.load_process = self.load_launcher(
             repo_root=context.config.repo_root,
@@ -35,7 +36,9 @@ class BaselinePhase(PhaseSupport):
             scenario=context.config.loadgenerator,
             application_module=context.config.loadgenerator_module,
             host=context.config.host,
-            duration_seconds=context.total_load_duration,
+            # Activation and chaos transitions take additional wall-clock time.
+            # Finalization stops traffic after the last step, including on failure.
+            duration_seconds=None,
             parameters=getattr(context.config, "load_parameters", None),
         )
         context.metadata["loadgenerator"]["command"] = context.load_process.command

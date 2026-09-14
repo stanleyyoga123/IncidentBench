@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "global_config": "../../../config/bundled.json",
-  "name": "real-pod-productcatalogservice-cpu-all-one-hour",
+  "name": "online-boutique-pod-productcatalogservice-cpu-all-one-hour",
   "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [

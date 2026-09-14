@@ -137,7 +137,7 @@ class PrometheusSeriesProviderTest(unittest.IsolatedAsyncioTestCase):
             collector,
             namespaces=["team.b", "team-a"],
             excluded_nodes=["tools-node"],
-            history_minutes=65,
+            history_minutes=30,
             query_step_seconds=30,
             clock=lambda: 1_234.9,
         )
@@ -148,7 +148,7 @@ class PrometheusSeriesProviderTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, collector.verify_calls)
         self.assertEqual(QueryBuilder.required_record_names(), collector.required_names)
         self.assertEqual(1_230, collector.collect_calls[0]["end"])
-        self.assertEqual(-2_670, collector.collect_calls[0]["start"])
+        self.assertEqual(-570, collector.collect_calls[0]["start"])
         self.assertEqual(30, collector.collect_calls[0]["step"])
         self.assertEqual("team\\-a|team\\.b", collector.collect_calls[0]["namespace_regex"])
         self.assertEqual("tools\\-node", collector.collect_calls[0]["excluded_node_regex"])

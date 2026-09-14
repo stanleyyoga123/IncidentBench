@@ -79,13 +79,18 @@ Traffic parameters:
 | `sinus` | `min_users`, `max_users`, `period_seconds`, `bias_users`, `spawn_rate`, `seed` |
 | `daily` | `base_users`, `stages` containing cumulative `duration`, `percentage_users`, and `spawn_rate` |
 
-Defaults are fixed in `testbed/loadgenerator/defaults.json` and materialized into the resolved scenario. A daily curve repeats after its final stage. Its clock starts with Locust, including the baseline. Total traffic runtime is baseline + activation grace + scenario step durations. Global defaults use only a load type so changing shape does not inherit incompatible parameters; if you add global shape parameters, scenario overrides must remain compatible with that shape.
+Defaults are fixed in `testbed/loadgenerator/defaults.json` and materialized into the resolved scenario. A daily curve repeats after its final stage. Its clock starts with Locust, including the baseline. Traffic runs through baseline, worker activation, activation grace, and every scenario step until finalization stops it. Activation and transition waits add to the planned baseline + grace + step durations; a fixed Locust timer must not truncate recovery. Global defaults use only a load type so changing shape does not inherit incompatible parameters; if you add global shape parameters, scenario overrides must remain compatible with that shape.
 
 Suites list ordered `{ "scenario": "...", "overrides": { ... } }` entries and `inter_run_seconds`. `resources/suites/paired.json` runs matching scenarios with `agents_enabled` true and false. Both variants use the bundled preparation/reset; false leaves workers stopped after baseline. `config/none.json` selects no external solution at all.
 
 Environment JSON owns endpoints, node IPs, inventory, port forwarding, optional S3 destination, and the *name* of the token environment variable. URLs cannot contain credentials. Node-delay YAML uses `${node_ip:worker-node-N}`; only referenced schedules require matching `node_ips`. The archived YAML contains the resolved IP, and its digest describes the actual applied file. Node names and placement topology remain explicit experiment inputs: change placement overlays and chaos selectors together for a different topology.
 
-For TeaStore use at least a ten-minute baseline, and for Sock Shop at least six minutes; their existing baseline health checks remain active. Curated ordinary scenarios retain the batch default of a 60-minute baseline; Sock Shop scenarios explicitly set shorter durations. Application warm-up remains in its profile.
+For TeaStore use at least a ten-minute baseline, and for Sock Shop at least six minutes; their existing baseline health checks remain active. Curated ordinary scenarios inherit a 30-minute baseline from both bundled and workload-only global configurations. The dedicated Sock Shop short test and TeaStore baseline test retain their explicit six- and ten-minute overrides. Application warm-up remains in its profile.
+
+Sock Shop's shopping journey selects items whose price plus the demo's 4.99
+shipping fee stays within its 100 payment limit. Expected over-limit declines
+would otherwise contaminate the baseline failure rate. HTTP and invalid-order
+responses still count as failures; an empty or unaffordable catalogue fails too.
 
 ## Lifecycle and hook interface
 
@@ -108,6 +113,11 @@ Pre-run failure prevents baseline/chaos. `run-status.json` reports outer failure
 
 Bundled hooks are intentionally small shell files. `reset-solution/run.sh` visibly calls `api-reset`; `export-sessions/run.sh` calls `api-export`. Reusable HTTP/scale/install mechanics are in `hooks/runtime.py`. There are no partial reset options: bundled pre-run always clears workflows, jobs, audits, artifacts, lessons and the execution slot through Orchestrator.
 
+The `grant-remediation` hook verifies deployment and HPA patch permissions with
+Kubernetes SubjectAccessReview requests using Runner's normal credentials. This
+also works inside the Runner pod, where `kubectl --as` can bypass in-cluster
+credential discovery. A denied or missing permission result fails preparation.
+
 ## Extend the platform
 
 - **Another solution:** copy `hooks/integrations/example/`, implement its four actions, add its deployment list to a global JSON file, and select your own pre/post hooks. Kubernetes lifecycle helpers accept any configured deployment names. Select `none` for a workload-only run.
@@ -128,6 +138,20 @@ Legacy `.env` load files are not loaded and have been removed. Experiment settin
 The bundled post-run list already includes `upload` after `export-sessions`. Set `s3_results_uri` in `config/environment.json` to `s3://YOUR-BUCKET/evaluation-results` and supply AWS credentials through the AWS CLI credential chain. A null destination skips sync. See the [S3 upload hook](hooks/postrun/upload/README.md) for configuration, retries and final-status timing.
 
 ## Track an experiment
+
+The three-application CPU smoke suite runs Sock Shop, Online Boutique, and
+TeaStore serially with agents enabled:
+
+```bash
+python -m testbed.main --suite resources/suites/cpu-smoke.json --environment config/environment.json
+```
+
+Each scenario injects CPU stress for 15 minutes and observes recovery for five
+minutes. Baselines are six minutes for Sock Shop, five for Online Boutique, and
+ten for TeaStore, retaining the applications' documented health requirements.
+These explicit smoke-test durations do not change the standard 30-minute baseline.
+TeaStore uses a dedicated two-worker CPU fault to exceed its image container's
+1500m limit; the existing single-worker headroom scenario remains separate.
 
 Every new run saves resolved settings and original configuration layers before preparation, with a hashed source manifest under `inputs/`. `run-status.json`, `hooks.json`, and `events.jsonl` expose lifecycle progress; `runner.log` and `metadata.json` expose engine progress. See [input capture and live tracking](docs/experiment-visibility.md) for commands, artifact timing, exclusions and S3 visibility.
 

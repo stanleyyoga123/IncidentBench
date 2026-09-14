@@ -8,6 +8,11 @@ from locust.exception import RescheduleTask
 from testbed.loadgenerator.common import request
 
 
+# The bundled payment image declines totals above 100; orders adds 4.99 shipping.
+PAYMENT_LIMIT = 100.0
+SHIPPING_COST = 4.99
+
+
 class SockShopBehavior(TaskSet):
     def on_start(self):
         self.requests_since_connection_recycle = 0
@@ -68,7 +73,12 @@ class SockShopBehavior(TaskSet):
                 raise RescheduleTask()
             try:
                 products = catalogue.json()
-                product_id = random.choice(products)["id"]
+                affordable = [product for product in products
+                              if isinstance(product, dict)
+                              and product.get("id")
+                              and type(product.get("price")) in (int, float)
+                              and 0 < product["price"] <= PAYMENT_LIMIT - SHIPPING_COST]
+                product_id = random.choice(affordable)["id"]
             except (TypeError, ValueError, KeyError, IndexError):
                 catalogue.failure("Sock Shop catalogue returned no usable products")
                 raise RescheduleTask() from None

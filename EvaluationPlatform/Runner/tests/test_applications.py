@@ -5,6 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 import yaml
 
 from testbed.applications import ApplicationCatalog
@@ -421,7 +422,8 @@ def test_kustomize_install_deletes_sibling_application_namespaces_first():
         )
 
 
-def test_locust_launcher_composes_shape_with_application_behavior():
+@pytest.mark.parametrize('duration', [60, None])
+def test_locust_launcher_composes_shape_with_application_behavior(duration):
     class Process:
         returncode = None
 
@@ -432,15 +434,17 @@ def test_locust_launcher_composes_shape_with_application_behavior():
         "testbed.loadgenerator.runner.subprocess.Popen", return_value=Process()
     ):
         output = Path(tmp)
-        start_locust(
+        launched = start_locust(
             ROOT,
             output,
             "constant",
             "resources.applications.teastore",
             "http://teastore",
-            60,
+            duration,
         )
         locustfile = output / "loadgenerator" / "locustfile.py"
         text = locustfile.read_text()
         assert "from resources.applications.teastore import *" in text
         assert "loadgenerator.constant" in text
+        assert ('--run-time' in launched.command) == (duration is not None)
+        assert f'"run_time_seconds": {duration or 0}' in text

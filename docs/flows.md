@@ -33,7 +33,11 @@ cycle, the event can be lost; this is an accepted fail-and-re-detect tradeoff.
    for the shared lease.
 3. It validates current state, writes session artifacts, runs Ansible check mode,
    performs guarded live execution, then verifies directly.
-4. Success enters learning. A crash or ambiguous failure after execution
+4. Success requires a live execution, explicit verified recovery, and subsequent
+   Kubernetes and non-empty Prometheus evidence before entering learning. The
+   model still assesses whether that evidence meets the approved success criteria.
+   Stale, unnecessary, unsafe, or unverified plans stop for `needs_review` without
+   forcing a mutation. A crash or ambiguous failure after execution
    begins becomes `needs_review`; only an explicit retry decision can proceed.
 
 Failed RCA or reviewed remediation can be retried with a fresh versioned

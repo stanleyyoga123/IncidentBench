@@ -21,7 +21,7 @@ class PrometheusSeriesProvider:
         *,
         namespaces: list[str],
         excluded_nodes: list[str] | None = None,
-        history_minutes: int = 65,
+        history_minutes: int = 30,
         query_step_seconds: int = 30,
         clock: Callable[[], float] = time.time,
     ) -> None:

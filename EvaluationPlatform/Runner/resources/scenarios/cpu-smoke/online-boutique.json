@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "online-boutique-cpu-saturation-smoke",
+  "application": "online-boutique",
+  "placement": "canonical-six-node",
+  "timing": {
+    "baseline_seconds": 300,
+    "grace_seconds": 60
+  },
+  "steps": [
+    {
+      "name": "cpu-saturation",
+      "chaos": [
+        "single-productcatalogservice-cpu"
+      ],
+      "duration": 900
+    },
+    {
+      "name": "recovery",
+      "chaos": [],
+      "duration": 300
+    }
+  ]
+}

@@ -65,6 +65,24 @@ def scale(context, enabled, *, run=subprocess.run, sleep=time.sleep, monotonic=t
             raise RuntimeError(f'deployment {namespace}/{name} did not stop')
 
 
+def verify_remediation_permissions(namespace, *, run=subprocess.run):
+    # SubjectAccessReview uses the caller's normal in-cluster authentication.
+    # kubectl --as can disable in-cluster credential fallback in Runner pods.
+    for group, resource in (('apps', 'deployments'), ('autoscaling', 'horizontalpodautoscalers')):
+        review = {
+            'apiVersion': 'authorization.k8s.io/v1', 'kind': 'SubjectAccessReview',
+            'spec': {
+                'user': 'system:serviceaccount:agents:mcp-tools-remediation',
+                'groups': ['system:serviceaccounts', 'system:serviceaccounts:agents', 'system:authenticated'],
+                'resourceAttributes': {'namespace': namespace, 'verb': 'patch', 'group': group, 'resource': resource},
+            },
+        }
+        result = run(['kubectl', 'create', '-f', '-', '-o', 'json'],
+                     input=json.dumps(review), capture_output=True, text=True, check=True)
+        if json.loads(result.stdout).get('status', {}).get('allowed') is not True:
+            raise RuntimeError(f'MCP remediation cannot patch {resource}.{group} in {namespace}')
+
+
 def main():
     operation, context_path, output = sys.argv[1:4]
     context = json.loads(Path(context_path).read_text())
@@ -97,8 +115,7 @@ def main():
         profile = ApplicationCatalog(root / 'resources/applications', root.parents[1]).resolve(context['scenario']['application'])
         binding = root.parents[1] / 'Agents/MCPTools/kubernetes/application-role-binding.yaml'
         subprocess.run(['kubectl', '-n', profile.namespace, 'apply', '-f', str(binding)], check=True)
-        for resource in ('deployments.apps','horizontalpodautoscalers.autoscaling'):
-            subprocess.run(['kubectl', '-n', profile.namespace, 'auth', 'can-i', 'patch', resource, '--as=system:serviceaccount:agents:mcp-tools-remediation', '--quiet'], check=True)
+        verify_remediation_permissions(profile.namespace)
     elif operation == 'upload':
         uri = context['environment'].get('s3_results_uri')
         if not uri:

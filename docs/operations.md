@@ -40,19 +40,24 @@ old namespaced Role to the workload ClusterRole.
 Downgrade recreates legacy table structure only. Deleted records are not
 recoverable. Return `ALLOW_AGENT_WORKFLOW_RESET` to false after migration.
 
-## Development image rollout
+## Agent manifest rollout
 
-After the platform and database have been installed, the root
-`build-push-deploy-dev.sh` delegates build and deployment to the six platform
-components in dependency order. Docker Buildx, Docker Hub authentication,
-populated component Secrets, and a valid kubectl current context are required:
+The root `deploy.sh` invokes the six component deployment scripts in dependency
+order, including Orchestrator and both MCP profiles. It checks all component
+Secrets before applying resources, uses the current kubectl context, and stops
+on the first error. Each agent Deployment is restarted and awaited so mounted
+ConfigMaps and Secret environment changes are loaded, including namespace
+monitoring changes. Use it when evaluations and agent jobs are idle.
 
 ```bash
-./build-push-deploy-dev.sh
+./deploy.sh
 ```
 
-The script mutates kubectl's current cluster. It accepts no context argument and
-does not install platform prerequisites or run DatabaseJob.
+This applies the current local manifests and their image tags. Build/push images
+with the individual component `build.sh` scripts beforehand when required.
+Platform initialization, database migrations, application/Runner deployment,
+and automatic rollback are outside this command's scope. If a component fails,
+previous components may already be updated; fix the cause and rerun.
 
 ## Local verification
 

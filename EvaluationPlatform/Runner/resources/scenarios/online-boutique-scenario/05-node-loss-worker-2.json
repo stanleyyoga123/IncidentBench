@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "global_config": "../../../config/bundled.json",
-  "name": "real-node-loss-worker-2-one-hour",
+  "name": "online-boutique-node-loss-worker-2-one-hour",
   "application": "online-boutique",
   "placement": "canonical-six-node",
   "steps": [

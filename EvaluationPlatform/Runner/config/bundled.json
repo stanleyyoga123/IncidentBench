@@ -4,7 +4,7 @@
     "type": "constant"
   },
   "timing": {
-    "baseline_seconds": 3600,
+    "baseline_seconds": 1800,
     "grace_seconds": 60
   },
   "integration": "bundled",

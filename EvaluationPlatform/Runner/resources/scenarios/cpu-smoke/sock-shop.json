@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "global_config": "../../../config/bundled.json",
+  "name": "sock-shop-cpu-saturation-smoke",
+  "application": "sock-shop",
+  "placement": "canonical-six-node",
+  "timing": {
+    "baseline_seconds": 360,
+    "grace_seconds": 60
+  },
+  "steps": [
+    {
+      "name": "cpu-saturation",
+      "chaos": [
+        "sock-shop-catalogue-cpu"
+      ],
+      "duration": 900
+    },
+    {
+      "name": "recovery",
+      "chaos": [],
+      "duration": 300
+    }
+  ]
+}

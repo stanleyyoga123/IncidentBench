@@ -23,6 +23,52 @@ Start with [Runner configuration and extension interfaces](EvaluationPlatform/Ru
 
 For an existing deployment, stop the detector and job workers before deploying the new database migration and Orchestrator API. Migration `20260913_0005` adds evaluation ownership without clearing existing workflow data. The older legacy-table migration still requires its explicit reset flag when applicable. Do not set that flag merely to install this additive migration.
 
+## Build component images
+
+From the project root, build and push all eight component images, or select
+individual components:
+
+```bash
+./build.sh
+./build.sh rca-agent mcp-tools
+./build.sh database-job runner
+PLATFORM=linux/arm64 ./build.sh learning-agent
+```
+
+Run `./build.sh --help` for component names. Docker Buildx and registry login
+with push access to the existing `stanleyyoga123/*:dev` repositories are required.
+The default platform is `linux/amd64`; builds run sequentially and stop on the
+first failure. Initialization and Grader have no component Docker images.
+
+Individual scripts also work from the project root, for example
+`./Agents/RCAAgent/build.sh` or
+`./EvaluationPlatform/Runner/scripts/build.sh`. Each script resolves its own
+build context; Runner uses the repository root. Building images does not deploy
+them or run database migrations.
+
+## Update all agent deployments
+
+After platform prerequisites and database migrations are installed, run
+`./deploy.sh` from the workspace root. It applies each component's current local
+Kubernetes files in dependency order: MCPTools, LearningAgent, RCAAgent,
+RemediatorAgent, Orchestrator, then AnomalyDetector. It restarts all seven
+Deployments and waits for readiness so ConfigMap and Secret changes take effect.
+
+Populate each component's ignored `kubernetes/secret.yml` first. The script uses
+kubectl's current context; run it when evaluations and agent jobs are idle. It
+stops on failure without rollback. It does not build images, deploy the Runner,
+install infrastructure, or execute database migrations. Image tags come from
+the manifests. For existing application namespace bindings, the MCPTools script
+also accepts `APPLICATION_NAMESPACES="online-boutique teastore sock-shop"`.
+
+## Scale down the agent platform
+
+Run `./scale.sh` from the project root when evaluations and agent jobs are idle.
+It sets replicas to zero for AnomalyDetector, Orchestrator, RCAAgent,
+RemediatorAgent, LearningAgent, and both MCPTools deployments in namespace
+`agents`, using kubectl's current context. It checks that all seven deployments
+exist before scaling. Kubernetes terminates their pods asynchronously.
+
 ## Validate and run
 
 Install `EvaluationPlatform/Runner/requirements.txt` in your Python environment, plus kubectl, Helm and SSH. From the Runner directory:
@@ -38,6 +84,14 @@ python -m testbed.main --suite resources/suites/paired.json --environment config
 ```
 
 Validation reads configuration, catalogs and application sources, and checks local installer binaries. It does not contact or change the cluster. A real bundled run **clears all solution workflow and lesson data**, recreates application namespaces, scales configured deployments, and applies chaos. Use a dedicated evaluation cluster/deployment; runs are serial.
+
+Standard scenarios use a 30-minute baseline; AnomalyDetector queries the latest
+30 minutes at 30-second spacing. Explicit short test scenarios keep their own
+baseline durations.
+
+Online Boutique's 23 standard scenario names use the `online-boutique-` prefix,
+matching the application prefixes used by TeaStore and Sock Shop. Their JSON
+file paths are unchanged; the grader also retains the historical `real-` names.
 
 Run JSON owns experiment behavior. There are no load, timing, deployment, or agent-mode CLI overrides. Suite JSON describes repeated and paired experiments. Resolved scenarios, exact applied chaos YAML, placement fingerprints, metrics, lifecycle logs, and exported sessions remain in the output folder.
 

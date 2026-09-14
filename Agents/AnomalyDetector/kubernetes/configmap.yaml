@@ -9,7 +9,7 @@ data:
     collector.metadata.excluded_nodes=["tools-node"]
     collector.metrics.base_url=http://prometheus-server.monitoring.svc.cluster.local
     collector.metrics.timeout=10
-    collector.metrics.history_minutes=65
+    collector.metrics.history_minutes=30
     collector.metrics.query_step_seconds=30
     collector.metrics.max_concurrency=4
     orchestrator.base_url=http://agent-orchestrator.agents.svc.cluster.local:8080

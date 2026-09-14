@@ -12,6 +12,15 @@ from testbed.cli import parse_args
 SOURCE = ROOT/'resources/scenarios/online-boutique-scenario/01-node-delay-worker-3.json'
 
 
+def test_standard_baseline_is_thirty_minutes_and_short_tests_keep_overrides():
+    for name in ('bundled', 'none'):
+        config = json.loads((ROOT / 'config' / f'{name}.json').read_text())
+        assert config['timing']['baseline_seconds'] == 1800
+    assert resolve_scenario(SOURCE)['timing']['baseline_seconds'] == 1800
+    short = ROOT / 'resources/scenarios/sock-shop-scenario/01-pod-catalogue-cpu-all-ten-minutes.json'
+    assert resolve_scenario(short)['timing']['baseline_seconds'] == 360
+
+
 def test_recursive_merge_replaces_lists_without_changing_inputs():
     original={'timing':{'baseline_seconds':60,'grace_seconds':10},'prerun':['a','b']}
     assert merge(original,{'timing':{'baseline_seconds':120},'prerun':['c']}) == {'timing':{'baseline_seconds':120,'grace_seconds':10},'prerun':['c']}
@@ -49,7 +58,7 @@ def test_suite_validation_never_executes_run_or_cluster_commands(tmp_path):
 
 def test_all_committed_scenarios_resolve():
     paths = list((ROOT/'resources/scenarios').rglob('*.json'))
-    assert len(paths) == 72
+    assert len(paths) == 75
     for path in paths:
         resolve_scenario(path)
 
