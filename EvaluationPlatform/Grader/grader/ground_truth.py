@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-DEFAULT_GROUND_TRUTH_DIR = Path(__file__).resolve().parent / "ground_truth"
+DEFAULT_GROUND_TRUTH_DIR = Path(__file__).resolve().parents[1] / "resources" / "ground_truth"
 
 
 def load_ground_truth(path: Path | None = None) -> dict[str, dict[str, str]]:

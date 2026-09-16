@@ -13,7 +13,9 @@ import yaml
 from .chaos import ArchivedInputError, load_archived_chaos, load_archived_scenario
 from .ground_truth import DEFAULT_GROUND_TRUTH_DIR, load_ground_truth
 from .judge import JudgeClient, PROMPT_VERSION, build_payload, build_penalty_payload
-from .metrics import evaluate_metrics
+from .research import evaluate_incident, policy
+from .window_comparison import compare_windows, paired_frontend_window, validate_window, write_comparisons
+from .scenario_table import write_scenario_table
 from .penalty import (
     DEFAULT_PENALTIES_DIR,
     PenaltySet,
@@ -23,7 +25,6 @@ from .penalty import (
     penalty_set_for,
 )
 from .reports import (
-    write_global_report,
     write_rubric_score_csv,
     write_run_report,
     write_summary_csv,
@@ -52,31 +53,39 @@ class GraderConfig:
     rubric_path: Path = DEFAULT_RUBRIC_PATH
     penalties_path: Path = DEFAULT_PENALTIES_DIR
     model: str = "unknown"
+    model_revision: str | None = None
     judge_max_tokens: int = 8192
     concurrency: int = DEFAULT_CONCURRENCY
-    window_minutes: float = 5.0
-    threshold: float = 0.15
+    evaluation_policy: Path | None = None
     refresh_judge: bool = False
+    operational_only: bool = False
+    comparison_window_minutes: float = 5.0
+    table_workload: str = "front-end"
+    table_namespace: str | None = None
+    table_max_5xx_rate: float = 0.5
+    baseline_ignore_minutes: float = 5.0
 
 
 def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]:
-    if config.window_minutes <= 0:
-        raise ValueError("window_minutes must be positive")
-    if not 0 < config.threshold < 1:
-        raise ValueError("threshold must be between zero and one")
+    policy(config.evaluation_policy)
+    validate_window(config.comparison_window_minutes)
+    import math
+    if not math.isfinite(config.table_max_5xx_rate) or config.table_max_5xx_rate < 0:
+        raise ValueError("table maximum 5xx rate must be finite and nonnegative")
     if config.concurrency <= 0:
         raise ValueError("concurrency must be positive")
+    if not math.isfinite(config.baseline_ignore_minutes) or config.baseline_ignore_minutes < 0:
+        raise ValueError("baseline ignore minutes must be finite and nonnegative")
     rubric = load_rubric(config.rubric_path)
     penalties = load_penalties(config.penalties_path)
     LOGGER.info(
-        "grading started input=%s output=%s model=%s judge_max_tokens=%s concurrency=%s window_minutes=%s threshold=%s refresh_judge=%s rubric=%s rubric_hash=%s penalties=%s penalty_scenarios=%d",
+        "grading started input=%s output=%s model=%s judge_max_tokens=%s concurrency=%s evaluation_policy=%s refresh_judge=%s rubric=%s rubric_hash=%s penalties=%s penalty_scenarios=%d",
         config.input_path,
         config.output_path,
         config.model,
         config.judge_max_tokens,
         config.concurrency,
-        config.window_minutes,
-        config.threshold,
+        config.evaluation_policy,
         config.refresh_judge,
         rubric.source_path,
         rubric.source_hash,
@@ -93,6 +102,9 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
     LOGGER.info("discovered runs=%d", len(metadata_files))
     output = Path(config.output_path)
     (output / "runs").mkdir(parents=True, exist_ok=True)
+    (output / "logs").mkdir(exist_ok=True)
+    csv_output = output / "csvs"
+    csv_output.mkdir(exist_ok=True)
     run_specs: list[tuple[Path, Path, str, Path]] = []
     seen_names: set[str] = set()
     for metadata_path in metadata_files:
@@ -102,6 +114,9 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
             raise ValueError(f"duplicate run folder name under input: {run_name}")
         seen_names.add(run_name)
         run_output = output / "runs" / run_name
+        prior = run_output / 'grade.json'
+        if prior.exists() and (json.loads(prior.read_text()).get('schema_version') != 2 or json.loads(prior.read_text()).get('research', {}).get('methodology_version') != policy(config.evaluation_policy)['methodology_version']):
+            raise ValueError('Existing legacy reports are preserved; select a new --output directory for the current methodology')
         run_specs.append((metadata_path, run_folder, run_name, run_output))
 
     def process_run(spec: tuple[Path, Path, str, Path]) -> dict[str, Any]:
@@ -118,6 +133,18 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
             config,
             judge,
         )
+        grade['window_comparison'] = compare_windows(run_folder, config.comparison_window_minutes)
+        grade['paired_window'] = paired_frontend_window(
+            run_folder, grade['window_comparison'], config.table_workload,
+            config.table_namespace, config.table_max_5xx_rate, config.baseline_ignore_minutes)
+        grade['schema_version'] = 2
+        grade['research'] = evaluate_incident(run_folder, config.evaluation_policy)
+        LOGGER.info('incident outcome run=%s status=%s policy_hash=%s', run_name, grade['research']['operational']['status'], grade['research']['policy_hash'])
+        grade.setdefault('configuration', {}).update({
+            'model': config.model, 'model_revision': config.model_revision,
+            'methodology_version': grade['research']['methodology_version'],
+            'policy_hash': grade['research']['policy_hash'],
+        })
         cache_path = run_output / "judge-cache.json"
         if not cache_path.exists():
             _write_cache(
@@ -151,14 +178,11 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
         grades = list(executor.map(process_run, run_specs))
 
     rows = [row for grade in grades for row in _summary_rows(grade)]
-    write_summary_csv(output / "summary.csv", rows)
-    write_rubric_score_csv(
-        output / "rca_rubric_score.csv", grades, rubric.kind("rca")
-    )
-    write_rubric_score_csv(
-        output / "remediation_rubric_score.csv", grades, rubric.kind("remediation")
-    )
-    write_global_report(output / "report.md", grades, rubric)
+    write_summary_csv(csv_output / "summary.csv", rows)
+    write_rubric_score_csv(csv_output / "rca_rubric_score.csv", grades, rubric.kind("rca"))
+    write_rubric_score_csv(csv_output / "remediation_rubric_score.csv", grades, rubric.kind("remediation"))
+    write_comparisons(output, grades)
+    write_scenario_table(csv_output, grades, csv_only=True)
     LOGGER.info(
         "grading completed runs=%d graded=%d ungraded=%d jobs=%d",
         len(grades),
@@ -166,13 +190,7 @@ def grade_runs(config: GraderConfig, judge: JudgeClient) -> list[dict[str, Any]]
         sum(item["status"] != "graded" for item in grades),
         len(rows),
     )
-    LOGGER.debug(
-        "aggregate artifacts summary_csv=%s rca_rubric_score_csv=%s remediation_rubric_score_csv=%s report=%s",
-        output / "summary.csv",
-        output / "rca_rubric_score.csv",
-        output / "remediation_rubric_score.csv",
-        output / "report.md",
-    )
+    LOGGER.debug("aggregate CSV artifacts directory=%s", csv_output)
     return grades
 
 
@@ -232,6 +250,14 @@ def _grade_run(
         len(rca_jobs),
         len(remediation_jobs),
     )
+    from .research import records, read
+    try:
+        run_id = read(run_folder / 'run-context.json', {}).get('run_id', run_folder.name)
+        evidence = records(run_folder, 'observations', run_id)
+    except (ValueError, KeyError, TypeError, OSError):
+        evidence = []
+    for job in rca_jobs + remediation_jobs:
+        job['_grading_observations'] = [e for e in evidence if e.get('data', {}).get('job_id') == job.get('id')][:100]
     penalty_set = penalty_set_for(penalties, scenario_name)
     cache.update(_cache_metadata(config.model, rubric.source_hash))
     rca_results = []
@@ -265,47 +291,9 @@ def _grade_run(
             judge,
             cache_entries,
         )
-        # Metric grading is independent of semantic judging. A failed model call
-        # must not hide an otherwise complete before/after metric comparison.
-        if job.get("status") != "succeeded" or not _has_result(job.get("result")):
-            metrics = evaluate_metrics(
-                run_folder,
-                None,
-                window_seconds=config.window_minutes * 60,
-                threshold=config.threshold,
-            )
-            metrics["reason"] = (
-                "metric comparison requires a succeeded remediation with a "
-                "non-empty final result object"
-            )
-        else:
-            metrics = evaluate_metrics(
-                run_folder,
-                job.get("completed_at"),
-                window_seconds=config.window_minutes * 60,
-                threshold=config.threshold,
-            )
-        item["metrics"] = metrics
-        item["final_grade"] = _final_grade(item["alignment"]["verdict"], metrics["outcome"])
-        LOGGER.debug(
-            "remediation metric outcome run=%s job_id=%s outcome=%s final_grade=%s reason=%s",
-            run_folder.name,
-            job.get("id"),
-            metrics["outcome"],
-            item["final_grade"],
-            metrics["reason"],
-        )
-        for metric_name, family in metrics.get("families", {}).items():
-            LOGGER.debug(
-                "metric family run=%s job_id=%s metric=%s assessment=%s before=%s after=%s series=%d",
-                run_folder.name,
-                job.get("id"),
-                metric_name,
-                family.get("assessment"),
-                family.get("before_median"),
-                family.get("after_median"),
-                len(family.get("series") or []),
-            )
+        item['metrics'] = {'outcome': 'not_evaluable', 'families': {},
+                           'reason': 'Recovery is evaluated once per incident; see research.operational.'}
+        item['final_grade'] = 'not_evaluable'
         remediation_results.append(item)
         _write_cache(cache_path, cache)
     return {
@@ -322,11 +310,12 @@ def _grade_run(
         },
         "configuration": {
             "prompt_version": PROMPT_VERSION,
+            "semantic_eligibility": "succeeded-or-failed-with-final-result-v1",
             "model": config.model,
+            "model_revision": config.model_revision,
             "judge_max_tokens": config.judge_max_tokens,
             "concurrency": config.concurrency,
-            "window_minutes": config.window_minutes,
-            "threshold": config.threshold,
+            "evaluation_policy": str(config.evaluation_policy) if config.evaluation_policy else None,
             "rubric_path": str(rubric.source_path),
             "rubric_hash": rubric.source_hash,
             "penalties_path": str(penalty_set.source_path) if penalty_set.source_path else None,
@@ -361,7 +350,10 @@ def _grade_job(
         "result": result,
         "rubric": None,
     }
-    if job.get("status") != "succeeded":
+    if config.operational_only:
+        base['alignment'] = {'verdict': 'not_evaluable', 'reason': 'semantic grading skipped (--operational-only)', 'cached': False, 'cache_key': None}
+        return base
+    if job.get("status") not in ("succeeded", "failed"):
         LOGGER.debug(
             "job not evaluable kind=%s job_id=%s status=%s",
             kind,
@@ -370,7 +362,7 @@ def _grade_job(
         )
         base["alignment"] = {
             "verdict": "not_evaluable",
-            "reason": f"job status is {job.get('status')!r}, not succeeded",
+            "reason": f"job status is {job.get('status')!r}, not succeeded or failed",
             "cached": False,
             "cache_key": None,
         }
@@ -390,7 +382,9 @@ def _grade_job(
         ground_truth=truth,
         result=result,
     )
-    key = _cache_key(kind, payload, config.model, rubric.source_hash)
+    payload['observations'] = job.get('_grading_observations', [])
+    payload['evidence_assessment'] = 'referenced_observations' if payload['observations'] else 'reported_evidence_quality'
+    key = _cache_key(kind, payload, config.model + "@" + (config.model_revision or "unknown"), rubric.source_hash)
     cached_entry = cache_entries.get(key)
     if not config.refresh_judge and _valid_cache_entry(cached_entry, kind_rubric):
         LOGGER.debug("judge cache hit kind=%s job_id=%s cache_key=%s", kind, job.get("id"), key)
@@ -504,7 +498,7 @@ def _attach_penalties(
     key = _cache_key(
         "remediation_penalty",
         penalty_payload,
-        config.model,
+        config.model + "@" + (config.model_revision or "unknown"),
         penalty_set.source_hash,
     )
     cached_entry = cache_entries.get(key)
@@ -658,12 +652,6 @@ def _cache_key(
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _final_grade(alignment: str, metric_outcome_value: str) -> str:
-    if alignment == "not_evaluable" or metric_outcome_value == "not_evaluable":
-        return "not_evaluable"
-    return "good" if alignment == "aligned" and metric_outcome_value == "good" else "not_good"
-
-
 def _ungraded(run: str, scenario: str | None, reason: str) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -687,12 +675,15 @@ def _summary_rows(grade: dict[str, Any]) -> list[dict[str, Any]]:
         for job in jobs:
             rows.append(
                 {
+                    "methodology_version": grade.get("research", {}).get("methodology_version"),
+                    "policy_hash": grade.get("research", {}).get("policy_hash"),
                     "run": grade["run"],
                     "scenario": grade.get("scenario"),
                     "kind": kind,
                     "job_id": job.get("id"),
                     "workflow_id": job.get("workflow_id"),
                     "status": job.get("status"),
+                    "is_failed": job.get("status") == "failed",
                     "alignment": (job.get("alignment") or {}).get("verdict"),
                     "overall_score": (job.get("rubric") or {}).get("overall_score"),
                     "metric_outcome": (job.get("metrics") or {}).get("outcome"),

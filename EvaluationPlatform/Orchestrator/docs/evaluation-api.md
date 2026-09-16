@@ -28,6 +28,6 @@ A process restart does not clear ownership or maintenance. Failed cleanup/export
 2. From Runner, rerun the bundled `stop` action with that context and output directory. It pauses dispatch and waits for workers to stop. If ownership acquisition timed out, use the run ID in the context to inspect ownership before doing anything else.
 3. Run the documented authoritative `scripts/cleanup_chaos_state.sh --yes` from the Runner directory against the confirmed evaluation cluster; verify cleanup succeeds. Inspect captured application placement/state before a new evaluation.
 4. Rerun `hooks/postrun/export-sessions/run.sh CONTEXT OUTPUT` from the Runner directory and any other failed post-run hooks. Preserve partial evidence even when jobs did not complete.
-5. Invoke the bundled `release` action with the same context/output. The next run receives a new ID, resets all data in its pre-run hook, and resumes after baseline.
+5. Invoke the bundled `release` action with the same context/output, or use Runner's `scripts/reset_evaluation_lock.sh --run-id INTERRUPTED_RUN_ID` with its configured environment and control token. The script checks ownership, pauses, and releases without deleting results. The next run receives a new ID, resets all data in its pre-run hook, and resumes after baseline.
 
 Recovery commands intentionally require an operator decision and confirmed target. Do not resume old remediation jobs or reset away partial evidence as an automatic retry.

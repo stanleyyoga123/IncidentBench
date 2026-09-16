@@ -2,7 +2,7 @@
 
 RemediatorAgent accepts explicitly approved RCA results, queues durable jobs,
 and uses the remediation MCPTools profile. A started job is never automatically
-retried after failure; ambiguous outcomes become `needs_review`.
+retried after failure; a nonempty final output completes as `succeeded`, even when recovery is unverified.
 
 The service receives the approved structured RCA snapshot as JSON, records
 tool-created artifacts through AgentOrchestrator, and returns their filenames
@@ -19,3 +19,11 @@ The script refuses placeholders. `REMEDIATOR_SUBMIT_TOKEN` must match
 AgentOrchestrator, `AGENT_STORE_TOKEN` must match AgentOrchestrator, RCAAgent,
 and LearningAgent, and `MCP_TOKEN` must match only the remediation MCP
 Secret. Deploy after MCPTools and DatabaseJob.
+
+### Output persistence
+
+Generated final text is saved through Orchestrator's authenticated job-output
+endpoint before parsing. Any nonempty final output completes as `succeeded`;
+this means output completion, not successful execution or verified recovery.
+Execution errors and recovery observations remain in the output and tool audits.
+Empty output or errors preventing durable completion remain `failed`.

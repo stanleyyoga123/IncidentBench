@@ -26,6 +26,7 @@ PUBLIC_OPERATION_IDS = {
 }
 
 INTERNAL_OPERATION_IDS = {
+    "record_internal_agent_output",
     "create_internal_rca_job",
     "get_internal_rca_job",
     "create_internal_remediation_job",
@@ -235,7 +236,7 @@ def test_token_separation_idempotency_and_operation_ids():
 
     ids = operation_ids(app)
     assert ids == PUBLIC_OPERATION_IDS | INTERNAL_OPERATION_IDS
-    assert len(ids) == len(set(ids)) == 33
+    assert len(ids) == len(set(ids)) == 34
 
 
 def test_store_token_owns_internal_job_routes():
@@ -316,3 +317,18 @@ def test_store_token_owns_internal_job_routes():
         )
         assert finished.status_code == 200
         assert finished.json()["result"]["lessons"] == []
+
+
+def test_output_endpoint_uses_store_auth_and_passes_lease():
+    store = FakeStore()
+    calls = []
+    store.record_agent_output = lambda *args: calls.append(args)
+    app = create_app(settings(), start_loops=False, store=store,
+                     rca=FakeClient(), remediator=FakeClient(), learning=FakeClient())
+    job_id = uuid4()
+    body = {'lease_owner':'worker', 'raw_output':'answer', 'result':{'summary':'unverified'}}
+    with TestClient(app) as client:
+        path = f'/api/v1/internal/remediation/jobs/{job_id}/output'
+        assert client.post(path, json=body, headers={'Authorization':'Bearer control'}).status_code == 401
+        assert client.post(path, json=body, headers={'Authorization':'Bearer store'}).status_code == 204
+    assert calls == [('remediation', job_id, 'worker', 'answer', {'summary':'unverified'})]

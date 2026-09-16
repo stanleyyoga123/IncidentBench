@@ -46,7 +46,7 @@ def test_settings_require_orchestrator_not_database():
     assert not hasattr(settings, "database")
 
 
-def test_create_claim_artifacts_and_needs_review_use_orchestrator_http():
+def test_create_claim_artifacts_and_failed_use_orchestrator_http():
     job_id = uuid4()
     now = datetime.now(timezone.utc).isoformat()
     paths = []
@@ -77,13 +77,13 @@ def test_create_claim_artifacts_and_needs_review_use_orchestrator_http():
             return httpx.Response(204)
         if request.url.path == f"/api/v1/internal/remediation/jobs/{job_id}/finish":
             body = json.loads(request.content)
-            assert body["status"] == "needs_review"
+            assert body["status"] == "failed"
             return httpx.Response(
                 200,
                 json={
                     "id": str(job_id),
                     "rca_job_id": str(uuid4()),
-                    "status": "needs_review",
+                    "status": "failed",
                     "version": 2,
                     "attempts": 1,
                     "created_at": now,
@@ -103,6 +103,6 @@ def test_create_claim_artifacts_and_needs_review_use_orchestrator_http():
         {"filename": "remediation.yml", "content": "---\n"},
         {"ok": True},
     )
-    store.needs_review(job_id, RuntimeError("ambiguous execution"))
+    store.fail(job_id, RuntimeError("ambiguous execution"))
     assert "/api/v1/internal/execution/claim" in paths
     assert f"/api/v1/internal/remediation/jobs/{job_id}/finish" in paths

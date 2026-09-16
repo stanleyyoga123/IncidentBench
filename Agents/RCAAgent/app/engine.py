@@ -34,6 +34,7 @@ _HEADING_COLON = r"(?:\*{1,2}|_{1,2})?\s*:?\s*(?:\*{1,2}|_{1,2})?"
 
 class RCAEngine:
     def __init__(self, settings, audit_callback=None):
+        self.output_callback = None
         self.settings = settings
         self.audit_callback = audit_callback
 
@@ -66,6 +67,9 @@ class RCAEngine:
         with audit_tool_calls(callback):
             with propagate_attributes(session_id=str(job_id), trace_name="rca"):
                 raw = agent.run(prompt)
+        self.last_raw_output = raw
+        if self.output_callback:
+            self.output_callback(job_id, raw)
         result = self._parse(raw)
         return result, raw
 

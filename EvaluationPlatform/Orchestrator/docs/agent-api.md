@@ -26,7 +26,7 @@ the store token can call only `/internal/...` job-store endpoints.
 | `claim_agent_execution` | `POST /internal/execution/claim` | Claim the singleton slot or return 204. |
 | `renew_agent_execution` | `POST /internal/execution/renew` | Extend a held execution lease. |
 | `finish_internal_rca_job` | `POST /internal/rca/jobs/{id}/finish` | Apply RCA retry policy and release the slot. |
-| `finish_internal_remediation_job` | `POST /internal/remediation/jobs/{id}/finish` | Finish as `succeeded` or `needs_review`. |
+| `finish_internal_remediation_job` | `POST /internal/remediation/jobs/{id}/finish` | Finish as `succeeded` or `failed`. |
 | `finish_internal_learning_job` | `POST /internal/learning/jobs/{id}/finish` | Publish valid lessons or apply retry policy. |
 | `record_internal_rca_tool_call` | `POST /internal/rca/jobs/{id}/tool-calls` | Insert an RCA tool-call audit. |
 | `record_internal_remediation_tool_call` | `POST /internal/remediation/jobs/{id}/tool-calls` | Insert a remediator audit; write_file upserts artifacts. |
@@ -40,3 +40,10 @@ deciding. Treat duplicate ingestion as success. When RCA succeeds with
 Successful no-action RCA and verified remediation then block in learning states.
 Learning success publishes atomic lessons; the third failure completes without
 lessons. New RCA jobs receive at most 40 active relevant lessons.
+
+`record_internal_agent_output`: `POST /api/v1/internal/{service}/jobs/{job_id}/output`
+checkpoints `raw_output` and optional `result` while the request's `lease_owner`
+still owns the running job. Uses the store token; returns 204 or 409 for a stale
+lease/maintenance. Services: `rca`, `remediation`, `learning`. Finish calls preserve
+checkpointed fields when omitted. Remediation failures are terminal `failed`
+with retained output; they never wait for manual review.

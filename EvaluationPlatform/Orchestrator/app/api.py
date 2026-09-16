@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from clients import AgentClient
 from config import Settings, get_settings
 from schema import (
+    AgentOutputRequest,
     AnomalyBatchRequest,
     ArtifactListResponse,
     ArtifactUpsertRequest,
@@ -429,6 +430,18 @@ def create_app(
                 request.lease_seconds,
             )
         )
+
+    @app.post(
+        "/api/v1/internal/{service}/jobs/{job_id}/output",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=[store_auth],
+        operation_id="record_internal_agent_output",
+    )
+    def record_internal_agent_output(service: str, job_id: UUID, request: AgentOutputRequest) -> None:
+        if service not in {"rca", "remediation", "learning"}:
+            raise HTTPException(status_code=404, detail="unknown agent service")
+        store.record_agent_output(service, job_id, request.lease_owner,
+                                  request.raw_output, request.result)
 
     @app.post(
         "/api/v1/internal/rca/jobs/{job_id}/finish",

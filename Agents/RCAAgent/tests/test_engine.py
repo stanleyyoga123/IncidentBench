@@ -202,3 +202,25 @@ pods become Running on real worker nodes
     assert result.remediation_plan.targets == [
         "deployment.apps/checkoutservice` (namespace: `online-boutique`)"
     ]
+
+
+def test_raw_answer_saved_before_parser_rejects_it(monkeypatch):
+    import pytest
+    import engine as module
+    from uuid import uuid4
+    settings = SimpleNamespace(client=SimpleNamespace(model='test',url='http://test',token='test',timeout_seconds=1),
+                               manager=SimpleNamespace(max_rounds=1))
+    instance = RCAEngine(settings)
+    monkeypatch.setattr(module.TOOL_REGISTRY, 'describe_openai_format', lambda tools: [])
+    monkeypatch.setattr(module, 'Agent', lambda **kwargs: SimpleNamespace(run=lambda prompt: 'final answer'))
+    monkeypatch.setattr(instance, '_workload_context', lambda request: '')
+    monkeypatch.setattr(instance, '_prompt', lambda request: '')
+    def invalid(raw):
+        raise ValueError('parse rejected')
+    monkeypatch.setattr(instance, '_parse', invalid)
+    saved = []
+    instance.output_callback = lambda *args: saved.append(args)
+    job_id = uuid4()
+    with pytest.raises(ValueError, match='parse rejected'):
+        instance.run(job_id, SimpleNamespace())
+    assert saved == [(job_id, 'final answer')]

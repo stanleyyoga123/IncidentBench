@@ -100,3 +100,18 @@ def test_parse_rejects_unknown_confidence_label():
     )
     with pytest.raises(ValidationError):
         LearningEngine.parse(raw)
+
+
+def test_malformed_answer_is_saved_before_parse_failure():
+    from types import SimpleNamespace
+    from uuid import uuid4
+    engine = LearningEngine.__new__(LearningEngine)
+    engine.settings = SimpleNamespace(client=SimpleNamespace(model='test'))
+    engine.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs:
+        SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='malformed answer'))]))))
+    saved = []
+    engine.output_callback = lambda *args: saved.append(args)
+    job_id = uuid4()
+    with pytest.raises(ValueError):
+        engine.run(job_id, SimpleNamespace(source={}))
+    assert saved == [(job_id, 'malformed answer')]

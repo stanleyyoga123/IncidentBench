@@ -156,13 +156,13 @@ persisting the job.
 
 `remediation_queued` and `remediation_running` are non-terminal. Verified
 success moves the workflow to `learning_submitting`. A failed execution becomes
-`failed`; a crash or ambiguous result after mutation becomes `needs_review` and
+`failed`; a crash or ambiguous result after mutation becomes `failed` and
 is never blindly replayed.
 
 ## 6. Learning submission and finalization
 
 Learning is started only after successful no-action RCA or successful verified
-remediation. Declined, failed, and `needs_review` workflows do not generate
+remediation. Declined and failed workflows do not generate
 lessons.
 
 The source snapshot contains workflow ID, anomalies, structured RCA result,
@@ -197,7 +197,7 @@ pending events
 failure branches:
   RCA failure -------------------------------> failed
   remediation failure ------------------------> failed
-  ambiguous remediation ----------------------> needs_review
+  ambiguous remediation ----------------------> failed
   decline while awaiting approval ------------> closed_declined
   third learning failure ---------------------> completed_* + learning_status=failed
 ```
@@ -214,7 +214,7 @@ the job attempt count, and records lease owner/expiry. Workers renew through the
 internal API while inference/tool work continues.
 
 Expired RCA and learning leases are requeued while attempts remain, then fail.
-Expired remediation leases become `needs_review` because a mutation may already
+Expired remediation leases become `failed` because a mutation may already
 have occurred. Workflows waiting for approval do not occupy the slot.
 
 ## Lesson control

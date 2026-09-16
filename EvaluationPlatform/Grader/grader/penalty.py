@@ -9,7 +9,7 @@ from typing import Any
 from .rubric import REASON_MAX_LENGTH
 
 
-DEFAULT_PENALTIES_DIR = Path(__file__).resolve().parent / "penalties"
+DEFAULT_PENALTIES_DIR = Path(__file__).resolve().parents[1] / "resources" / "penalties"
 
 
 @dataclass(frozen=True)

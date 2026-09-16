@@ -57,7 +57,7 @@ class Store(WorkflowStore):
         return self._job
 
 
-def test_claim_reclaims_expired_remediation_as_needs_review():
+def test_claim_reclaims_expired_remediation_as_failed():
     cursor = Cursor(
         rows=[
             {
@@ -73,7 +73,7 @@ def test_claim_reclaims_expired_remediation_as_needs_review():
 
     assert store.claim_execution("rca", "worker", lease_seconds=60, max_attempts=3) is None
     sql = "\n".join(query for query, _ in cursor.queries)
-    assert "UPDATE remediation_job SET status='needs_review'" in sql
+    assert "UPDATE remediation_job SET status='failed'" in sql
     assert "UPDATE agent_execution_slot SET holder_type=NULL" in sql
     assert connection.committed is True
 
@@ -193,15 +193,15 @@ def test_successful_learning_publishes_and_releases_slot_in_one_commit():
     assert connection.committed is True
 
 
-def test_finish_remediation_accepts_needs_review_only_as_terminal():
+def test_finish_remediation_accepts_failed_only_as_terminal():
     cursor = Cursor()
     store = Store(Connection(cursor))
     store.get_remediation_job = lambda _job_id: SimpleNamespace()
 
-    store.finish_remediation_job(uuid4(), "needs_review", error={"type": "Ambiguous"})
+    store.finish_remediation_job(uuid4(), "failed", error={"type": "Ambiguous"})
     sql = "\n".join(query for query, _ in cursor.queries)
     assert "UPDATE remediation_job SET status=%s" in sql
-    assert cursor.queries[0][1][0] == "needs_review"
+    assert cursor.queries[0][1][0] == "failed"
     assert "completed_at=now()" in sql
 
 
@@ -290,3 +290,39 @@ def test_retrieve_lessons_prioritizes_relevance_then_recency_and_budget():
         character_budget=10,
     )
     assert too_small == []
+
+
+def test_output_checkpoint_requires_current_lease_and_finish_preserves_it():
+    from store import WorkflowConflictError
+    import pytest
+    job_id = uuid4()
+    cursor = Cursor(rows=[{'id': job_id}])
+    store = Store(Connection(cursor))
+    store.record_agent_output('remediation', job_id, 'worker-1', 'generated answer', {'summary': 'not recovered'})
+    sql, params = cursor.queries[0]
+    assert "status='running' AND lease_owner=%s" in sql
+    assert 'lease_expires_at > now()' in sql
+    assert params[0] == 'generated answer'
+    store._finish_job('remediation_job', job_id, 'failed', error={'type':'VerificationError'})
+    assert 'raw_output=COALESCE(%s, raw_output)' in cursor.queries[1][0]
+    assert 'result=COALESCE(%s, result)' in cursor.queries[1][0]
+    stale = Store(Connection(Cursor(rows=[None])))
+    with pytest.raises(WorkflowConflictError):
+        stale.record_agent_output('remediation', job_id, 'old-worker', 'stale')
+
+
+def test_legacy_review_becomes_terminal_failure():
+    cursor = Cursor()
+    store = Store(Connection(cursor))
+    store.get_remediation_job = lambda _job_id: SimpleNamespace()
+    store.finish_remediation_job(uuid4(), 'needs_review', error={'type':'Legacy'})
+    assert cursor.queries[0][1][0] == 'failed'
+
+
+def test_remediation_failure_finishes_workflow_without_manual_review():
+    store = Store(Connection(Cursor()))
+    changes = []
+    store._update_workflow = lambda *args, **kwargs: changes.append(kwargs)
+    for status in ('failed', 'needs_review'):
+        store.set_remediation_state(uuid4(), status, error={'type':'VerificationError'})
+    assert all(c['status'] == c['anomaly_status'] == 'failed' and c['completed'] for c in changes)

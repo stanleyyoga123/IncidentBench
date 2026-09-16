@@ -60,7 +60,7 @@ The workspace is a Git repository. Components may contain unrelated local change
 7. Detector signals are leads. RCA must corroborate them with current evidence.
 8. Remediation requires an approved RCA snapshot and matching SHA-256 hash.
 9. RCA transient failures retry at most three times. An ambiguous remediation
-   failure becomes `needs_review` and is never repeated automatically.
+   failure becomes `failed` and is never repeated automatically.
 10. Remediation follows validation, artifact creation, Ansible check mode,
     guarded live execution, then direct post-action verification.
 11. MCPTools never writes workflow state. Job services audit

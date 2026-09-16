@@ -10,7 +10,7 @@ LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
 
 def configure_logging(output_path: Path, *, verbose: bool = False) -> Path:
     """Configure a fresh verbose file log and a concise/verbose console log."""
-    output = Path(output_path)
+    output = Path(output_path) / "logs"
     output.mkdir(parents=True, exist_ok=True)
     log_path = output / "grader.log"
     logger = logging.getLogger(LOGGER_NAME)

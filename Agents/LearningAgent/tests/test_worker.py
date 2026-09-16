@@ -14,7 +14,7 @@ class Store:
         job, self.job = self.job, None
         return job
 
-    def fail(self, job_id, exc, max_attempts):
+    def fail(self, job_id, exc, max_attempts, **output):
         self.failed.append((job_id, type(exc).__name__, max_attempts))
 
 

@@ -17,3 +17,15 @@ The bundled AnomalyDetector and RCAAgent ConfigMaps include `sock-shop` alongsid
 and `workloads.namespaces` (RCA, including cluster-scoped incident profiling) in
 sync when adding applications. Existing pods need a restart after ConfigMap
 updates because configuration is read at process startup.
+
+
+## Offline archive grading
+
+The Grader uses the original Runner archive format: Locust CSV counters,
+Prometheus service metrics, metadata and exported sessions. No Runner update or
+additional scenario is required. Methodology `archive-recovery-v3` separates a
+descriptive service recovery proxy from semantic quality and unverified safety.
+The evaluation policy is owned by the Grader. See the
+[methodology](../EvaluationPlatform/Grader/docs/methodology.md),
+[metrics](../EvaluationPlatform/Grader/docs/metrics.md), and
+[input contract](../EvaluationPlatform/Grader/docs/evidence-contract.md).

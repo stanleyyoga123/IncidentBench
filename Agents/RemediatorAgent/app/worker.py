@@ -1,4 +1,6 @@
 import logging
+
+import httpx
 import socket
 import threading
 
@@ -45,16 +47,24 @@ class RemediatorWorker:
             daemon=True,
         )
         heartbeat.start()
+        self.engine.last_raw_output = None
+        self.engine.last_result = None
         try:
             request = RemediationJobRequest.model_validate(job.request)
+            self.engine.output_callback = lambda job_id, raw, result=None: self.store.record_output(
+                job_id, self.owner, raw, result
+            )
             result, raw = self.engine.run(job.id, request)
             result = result.model_copy(
                 update={"artifacts": self.store.list_artifacts(job.id)}
             )
             self.store.succeed(job.id, result, raw)
         except Exception as exc:
-            LOGGER.exception("Remediation job %s requires review", job.id)
-            self.store.needs_review(job.id, exc)
+            LOGGER.exception("Remediation job %s failed", job.id)
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 409:
+                LOGGER.warning("Job %s lost write access; leaving completion to lease reconciliation", job.id)
+            else:
+                self.store.fail(job.id, exc, raw_output=self.engine.last_raw_output, result=self.engine.last_result)
         finally:
             heartbeat_stop.set()
             heartbeat.join(timeout=5)

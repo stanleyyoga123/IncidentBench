@@ -24,7 +24,7 @@ from .rubric import (
 LOGGER = logging.getLogger("grader.judge")
 
 
-PROMPT_VERSION = "production-incident-grader-v3"
+PROMPT_VERSION = "sustained-recovery-grader-v4"
 DEFAULT_JUDGE_URL = "http://localhost:8000/v1"
 DEFAULT_JUDGE_MODEL = "Qwen/Qwen3.6-35B-A3B"
 DEFAULT_TIMEOUT_SECONDS = 600.0
@@ -167,6 +167,7 @@ def build_penalty_payload(
         "ground_truth": payload["ground_truth"],
         "chaos_manifests": chaos_manifests,
         "agent_result": payload["agent_result"],
+        "observations": payload.get("observations", []),
         "penalties": penalty_set.judge_items(),
     }
 

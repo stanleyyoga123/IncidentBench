@@ -33,19 +33,19 @@ cycle, the event can be lost; this is an accepted fail-and-re-detect tradeoff.
    for the shared lease.
 3. It validates current state, writes session artifacts, runs Ansible check mode,
    performs guarded live execution, then verifies directly.
-4. Success requires a live execution, explicit verified recovery, and subsequent
-   Kubernetes and non-empty Prometheus evidence before entering learning. The
-   model still assesses whether that evidence meets the approved success criteria.
-   Stale, unnecessary, unsafe, or unverified plans stop for `needs_review` without
-   forcing a mutation. A crash or ambiguous failure after execution
-   begins becomes `needs_review`; only an explicit retry decision can proceed.
+4. A nonempty final agent output completes the remediation job as `succeeded`,
+   including outputs reporting failed, skipped, or unverified actions. Execution
+   and recovery remain in the output and tool audits, not the job status.
+   Empty output or an exception preventing durable completion remains `failed`.
+   Completed outputs enter learning; LearningAgent assesses the evidence without
+   assuming the job status proves recovery.
 
-Failed RCA or reviewed remediation can be retried with a fresh versioned
-idempotency key.
+Transient RCA errors retry up to three attempts. Remediation failures do not
+wait for review or replay the same mutation.
 
 ## Learning and future RCA context
 
-1. After successful no-action RCA or verified remediation, AgentOrchestrator
+1. After successful no-action RCA or completed remediation output, AgentOrchestrator
    submits a canonical, hashed workflow snapshot to LearningAgent.
 2. LearningAgent claims the shared global slot and returns zero or more
    evidence-linked atomic lessons. It has no MCP tools or database credentials.

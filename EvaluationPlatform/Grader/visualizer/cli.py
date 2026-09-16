@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .metrics import load_run_metrics
+from .metrics import load_run_metrics, load_client_metrics
 from .render import render_metric, render_metric_with_timeline, render_timeline, write_events_csv
 from .timeline import load_run_timeline
 
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> None:
         run_output.mkdir(parents=True, exist_ok=True)
         try:
             timeline = load_run_timeline(run_dir)
-            metrics = load_run_metrics(run_dir, timeline.origin)
+            metrics = load_run_metrics(run_dir, timeline.origin) + load_client_metrics(run_dir, timeline.origin)
             formats = ("png", "svg") if args.format == "both" else (args.format,)
             views = ("metrics-only", "metrics-with-timeline", "timeline-only") if args.view == "all" else (args.view,)
             if "timeline-only" in views:

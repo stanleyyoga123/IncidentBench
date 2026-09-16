@@ -165,8 +165,11 @@ class WorkflowCoordinator:
                         current = self.store.get_workflow(workflow.id)
                         if current is not None:
                             self.submit_learning(current)
-                elif workflow.status.startswith("remediation_") and workflow.remediation_job_id:
+                elif (workflow.status.startswith("remediation_") or workflow.status == "needs_review") and workflow.remediation_job_id:
                     job = self.remediator.get_remediation(workflow.remediation_job_id)
+                    if job.status == "needs_review":
+                        # Finish legacy review records automatically during rolling upgrades.
+                        self.store.finish_remediation_job(job.id, "failed", error=job.error)
                     expected = "remediation_running" if job.status == "running" else "remediation_queued"
                     if job.status in {"queued", "running"} and workflow.status == expected:
                         continue

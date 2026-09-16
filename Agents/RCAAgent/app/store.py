@@ -51,6 +51,13 @@ class RCAJobStore:
             return None
         return RCAJob.model_validate(response.json())
 
+    def record_output(self, job_id, lease_owner, raw_output, result=None):
+        response = self._client.post(
+            f"/api/v1/internal/rca/jobs/{job_id}/output",
+            json={"lease_owner": lease_owner, "raw_output": raw_output, "result": result},
+        )
+        response.raise_for_status()
+
     def succeed(self, job_id: UUID, result: RCAResult, raw_output: str) -> None:
         response = self._client.post(
             f"/api/v1/internal/rca/jobs/{job_id}/finish",
@@ -75,12 +82,14 @@ class RCAJobStore:
         response.raise_for_status()
         return bool(response.json()["renewed"])
 
-    def fail(self, job: RCAJob, exc: Exception, max_attempts: int) -> None:
+    def fail(self, job: RCAJob, exc: Exception, max_attempts: int, *, raw_output=None, result=None) -> None:
         response = self._client.post(
             f"/api/v1/internal/rca/jobs/{job.id}/finish",
             json={
                 "outcome": "failed",
                 "error": {"type": type(exc).__name__, "message": str(exc)},
+                "raw_output": raw_output,
+                "result": result,
                 "max_attempts": max_attempts,
             },
         )

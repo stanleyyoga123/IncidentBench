@@ -68,3 +68,7 @@ figure. Each line is labelled by deployment, destination workload, node, or the
 best remaining Prometheus identity label. Missing optional session files
 result in empty lanes rather than a failure. Invalid metadata or a run with no
 timeline events is reported as a failure, while other runs continue rendering.
+
+New archives additionally plot client P95 histogram estimates, failure ratio and successful throughput. These are distinct from per-service mesh metrics. Incident outcomes and methodology hashes are documented in the [research guide](../docs/methodology.md).
+
+Original Runner CSV histories also produce client failure-ratio and successful-throughput charts from counter differences. Cumulative client P95 is not plotted as interval latency. No Runner instrumentation update is required.

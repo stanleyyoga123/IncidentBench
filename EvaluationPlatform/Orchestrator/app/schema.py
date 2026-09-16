@@ -251,7 +251,7 @@ class RCAFinishRequest(BaseModel):
 
 
 class RemediationFinishRequest(BaseModel):
-    status: Literal["succeeded", "needs_review"]
+    status: Literal["succeeded", "failed", "needs_review"]
     result: dict[str, Any] | None = None
     raw_output: str | None = None
     error: dict[str, Any] | None = None
@@ -314,3 +314,9 @@ class ArtifactListResponse(BaseModel):
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class AgentOutputRequest(BaseModel):
+    lease_owner: str = Field(min_length=1)
+    raw_output: str
+    result: dict[str, Any] | None = None

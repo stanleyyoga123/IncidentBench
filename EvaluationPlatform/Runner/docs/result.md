@@ -205,7 +205,7 @@ retained for provenance and are supplied only to the separate remediation
 penalty judge. Rubric classes are converted to weighted 0–1 scores;
 remediation can also receive scenario-specific penalties.
 
-The shared [scenario grading policy](../../Grader/grader/scenario-policy.md) defines the
+The shared [scenario grading policy](../../Grader/resources/scenario-policy.md) defines the
 audited fault-family expectations, partial-credit treatment, simulation-wide
 exclusions, and penalty weights used by all 74 scenario-specific ground truths.
 

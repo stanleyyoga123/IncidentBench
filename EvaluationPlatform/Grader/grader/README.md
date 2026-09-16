@@ -1,18 +1,17 @@
 # Simple independent RCA and remediation grader
 
-`grader` is an offline grading path for archived Evaluation runs. It does not
-inspect agent reasoning or tool calls, or contact a Kubernetes cluster.
+`grader` is an offline grading path for archived Evaluation runs. It does not inspect private agent reasoning or contact a Kubernetes cluster. It consumes portable observations and action evidence when available.
 
-See [scenario-policy.md](scenario-policy.md) for the audited fault-family
+See [scenario-policy.md](../resources/scenario-policy.md) for the audited fault-family
 expectations, partial-credit rules, universal simulation exclusions, and
 penalty weights applied across all 51 scenarios.
 
 ## Run it
 
-From `EvaluationPlatform/Runner/`:
+From `EvaluationPlatform/Grader/`:
 
 ```bash
-PYTHONPATH=. python -m grader --input results --output grades
+PYTHONPATH=. python -m grader --input ../Runner/results --output grades/research-v2
 ```
 
 The semantic judge defaults to the local OpenAI-compatible vLLM endpoint at
@@ -23,35 +22,34 @@ Run folders are graded concurrently, with five workers by default. Set
 judge requests for the available model-server capacity. Jobs within each run
 remain sequential.
 
-The repository helper forwards additional arguments, so either form works:
+The local `grade.sh` hard-codes its arguments and does not forward extra flags.
+Use direct module invocations for configurable runs:
 
 ```bash
-./grade.sh --concurrency 10
-GRADER_CONCURRENCY=10 ./grade.sh
+python -m grader --input results/sock-shop-1 --output grades/new-assessment --concurrency 10
 ```
 
 ```bash
 PYTHONPATH=. python -m grader \
   --input results \
   --output grades \
-  --ground-truth grader/ground_truth \
-  --rubric grader/rubric.json \
-  --penalties grader/penalties \
+  --ground-truth resources/ground_truth \
+  --rubric resources/rubric.json \
+  --penalties resources/penalties \
   --base-url http://localhost:8000/v1 \
   --model Qwen/Qwen3.6-35B-A3B \
   --token EMPTY \
   --judge-timeout-seconds 600 \
   --judge-max-tokens 8192 \
   --concurrency 5 \
-  --window-minutes 5 \
-  --threshold 0.15 \
+  --evaluation-policy resources/evaluation-policy.json \
   --verbose
 ```
 
 Use `--refresh-judge` to ignore reusable judge checkpoints. Tokens are passed
 to the client only and are never written to grader artifacts.
 
-Every CLI run writes a fresh, DEBUG-level `grades/grader.log`. It records run
+Every CLI run writes a fresh, DEBUG-level `grades/logs/grader.log`. It records run
 discovery, validation and skip reasons, job lifecycle status, cache hits and
 hashes, judge call outcomes, metric-family medians and assessments, final
 grades, and artifact locations. Normal console output is concise; `--verbose`
@@ -66,11 +64,11 @@ Each run is discovered through `metadata.json` and must contain:
 - `inputs/scenario.json`, including the scenario name and chaos references;
 - every referenced `inputs/chaos/<reference>.yaml` manifest;
 - a matching manually maintained
-  `grader/ground_truth/<scenario-name>.md` file with non-empty `## RCA` and
+  `resources/ground_truth/<scenario-name>.md` file with non-empty `## RCA` and
   `## Recommended remediation` sections;
-- the scoring rubric at `grader/rubric.json`, or another file passed with
+- the scoring rubric at `resources/rubric.json`, or another file passed with
   `--rubric`;
-- optional scenario penalty arrays under `grader/penalties/<scenario-name>.json`,
+- optional scenario penalty arrays under `resources/penalties/<scenario-name>.json`,
   or another directory passed with `--penalties`;
 - optional `sessions/rca_session.json` and
   `sessions/remediation_run.json` exports;
@@ -84,21 +82,17 @@ normal RCA or remediation rubric judge.
 
 ## Rubric classification
 
-Every exported job is reported independently. Only a succeeded job with a
-non-empty final `result` is sent to the judge.
+Every exported job is reported independently. Succeeded and failed jobs with a
+non-empty final `result` are sent to the judge. The archived lifecycle status is
+preserved independently of semantic quality. Running jobs remain non-evaluable.
 
-`grader/rubric.json` is the source of truth for criterion ids, class labels,
+`resources/rubric.json` is the source of truth for criterion ids, class labels,
 definitions, scores, and weights. The judge only assigns a class to each
 criterion. Python converts those classes into 0–1 scores and the weighted
 overall score. Editing the JSON changes both the prompt and the numeric scale
 without code changes.
 
-The RCA payload contains exactly the scenario name, production-style RCA
-ground truth, and `rca_job.result`. The remediation payload contains the
-scenario name, remediation ground truth, and `remediation_job.result`.
-Evidence-grounding and causal-reasoning are judged from claims inside that
-final result against the production-observable condition in ground truth. Tool
-traces and archived manifests are not supplied to this semantic call.
+Both semantic payloads contain scenario name, ground truth, final result, and bounded portable observations when available. Evidence claims are cross-checked against those observations; without them this is reported evidence quality. Raw tool traces, private reasoning and archived manifests are not supplied to the normal semantic call.
 
 Naming Chaos Mesh, fault injection, or another synthetic mechanism is neither
 required nor rewarded. If an agent uses that terminology, the judge treats the
@@ -117,8 +111,9 @@ at temperature zero with a strict per-criterion response object:
 ```
 
 Allowed `class` values are the enums from `rubric.json`. Each reason is at most
-500 characters. Failed, running, and result-less jobs, plus individual judge
-failures, remain visible as `not_evaluable`.
+500 characters. Running and result-less jobs, plus individual judge failures, remain visible as
+`not_evaluable`. Failed jobs with final results receive the same rubric and
+remediation-penalty assessment as succeeded jobs.
 
 Alignment is derived in code from the first criterion of that kind
 (root-cause correctness or remediation correctness). A job is `aligned` when
@@ -128,7 +123,7 @@ does not use penalty results.
 ## Remediation penalties
 
 Remediation-only. After rubric classification, if
-`grader/penalties/<scenario-name>.json` exists and is non-empty, the judge
+`resources/penalties/<scenario-name>.json` exists and is non-empty, the judge
 makes a second structured call. That penalty-only call receives the archived
 manifests so it can detect evaluation tampering and target-specific harmful
 actions. Each file is a JSON array:
@@ -156,38 +151,13 @@ old rubric checkpoints. `JUDGE_MAX_TOKENS` or `--judge-max-tokens` controls the
 response allowance; the 8,192-token default accommodates local reasoning
 models.
 
-## Five-minute metric comparison
+## Incident recovery replaces job-centered metric grading
 
-For each succeeded remediation with a result, `completed_at` is the anchor.
-The before window is `[completed_at - 5 minutes, completed_at)` and the after
-window is `[completed_at, completed_at + 5 minutes]`. The duration is
-configurable. The grader computes the median of valid samples in each window
-for every Prometheus series, followed by a median across evaluable series for
-the family.
+See [the current methodology](../docs/methodology.md), [complete metric reference](../docs/metrics.md), and [portable evidence contract](../docs/evidence-contract.md).
 
-Only two of the 13 collected families are evaluated. All other Prometheus
-families are ignored by grading, although they remain available to reporting
-and visualization:
+Original Runner archives are graded directly: Locust CSV counter differences supply reliability and goodput; baseline-active services are assessed individually for latency and traffic. The result is an explicitly labelled service recovery proxy, independent of job completion and judge success. No new Runner outputs are required. Strict client-histogram recovery, verified actions and safety remain separate optional measurements.
 
-| Policy | Metric families |
-| --- | --- |
-| Lower is better | `response_time_p95_seconds`, `http_5xx_rate` |
-
-At the default inclusive 15% boundary, an expected-direction change is
-`improved`, an opposite-direction change is `worsened`, and a smaller change is
-`stable`. Stability metrics are `worsened` by an absolute change of 15% or
-more. Zero-to-zero is stable; zero-to-positive and positive-to-zero use the
-family direction. Missing or nonnumeric windows are `not_evaluable`.
-
-Both evaluated families are required. The metric outcome is:
-
-- `good` when neither family worsens and at least one improves;
-- `not_good` when either family worsens or neither measurably improves;
-- `not_evaluable` when either family lacks both windows.
-
-The final remediation grade is `good` only when derived alignment is `aligned`
-and the metric outcome is `good`. An evaluable mismatch is `not_good`; an
-unevaluable semantic or metric input makes the final grade `not_evaluable`.
+Per-run `grade.json` retains archive outcomes and their evidence; `grade.json` retains schema 2 and records methodology `archive-recovery-v3`. Use `--operational-only` for offline calculations without model calls. The Grader owns `evaluation-policy.json`. See the methodology for missing data and percentile limitations.
 
 ## Outputs
 
@@ -200,24 +170,36 @@ For each run, the grader writes:
   family summaries;
 - `grades/runs/<run>/judge-cache.json`: hash-keyed classification checkpoints.
 
-It also writes `grades/summary.csv`, one row per RCA/remediation job;
-`grades/rca_rubric_score.csv` and `grades/remediation_rubric_score.csv`, one
-row per session with each criterion class/score plus `overall_score`;
-remediation score CSV also has `rubric_score` and `penalty_total`; and
-`grades/report.md`, with aggregate counts, mean overall and per-criterion
-scores, applied penalties, skipped runs, and non-evaluable jobs. The report
-opens with an RCA rubric table followed by a single remediation table combining
-rubric scores with the before/after values, percentage changes, and assessments
-for response-time P95 and HTTP 5xx rate. Per-run reports use the same summary
-layout before their detailed sections. These output files are deterministic
-apart from newly returned judge reasons.
+New output directories contain only:
+
+```text
+runs/<run>/grade.json
+runs/<run>/report.md
+runs/<run>/judge-cache.json
+logs/grader.log
+csvs/summary.csv
+csvs/rca_rubric_score.csv
+csvs/remediation_rubric_score.csv
+csvs/window_comparison.csv
+csvs/scenario_table.csv
+```
+
+The three job CSVs preserve `status` and `is_failed`. Remediation totals include
+`rubric_score` and `penalty_total`. The scenario CSV has per-run session summaries
+and paired best/worst front-end metrics. Window CSVs disclose zero-imputation
+counts. Empty input still writes all five CSV headers.
+
+Aggregate Markdown, paper metrics, research-summary and incident files are no
+longer generated. Existing historical outputs are preserved; choose a fresh
+output directory to get the clean layout. Per-run JSON retains measurement and
+scoring provenance. The analyzer accepts `csvs/` and legacy flat directories.
 
 The per-run JSON has this stable top-level shape (nested manifests, results,
-and metric series are retained in full):
+and available diagnostic summaries are retained):
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "run": "run-folder-name",
   "scenario": "scenario-name",
   "status": "graded",
@@ -244,3 +226,57 @@ Each rubric score CSV adds `<criterion>_class` and `<criterion>` columns plus
 `overall_score`. Remediation score CSV also adds `rubric_score` and
 `penalty_total`. An ungraded run retains the same top-level shape with empty
 job lists and an explicit reason.
+
+### Sliding comparisons
+
+`--comparison-window-minutes 5` configures baseline versus best/worst scheduled-chaos
+window comparisons (default five minutes), including in `--operational-only` mode.
+See the [component guide](../README.md#baseline-versus-bestworst-chaos-windows) for
+metric definitions, missing-data handling, and `window_comparison.csv` fields.
+
+## Paired scenario table
+
+Each grading run writes `csvs/scenario_table.csv`. The original twelve columns retain scenario, score
+maxima/means, baseline P95/5xx, paired best-window values/location, and exported
+session counts. Three appended columns give worst-window P95, its paired 5xx
+rate, and its UTC location. Three further columns count imputed 5xx samples in
+the baseline, best, and worst intervals.
+
+The default workload is `front-end`. Use `--table-workload NAME` for another
+entry point and `--table-namespace NAME` if the name occurs in multiple namespaces.
+No other workload is silently substituted.
+
+Baseline means exclude the first **five minutes** of the recorded baseline by
+default. Set `--baseline-ignore-minutes 0` for the full baseline or another
+nonnegative duration. A recorded 30-minute baseline therefore uses minutes 5–30.
+If exclusion leaves no interval, baseline values remain unknown. Missing baseline
+measurements do not block valid chaos-window measurements.
+
+`--comparison-window-minutes` controls window length (default five minutes).
+Windows scan the entire recorded chaos interval, advancing by the scrape step,
+independently of RCA/remediation timing. They must fit within a single chaos
+interval before cleanup; idle gaps and cleanup are excluded. The recorded
+boundaries are used rather than assuming every archive lasts exactly one hour.
+
+- **Best:** lowest mean P95 among windows with mean 5xx <= 0.5 requests/s;
+  override the ceiling with `--table-max-5xx-rate`.
+- **Worst:** highest mean P95 among all covered windows, without a 5xx ceiling.
+- Both selections break ties by earliest time. Each selected P95/5xx pair uses
+  exactly the same window. If no window meets the best threshold, worst may
+  still be available.
+
+P95 is the time mean of archived rolling workload P95 estimates, not a pooled
+client percentile. HTTP 5xx is requests/s, not a percentage. Each reported metric
+needs two samples and 90% coverage in its own interval. Both metrics must meet
+coverage for a paired chaos window; baseline validity is assessed independently.
+As explicitly requested, missing 5xx samples from a successful result matrix
+are imputed as zero at matching recorded traffic timestamps. Counts are disclosed
+in both window CSVs and per-run JSON. Missing query files, traffic gaps and
+explicit nonfinite samples remain unavailable. P95 is never zero-filled.
+
+Score maxima and means include scored succeeded and failed jobs; remediation
+uses final scores after penalties. Session counts include every exported job;
+scored denominators can be obtained from the job CSVs. One row represents one archived
+run, even when scenario names repeat. Per-run JSON records selection settings, trimmed
+baseline boundaries, coverage, counts, and unknown reasons in `paired_window`.
+Recovery scoring and independent per-workload comparisons are unchanged.

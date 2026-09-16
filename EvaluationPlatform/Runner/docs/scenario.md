@@ -6,7 +6,7 @@ This document summarizes the 70 application-specific scenarios in
 evaluator-only inputs for exact execution timing and reproducibility; the
 catalogue below describes only the production-observable incident condition.
 The remediation descriptions match the grader ground-truth policy in
-[`grader/scenario-policy.md`](../../Grader/grader/scenario-policy.md).
+[`resources/scenario-policy.md`](../../Grader/resources/scenario-policy.md).
 The paper-level aggregation and reporting method is defined in
 [`evaluation_plan.md`](evaluation_plan.md).
 

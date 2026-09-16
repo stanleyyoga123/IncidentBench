@@ -10,6 +10,7 @@ from schema import LearningJobRequest, LearningResult
 
 class LearningEngine:
     def __init__(self, settings):
+        self.output_callback = None
         self.settings = settings
         self.client = OpenAI(
             base_url=settings.client.url,
@@ -31,6 +32,9 @@ class LearningEngine:
                 stream=False,
             )
         raw = response.choices[0].message.content or ""
+        self.last_raw_output = raw
+        if self.output_callback:
+            self.output_callback(job_id, raw)
         return self.parse(raw), raw
 
     @staticmethod

@@ -160,7 +160,7 @@ class WorkflowStore:
                 WHERE status IN ('rca_queued', 'rca_running', 'awaiting_approval',
                                  'remediation_queued', 'remediation_running',
                                  'learning_submitting', 'learning_queued',
-                                 'learning_running')
+                                 'learning_running', 'needs_review')
                 ORDER BY created_at
                 """
             )
@@ -264,9 +264,10 @@ class WorkflowStore:
         elif status in {"failed", "needs_review"}:
             self._update_workflow(
                 workflow_id,
-                status="needs_review" if status == "needs_review" else "failed",
+                status="failed",
                 error=error,
-                anomaly_status=status,
+                anomaly_status="failed",
+                completed=True,
             )
         else:
             self._update_workflow(
@@ -570,7 +571,7 @@ class WorkflowStore:
         elif slot["holder_type"] == "remediation":
             cur.execute(
                 """
-                UPDATE remediation_job SET status='needs_review',
+                UPDATE remediation_job SET status='failed',
                     error=%s, lease_owner=NULL, lease_expires_at=NULL,
                     version=version+1, updated_at=now(), completed_at=now()
                 WHERE id=%s AND status='running'
@@ -670,7 +671,7 @@ class WorkflowStore:
     def finish_remediation_job(
         self,
         job_id: UUID,
-        status: Literal["succeeded", "needs_review"],
+        status: Literal["succeeded", "failed", "needs_review"],
         *,
         result: dict[str, Any] | None = None,
         raw_output: str | None = None,
@@ -681,7 +682,7 @@ class WorkflowStore:
         self._finish_job(
             "remediation_job",
             job_id,
-            status,
+            "failed" if status == "needs_review" else status,
             result=result,
             raw=raw_output,
             error=error,
@@ -905,6 +906,21 @@ class WorkflowStore:
             conn.commit()
             return IncidentLesson.model_validate(row)
 
+    def record_agent_output(self, service, job_id, lease_owner, raw_output, result=None):
+        table = {"rca": "rca_job", "remediation": "remediation_job", "learning": "learning_job"}[service]
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""UPDATE {table} SET raw_output=%s, result=COALESCE(%s, result),
+                       version=version+1, updated_at=now()
+                    WHERE id=%s AND status='running' AND lease_owner=%s
+                      AND lease_expires_at > now()
+                    RETURNING id""",
+                (raw_output, Jsonb(result) if result is not None else None, job_id, lease_owner),
+            )
+            if cur.fetchone() is None:
+                raise WorkflowConflictError("agent output requires the current running job lease")
+            conn.commit()
+
     def _finish_job(
         self,
         table: str,
@@ -922,7 +938,7 @@ class WorkflowStore:
             if completed is True:
                 cur.execute(
                     f"""
-                    UPDATE {table} SET status=%s, result=%s, raw_output=%s, error=%s,
+                    UPDATE {table} SET status=%s, result=COALESCE(%s, result), raw_output=COALESCE(%s, raw_output), error=%s,
                         lease_owner=NULL, lease_expires_at=NULL, version=version+1,
                         updated_at=now(), completed_at=now()
                     WHERE id=%s
@@ -938,7 +954,7 @@ class WorkflowStore:
             else:
                 cur.execute(
                     f"""
-                    UPDATE {table} SET status=%s, result=%s, raw_output=%s, error=%s,
+                    UPDATE {table} SET status=%s, result=COALESCE(%s, result), raw_output=COALESCE(%s, raw_output), error=%s,
                         lease_owner=NULL, lease_expires_at=NULL, version=version+1,
                         updated_at=now(),
                         completed_at=CASE WHEN %s IN ('succeeded','failed') THEN now() ELSE NULL END

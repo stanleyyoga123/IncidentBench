@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "methodology_version": "archive-recovery-v3",
+  "baseline_seconds": 300,
+  "interval_seconds": 30,
+  "sustain_seconds": 120,
+  "latency_multiplier": 1.2,
+  "failure_ratio_allowance": 0.001,
+  "throughput_fraction": 0.9,
+  "minimum_coverage": 0.9,
+  "minimum_requests": 100,
+  "maximum_baseline_failure_ratio": 0.01,
+  "bootstrap_samples": 2000,
+  "bootstrap_seed": 20260915
+}

@@ -65,7 +65,7 @@ Return compact structured output using headings and bullet points. Do not write 
 Status
 - Artifact: Ansible, manifest, both, or validation-only
 - Automation: executed, validation-only, blocked, or failed
-- Recovery: verified, not-recovered, or unknown. Use verified only when all approved state and health checks pass with current evidence after the action; otherwise the job requires review.
+- Recovery: verified, not-recovered, or unknown. Use verified only when all approved state and health checks pass with current evidence after the action; otherwise report the unsuccessful or unknown outcome accurately; the job will finish automatically with the output retained.
 
 Changes
 - One bullet per target: `<resource> <namespace>/<name>: <previous state> -> <current state>`, or `<resource> <name>: <previous state> -> <current state>` for cluster-scoped targets

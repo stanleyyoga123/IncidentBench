@@ -21,3 +21,10 @@ The script refuses placeholders. `RCA_SUBMIT_TOKEN` must match
 AgentOrchestrator, `AGENT_STORE_TOKEN` must match AgentOrchestrator,
 RemediatorAgent, and LearningAgent, and `MCP_TOKEN` must match only the investigation MCP
 Secret. Deploy after MCPTools and DatabaseJob.
+
+### Output persistence
+
+Generated final text is saved through Orchestrator's authenticated job-output
+endpoint before parsing or verification. Failed jobs retain `raw_output` in
+session exports; Remediator also retains its parsed `result` when recovery
+verification fails. Failure status remains separate from generated claims.

@@ -51,6 +51,13 @@ class RemediationJobStore:
             return None
         return RemediationJob.model_validate(response.json())
 
+    def record_output(self, job_id, lease_owner, raw_output, result=None):
+        response = self._client.post(
+            f"/api/v1/internal/remediation/jobs/{job_id}/output",
+            json={"lease_owner": lease_owner, "raw_output": raw_output, "result": result},
+        )
+        response.raise_for_status()
+
     def succeed(self, job_id: UUID, result: RemediationResult, raw: str) -> None:
         response = self._client.post(
             f"/api/v1/internal/remediation/jobs/{job_id}/finish",
@@ -75,12 +82,14 @@ class RemediationJobStore:
         response.raise_for_status()
         return bool(response.json()["renewed"])
 
-    def needs_review(self, job_id: UUID, exc: Exception) -> None:
+    def fail(self, job_id: UUID, exc: Exception, *, raw_output=None, result=None) -> None:
         response = self._client.post(
             f"/api/v1/internal/remediation/jobs/{job_id}/finish",
             json={
-                "status": "needs_review",
+                "status": "failed",
                 "error": {"type": type(exc).__name__, "message": str(exc)},
+                "raw_output": raw_output,
+                "result": result,
             },
         )
         response.raise_for_status()

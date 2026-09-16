@@ -20,6 +20,9 @@ def api(context, action):
         raise ValueError('orchestrator_url is required')
     path = '/api/v1/evaluation/' + action
     data = json.dumps({'run_id': context['run_id']}).encode()
+    if action == 'state':
+        path = '/api/v1/evaluation'
+        data = None
     if action == 'export':
         path += '?' + urlencode({'run_id': context['run_id']})
         data = None

@@ -7,6 +7,11 @@ cluster state as a permanent fact. Generalize observations into conditional guid
 For example, replace "node X is cordoned" with guidance about how to investigate
 cordoned nodes when the same symptoms and evidence recur.
 
+Remediation job status `succeeded` means the agent produced a final output.
+The completion_type `remediated` identifies that workflow path, not proven recovery.
+Assess execution and recovery from the result and tool evidence; output may describe
+a failed, skipped, or unverified action. Never infer recovery from job status alone.
+
 Return one JSON object with keys `summary` and `lessons`. Each lesson must contain
 exactly these typed fields:
 - category: one of investigation, diagnosis, remediation, verification, guardrail

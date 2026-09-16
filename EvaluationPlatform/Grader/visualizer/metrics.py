@@ -33,6 +33,7 @@ METRIC_PRESENTATION = {
     "deployment_disk_io_bytes_per_second": ("Deployment disk I/O", "bytes/s"),
     "deployment_memory_request_utilization_percent": ("Deployment memory request utilization", "%"),
     "deployment_network_io_bytes_per_second": ("Deployment network I/O", "bytes/s"),
+    "http_5xx_ratio": ("HTTP 5xx ratio", "fraction"),
     "http_5xx_rate": ("HTTP 5xx rate", "requests/s"),
     "node_cpu_utilization_percent": ("Node CPU utilization", "%"),
     "node_disk_io_bytes_per_second": ("Node disk I/O", "bytes/s"),
@@ -113,4 +114,35 @@ def load_run_metrics(run_dir: Path, origin: datetime) -> tuple[MetricDataset, ..
         dataset = _load_metric(path, origin)
         if dataset is not None:
             datasets.append(dataset)
+    return tuple(datasets)
+
+
+def load_client_metrics(run_dir: Path, origin: datetime) -> tuple[MetricDataset, ...]:
+    from grader.research import jsonl, validate_intervals, summary, epoch, read
+    rows = jsonl(run_dir / 'evidence/client-intervals.jsonl')
+    if not rows:
+        from grader.archive_metrics import client_history, counter_window
+        try:
+            history, source = client_history(run_dir)
+        except (ValueError, OSError):
+            return ()
+        if len(history) < 2:
+            return ()
+        bins = [counter_window(history, start, start+30) for start in range(int(history[0]['t']), int(history[-1]['t'])-29, 30)]
+        datasets = []
+        for field, title, unit in [('failure_ratio', 'Client failure ratio (CSV counter differences)', 'fraction'), ('successful_rps', 'Successful client throughput (CSV counter differences)', 'requests/s')]:
+            values = [(epoch(r['measured_end']), r[field]) for r in bins if r['coverage'] >= .9 and r[field] is not None]
+            if values:
+                series = MetricSeries('client', {'source': source}, tuple((t-origin.timestamp())/60 for t,v in values), tuple(v for t,v in values))
+                datasets.append(MetricDataset('client_'+field, title, unit, (series,)))
+        return tuple(datasets)
+    run_id = read(run_dir / 'run-context.json', {}).get('run_id', run_dir.name)
+    validate_intervals(rows, run_id)
+    datasets = []
+    for field, title, unit in [('p95_seconds', 'Client P95 (histogram upper bound)', 'seconds'),
+                               ('failure_ratio', 'Client failure ratio', 'fraction'),
+                               ('successful_rps', 'Successful client throughput', 'requests/s')]:
+        values = [(epoch(r['end']), summary([r])[field]) for r in rows if r['attempted'] > 0 and r['observed_seconds'] > 0]
+        series = MetricSeries('client', {}, tuple((t-origin.timestamp())/60 for t,v in values), tuple(v for t,v in values))
+        datasets.append(MetricDataset('client_' + field, title, unit, (series,)))
     return tuple(datasets)

@@ -118,6 +118,42 @@ Kubernetes SubjectAccessReview requests using Runner's normal credentials. This
 also works inside the Runner pod, where `kubectl --as` can bypass in-cluster
 credential discovery. A denied or missing permission result fails preparation.
 
+## Clear an interrupted evaluation lock
+
+For no-argument recovery after stopping an interrupted experiment:
+
+```bash
+./clear-lock.sh
+```
+
+From your workstation this uses the current kubectl context and runs the local
+recovery implementation in `agents/evaluation-runner`, using the pod's existing
+configuration and credentials. It works without rebuilding an older Runner image.
+Inside the Runner pod it uses local configuration directly. The script discovers
+the current owner, pauses dispatch, and releases ownership. An already clear lock
+succeeds. Ownership changes during the operation are rejected by the API.
+It leaves maintenance enabled and preserves results. It does not stop experiments
+or clean up chaos; stop active runs and finish recovery before invoking it.
+The Runner pod must be available for workstation use.
+
+If a force-stopped run leaves `Orchestrator acquire returned HTTP 409`, stop the
+old Runner and complete the [interrupted-run recovery steps](../Orchestrator/docs/evaluation-api.md#interrupted-run-recovery)
+(worker shutdown, chaos cleanup, and evidence export). Then release its ownership:
+
+```bash
+./scripts/reset_evaluation_lock.sh --run-id INTERRUPTED_RUN_ID
+# Optional: --environment /path/to/environment.json
+```
+
+Use the `run_id` from the interrupted run's `run-context.json`, and supply the
+control token through the environment variable named in your environment JSON.
+The script checks the current owner, pauses dispatch, and releases the lock through
+Orchestrator's authenticated API. A different owner is rejected; an already clear
+lock succeeds. Stored results are preserved and maintenance stays enabled until
+the next run activates. This only clears ownership: it does not stop worker pods,
+remove chaos, or update the archived run status. The next run's normal pre-run
+reset clears database results, so finish exporting evidence first.
+
 ## Extend the platform
 
 - **Another solution:** copy `hooks/integrations/example/`, implement its four actions, add its deployment list to a global JSON file, and select your own pre/post hooks. Kubernetes lifecycle helpers accept any configured deployment names. Select `none` for a workload-only run.

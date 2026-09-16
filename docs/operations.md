@@ -68,7 +68,7 @@ checks must not apply resources to a live cluster.
 Operational symptoms map to boundaries: ingestion errors belong between
 detector/orchestrator; queued jobs with a valid slot holder are normal; expired
 RCA leases are retried within limits; expired remediation leases become
-`needs_review`; MCP 401 errors indicate token/profile mismatch; RBAC denial is
+`failed`; MCP 401 errors indicate token/profile mismatch; RBAC denial is
 expected when an investigation caller attempts mutation.
 Learning jobs share the global slot, retry three times, and then allow the
 workflow to complete with `learning_status=failed` and no published lessons.

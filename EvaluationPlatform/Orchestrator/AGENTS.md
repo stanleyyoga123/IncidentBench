@@ -14,7 +14,7 @@ versioned submission.
 The singleton `agent_execution_slot` serializes RCA, remediation, and learning, including
 direct job API submissions. Brief `awaiting_approval` does not occupy the slot.
 Expired RCA holders requeue while `attempts < max_attempts` and otherwise fail.
-Expired or failed remediation becomes `needs_review` and is never requeued.
+Expired or failed remediation becomes `failed` and is never requeued.
 Successful no-action or remediated workflows enter learning before completion.
 Publish only schema-valid lessons; after three failed learning attempts finalize
 without lessons and preserve `learning_error`. Retrieve no more than 40 active

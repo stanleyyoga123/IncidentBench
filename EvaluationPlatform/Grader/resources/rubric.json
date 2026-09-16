@@ -79,7 +79,7 @@
           "name": "Evidence Grounding",
           "weight": 0.2,
           "definition": "Measures the extent to which the agent's diagnosis and supporting claims are grounded in the telemetry, observations, logs, metrics, traces, or other evidence available during the incident.",
-          "evaluation_note": "Technical plausibility alone does not constitute evidence grounding. A claim must be supported by evidence stated in the agent result. Judge only claims inside AGENT_RESULT against GROUND_TRUTH; tool traces are not supplied.",
+          "evaluation_note": "Technical plausibility alone does not constitute grounding. Cross-check claims in AGENT_RESULT against supplied observations and GROUND_TRUTH. Without observations, grade reported evidence quality only; tool traces and private reasoning are not supplied.",
           "classes": [
             {
               "id": "UNGROUNDED",

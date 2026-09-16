@@ -66,3 +66,36 @@ resolved scenario, run ID, scenario path and non-secret environment configuratio
 [Evaluation API](../EvaluationPlatform/Orchestrator/docs/evaluation-api.md) documents
 authentication, transitions and the version-1 export envelope. Existing session
 arrays and metadata version 2 remain compatible with the offline grader.
+
+
+## Offline archive grading
+
+The Grader uses the original Runner archive format: Locust CSV counters,
+Prometheus service metrics, metadata and exported sessions. No Runner update or
+additional scenario is required. Methodology `archive-recovery-v3` separates a
+descriptive service recovery proxy from semantic quality and unverified safety.
+The evaluation policy is owned by the Grader. See the
+[methodology](../EvaluationPlatform/Grader/docs/methodology.md),
+[metrics](../EvaluationPlatform/Grader/docs/metrics.md), and
+[input contract](../EvaluationPlatform/Grader/docs/evidence-contract.md).
+
+## Durable agent outputs and autonomous failure
+
+`POST /api/v1/internal/{service}/jobs/{job_id}/output` accepts `lease_owner`,
+`raw_output`, and optional structured `result` for `rca`, `remediation`, or
+`learning`. It uses the store token and requires a running, unexpired matching
+job lease. Each engine checkpoints generated text before parsing or verification;
+Remediator additionally checkpoints its parsed result before completion.
+Finish calls preserve checkpointed fields when no replacement is supplied.
+The existing session exports include these fields on unsuccessful jobs too.
+
+Remediation jobs with nonempty final agent text finish as `succeeded` and enter
+learning, even when that text reports execution errors or unverified recovery.
+This status means output completion, not service recovery; grading and learning
+assess the recorded evidence separately. Empty output, runtime/persistence errors
+preventing completion, and expired leases still finish as `failed`, release the
+execution slot, and automatically finalize the workflow and anomalies. They do not wait for human review or replay
+an ambiguous mutation. New incidents proceed normally. Legacy `needs_review`
+finish requests are accepted during rolling upgrades and normalized to `failed`;
+legacy review workflows are finalized by reconciliation. Existing archived files
+are immutable and cannot recover text that was never persisted.

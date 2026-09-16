@@ -17,15 +17,7 @@ from grader.ground_truth import (
 )
 from grader.judge import build_payload, build_penalty_payload, parse_judge_response
 from grader.logging_utils import close_logging, configure_logging
-from grader.metrics import (
-    HIGHER,
-    LOWER,
-    METRIC_POLICIES,
-    STABLE,
-    assess_change,
-    evaluate_metrics,
-    metric_outcome,
-)
+
 from grader.penalty import (
     DEFAULT_PENALTIES_DIR,
     apply_penalties,
@@ -275,7 +267,7 @@ def _metric_values(before: float, after: float) -> list[list[object]]:
 
 
 def _write_metrics(run: Path) -> None:
-    for metric in METRIC_POLICIES:
+    for metric in ("http_5xx_rate", "response_time_p95_seconds"):
         before = 100.0
         after = 100.0
         if metric == "response_time_p95_seconds":
@@ -477,6 +469,7 @@ def test_penalty_payload_retains_archived_manifests() -> None:
         "chaos_manifests",
         "agent_result",
         "penalties",
+        "observations",
     }
     assert penalty_payload["chaos_manifests"][0]["manifest"]["kind"] == "Schedule"
 
@@ -654,9 +647,9 @@ def test_pipeline_applies_remediation_penalties_only(tmp_path: Path) -> None:
     assert rem["rubric"]["penalties"][0]["applied"] is True
     assert rem["rubric"]["penalties"][1]["applied"] is False
     assert len(judge.penalty_calls) == 1
-    report = (tmp_path / "grades" / "report.md").read_text(encoding="utf-8")
-    assert "## Remediation penalties applied" in report
-    assert "| Rubric | Penalty | Total |" in report
+    report = (tmp_path / "grades" / "runs" / "run-1" / "report.md").read_text(encoding="utf-8")
+    assert "penalt" in report.lower()
+    assert "Penalty" in report
 
 
 def test_missing_penalty_file_skips_second_judge_call(tmp_path: Path) -> None:
@@ -699,85 +692,6 @@ def test_strict_judge_response_parsing() -> None:
     invalid["root_cause_correctness"] = {"class": "maybe", "reason": "unclear"}
     with pytest.raises(ValueError):
         parse_judge_response(kind_rubric, json.dumps(invalid))
-
-
-@pytest.mark.parametrize(
-    ("before", "after", "policy", "expected"),
-    [
-        (100, 85, LOWER, "improved"),
-        (100, 115, LOWER, "worsened"),
-        (100, 115, HIGHER, "improved"),
-        (100, 85, HIGHER, "worsened"),
-        (100, 115, STABLE, "worsened"),
-        (100, 114.99, STABLE, "stable"),
-        (0, 0, LOWER, "stable"),
-        (0, 1, LOWER, "worsened"),
-        (0, 1, HIGHER, "improved"),
-        (1, 0, LOWER, "improved"),
-        (1, 0, HIGHER, "worsened"),
-        (0, 1, STABLE, "worsened"),
-    ],
-)
-def test_metric_direction_threshold_and_zero_rules(
-    before: float, after: float, policy: str, expected: str
-) -> None:
-    assert assess_change(before, after, policy, 0.15) == expected
-
-
-def test_metric_catalog_and_core_health_gate() -> None:
-    assert METRIC_POLICIES == {
-        "http_5xx_rate": LOWER,
-        "response_time_p95_seconds": LOWER,
-    }
-    families = {
-        name: {"assessment": "stable"}
-        for name in METRIC_POLICIES
-    }
-    assert metric_outcome(families)[0] == "not_good"
-    families["response_time_p95_seconds"]["assessment"] = "improved"
-    assert metric_outcome(families)[0] == "good"
-    families["http_5xx_rate"]["assessment"] = "worsened"
-    assert metric_outcome(families)[0] == "not_good"
-    families["http_5xx_rate"]["assessment"] = "not_evaluable"
-    assert metric_outcome(families)[0] == "not_evaluable"
-
-
-def test_all_metric_families_series_and_window_boundaries(tmp_path: Path) -> None:
-    run = tmp_path / "run"
-    _write_metrics(run)
-    result = evaluate_metrics(run, ANCHOR)
-    assert len(result["families"]) == 2
-    assert result["outcome"] == "good"
-    response = result["families"]["response_time_p95_seconds"]
-    assert response["before_median"] == 100
-    assert response["after_median"] == 80
-    assert response["assessment"] == "improved"
-    assert len(response["series"]) == 2
-    assert response["series"][0]["before_samples"] == 2
-    assert response["series"][0]["after_samples"] == 2
-
-
-def test_missing_core_window_is_not_evaluable(tmp_path: Path) -> None:
-    run = tmp_path / "run"
-    _write_metrics(run)
-    (run / "metrics" / "http_5xx_rate.json").unlink()
-    result = evaluate_metrics(run, ANCHOR)
-    assert result["outcome"] == "not_evaluable"
-    assert "http_5xx_rate" in result["reason"]
-
-
-def test_non_grading_metric_files_are_ignored(tmp_path: Path) -> None:
-    run = tmp_path / "run"
-    _write_metrics(run)
-    _write_json(run / "metrics" / "traffic_rps.json", {"invalid": "for grading"})
-
-    result = evaluate_metrics(run, ANCHOR)
-
-    assert result["outcome"] == "good"
-    assert set(result["families"]) == {
-        "http_5xx_rate",
-        "response_time_p95_seconds",
-    }
 
 
 def test_concurrency_cli_default_environment_and_override(monkeypatch) -> None:
@@ -848,7 +762,7 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
     assert len(judge.calls) == 2
     assert {kind for kind, _ in judge.calls} == {"rca", "remediation"}
     assert all(
-        set(payload) == {"scenario", "ground_truth", "agent_result"}
+        set(payload) == {"scenario", "ground_truth", "agent_result", "observations", "evidence_assessment"}
         for _, payload in judge.calls
     )
     assert grades[0]["rca_jobs"][1]["alignment"]["verdict"] == "not_evaluable"
@@ -859,8 +773,8 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
     assert "penalties" not in rca["rubric"]
     assert grades[0]["configuration"]["rubric_hash"] == load_rubric().source_hash
     remediation = grades[0]["remediation_jobs"][0]
-    assert remediation["metrics"]["outcome"] == "good"
-    assert remediation["final_grade"] == "good"
+    assert remediation["metrics"]["outcome"] == "not_evaluable"
+    assert remediation["final_grade"] == "not_evaluable"
     assert remediation["rubric"]["overall_score"] == 1.0
     assert remediation["rubric"]["rubric_score"] == 1.0
     assert remediation["rubric"]["penalty_total"] == 0.0
@@ -871,29 +785,30 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
         "chaos_manifests",
         "agent_result",
         "penalties",
+        "observations",
     }
     assert "penalty" not in json.dumps(judge.penalty_calls[0]["penalties"])
     assert grades[0]["remediation_jobs"][1]["final_grade"] == "not_evaluable"
     assert (output / "runs" / "run-1" / "grade.json").is_file()
     assert (output / "runs" / "run-1" / "report.md").is_file()
     assert (output / "runs" / "run-1" / "judge-cache.json").is_file()
-    assert (output / "summary.csv").is_file()
-    assert (output / "rca_rubric_score.csv").is_file()
-    assert (output / "remediation_rubric_score.csv").is_file()
-    assert (output / "report.md").is_file()
-    with (output / "summary.csv").open(newline="", encoding="utf-8") as handle:
+    assert (output / "csvs" / "summary.csv").is_file()
+    assert (output / "csvs" / "rca_rubric_score.csv").is_file()
+    assert (output / "csvs" / "remediation_rubric_score.csv").is_file()
+    assert not (output / "report.md").exists()
+    with (output / "csvs" / "summary.csv").open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 4
     assert "overall_score" in rows[0]
     assert rows[0]["overall_score"] == "1.0"
-    with (output / "rca_rubric_score.csv").open(newline="", encoding="utf-8") as handle:
+    with (output / "csvs" / "rca_rubric_score.csv").open(newline="", encoding="utf-8") as handle:
         rca_rows = list(csv.DictReader(handle))
     assert [row["job_id"] for row in rca_rows] == ["rca-1", "rca-running"]
     assert rca_rows[0]["root_cause_correctness"] == "1.0"
     assert rca_rows[0]["root_cause_correctness_class"] == "CORRECT"
     assert rca_rows[0]["overall_score"] == "1.0"
     assert rca_rows[1]["overall_score"] == ""
-    with (output / "remediation_rubric_score.csv").open(
+    with (output / "csvs" / "remediation_rubric_score.csv").open(
         newline="", encoding="utf-8"
     ) as handle:
         rem_rows = list(csv.DictReader(handle))
@@ -902,23 +817,14 @@ def test_pipeline_grades_jobs_writes_artifacts_and_reuses_cache(tmp_path: Path) 
     assert rem_rows[0]["rubric_score"] == "1.0"
     assert rem_rows[0]["penalty_total"] == "0.0"
     assert "penalty_total" not in rca_rows[0]
-    report = (output / "report.md").read_text(encoding="utf-8")
-    assert "## Summary" in report
+    report = (output / "runs/run-1/report.md").read_text(encoding="utf-8")
     assert "### RCA rubric scores" in report
-    assert "### Remediation rubric scores and metrics" in report
-    assert report.index("## Summary") < report.index("## Overview")
-    assert "| RC | CR | EG | LA | DC | Total |" in report
-    assert (
-        "| P95 before | P95 after | P95 change | P95 assessment | "
-        "5xx before | 5xx after | 5xx change | 5xx assessment | "
-        "Metric outcome | Final grade |"
-    ) in report
-    assert "| 100 | 80 | -20.00% | improved | 100 | 100 | 0.00% | stable | good | good |" in report
-    run_report = (output / "runs" / "run-1" / "report.md").read_text(encoding="utf-8")
-    assert "## Summary" in run_report
-    assert "### RCA rubric scores" in run_report
-    assert "### Remediation rubric scores and metrics" in run_report
-    assert run_report.index("## Summary") < run_report.index("## RCA outputs")
+    assert "### REMEDIATION rubric scores" in report
+    assert grades[0]['schema_version'] == 2
+    assert not (output / 'incidents.csv').exists()
+    assert not (output / 'incidents.json').exists()
+    run_report = (output / 'runs/run-1/report.md').read_text()
+    assert 'Semantic diagnostics' in run_report
 
     unavailable = StaticJudge(fail=True, fail_penalties=True)
     cached = grade_runs(config, unavailable)
@@ -971,6 +877,8 @@ def test_judge_failure_does_not_suppress_metric_grade(tmp_path: Path) -> None:
     _write_run(run)
     _write_jobs(run)
     _write_metrics(run)
+    from test_research import fixture
+    fixture(run)
     grades = grade_runs(
         GraderConfig(
             input_path=tmp_path / "results",
@@ -983,8 +891,9 @@ def test_judge_failure_does_not_suppress_metric_grade(tmp_path: Path) -> None:
     remediation = grades[0]["remediation_jobs"][0]
     assert remediation["alignment"]["verdict"] == "not_evaluable"
     assert remediation["rubric"] is None
-    assert remediation["metrics"]["outcome"] == "good"
+    assert remediation["metrics"]["outcome"] == "not_evaluable"
     assert remediation["final_grade"] == "not_evaluable"
+    assert grades[0]["research"]["operational"]["recovered"] is True
 
 
 def test_verbose_file_log_records_progress_without_payload_contents(
@@ -998,6 +907,7 @@ def test_verbose_file_log_records_progress_without_payload_contents(
     _write_jobs(run)
     _write_metrics(run)
     log_path = configure_logging(output, verbose=False)
+    assert log_path == output / "logs" / "grader.log"
     try:
         grade_runs(
             GraderConfig(
@@ -1013,7 +923,7 @@ def test_verbose_file_log_records_progress_without_payload_contents(
     log = log_path.read_text(encoding="utf-8")
     assert "run started run=run-1" in log
     assert "judge call started kind=rca job_id=rca-1" in log
-    assert "metric family run=run-1 job_id=rem-1" in log
+    assert "incident outcome run=run-1" in log
     assert "grading completed runs=1 graded=1 ungraded=0 jobs=4" in log
     assert "must not reach judge" not in log
     assert "network delay on worker-node-3" not in log
@@ -1067,3 +977,54 @@ def test_resolved_scenario_extensions_preserve_historical_grading(tmp_path: Path
     for kind in ('rca_jobs','remediation_jobs'):
         assert grades[0][kind][0]['rubric']['overall_score']==grades[1][kind][0]['rubric']['overall_score']
         assert grades[0][kind][0]['alignment']==grades[1][kind][0]['alignment']
+
+
+@pytest.mark.parametrize("status,result,eligible", [
+    ("succeeded", {"summary": "final output"}, True),
+    ("failed", {"summary": "final output"}, True),
+    ("failed", {}, False),
+    ("failed", None, False),
+    ("running", {"summary": "interim output"}, False),
+])
+@pytest.mark.parametrize("operational_only", [False, True])
+def test_failed_job_scoring_and_csv_failure_flags(tmp_path, status, result, eligible, operational_only):
+    run = tmp_path / "results" / "run-1"
+    truth = tmp_path / "truth"
+    output = tmp_path / "grades"
+    _write_ground_truth(truth)
+    _write_run(run)
+    for filename in ("rca_session.json", "remediation_run.json"):
+        _write_json(run / "sessions" / filename, [
+            {"id": filename, "status": status, "result": result},
+        ])
+    config = GraderConfig(input_path=run, output_path=output,
+                         ground_truth_path=truth, model="static-model",
+                         operational_only=operational_only)
+    judge = StaticJudge()
+    grade = grade_runs(config, judge)[0]
+    scored = eligible and not operational_only
+    assert len(judge.calls) == (2 if scored else 0)
+    assert len(judge.penalty_calls) == (1 if scored else 0)
+    for kind in ("rca", "remediation"):
+        item = grade[kind + "_jobs"][0]
+        assert item["status"] == status
+        assert (item["rubric"] is not None) == scored
+        assert (item["alignment"]["verdict"] == "aligned") == scored
+    for filename in ("summary.csv", "rca_rubric_score.csv", "remediation_rubric_score.csv"):
+        with (output / "csvs" / filename).open() as handle:
+            rows = list(csv.DictReader(handle))
+        for row in rows:
+            assert row["status"] == status
+            assert row["is_failed"] == str(status == "failed")
+            assert bool(row["overall_score"]) == scored
+    from grader.paper_summary import build_summary
+    summary = build_summary([grade])
+    for kind in ("rca", "remediation"):
+        assert summary["runs"][0][kind]["evaluable_jobs"] == int(scored)
+        assert summary["runs"][0][kind]["eligible_final_results"] == int(eligible)
+    if scored:
+        cached_judge = StaticJudge()
+        cached = grade_runs(config, cached_judge)[0]
+        assert not cached_judge.calls
+        assert not cached_judge.penalty_calls
+        assert cached["remediation_jobs"][0]["rubric"]["overall_score"] == 1.0

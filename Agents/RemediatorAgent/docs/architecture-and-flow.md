@@ -44,7 +44,7 @@ sequenceDiagram
   M->>K: bounded approved mutation
   R->>M: direct post-action kubectl verification
   R->>S: finish succeeded + result/artifacts
-  Note over R,S: any exception after claim becomes needs_review
+  Note over R,S: any exception after claim becomes failed
 ```
 
 ## 1. Approved request validation
@@ -74,9 +74,10 @@ one third of its duration.
 
 Unlike read-only RCA/learning, remediation cannot safely assume a timed-out
 operation did nothing. An expired running remediation job becomes
-`needs_review`. Any exception caught by the worker after claim also finishes as
-`needs_review`. There is no automatic remediation replay; an operator/control
-client must inspect current state and explicitly retry through AgentOrchestrator.
+`failed`. Any exception caught by the worker after claim also finishes as
+`failed`, retaining generated output. The workflow finalizes automatically and
+releases execution capacity for subsequent incidents. An ambiguous mutation is
+not replayed by the failed job.
 
 ## 3. Prompt and approved scope
 
@@ -133,22 +134,12 @@ successful check record for the exact current playbook content. Changing the
 playbook, inventory, or extra variables changes the complete execution hash and
 invalidates the prior check. MCPTools also bounds filenames and session paths.
 
-At the engine level, completion requires a successful live Ansible run, no
-observed failed live attempt, subsequent successful Kubernetes and non-empty
-Prometheus responses, and explicit `Automation: executed` / `Recovery: verified`
-status with verification text. Any further Ansible call invalidates prior
-verification observations. Missing evidence or an unverified result becomes
-`needs_review` and cannot enter successful-workflow learning.
-
-This is a minimum evidence gate, not an independent semantic recovery judge:
-the model still evaluates query relevance, freshness, thresholds, and all
-approved checks. Prompts require before/after symptom and condition-specific
-checks in addition to readiness. Check-mode success can reflect skipped command
-tasks and does not establish that a Kubernetes mutation is valid or safe.
-
-The agent must stop without mutation when the plan is stale, no longer needed,
-or unsafe. These validation-only outcomes use the existing `needs_review`
-state; they are not classified as successful remediation or retried automatically.
+At the engine level, completion requires a nonempty final agent output. The job
+finishes as `succeeded` even if the output reports failed execution, skipped actions,
+or unverified recovery. This is an output-completion status. The model still follows
+the execution and verification procedure and reports actual observations; tool audits
+preserve failures. Empty output and errors preventing durable completion remain
+`failed`. Learning assesses evidence rather than assuming recovery from status.
 
 ## 7. Mutation scopes
 
@@ -178,11 +169,9 @@ sections. `Changes` identifies each target's previous and current state.
 Verification must explicitly state that direct kubectl—not Ansible—observed the
 result.
 
-Direct post-verification is presently a prompt/audit requirement. The engine
-hard-gates a successful live Ansible result but does not yet reject a parsed
-result solely because its verification list is empty. Operators should treat an
-empty or unsupported verification result as an implementation gap requiring
-review, even if the job record says succeeded.
+Direct post-verification is a prompt/audit requirement. The engine records any
+nonempty final output as `succeeded`; read the observations and tool audits to
+assess whether execution and recovery actually succeeded.
 
 ## 9. Result and durable completion
 
@@ -195,7 +184,7 @@ review, even if the job record says succeeded.
 
 It finishes the internal job with structured result and raw model output.
 AgentOrchestrator releases the slot and later moves the workflow into learning.
-The subsequent LearningAgent snapshot includes this verified result and the
+The subsequent LearningAgent snapshot includes this completed output and the
 bounded RCA/remediation tool audit.
 
 ## Failure semantics
@@ -205,13 +194,10 @@ bounded RCA/remediation tool audit.
 | Invalid hash/approval/request | HTTP 422; no job created. |
 | Store or submission auth failure | API error; no local-only job. |
 | Global slot busy | Job remains queued. |
-| Pre-validation unavailable | Worker exception or blocked output; `needs_review`. |
-| Check-mode failure | No live run permitted; `needs_review`. |
-| Live run error/timeout | Ambiguous mutation; `needs_review`. |
-| Missing successful live run | Engine rejects final answer; `needs_review`. |
-| Post-verification tool/engine exception | Worker records `needs_review`. |
-| Missing verification text, verified status, or post-action state/metric evidence | Engine rejects completion; `needs_review`. |
-| Lease expiry | `needs_review`; never automatically requeued. |
+| Agent returns final output, including blocked/skipped/failed/unverified actions | `succeeded`; preserve the actual outcome in output and audits. |
+| Agent returns empty output or raises before final output | `failed`. |
+| Persistence error prevents durable completion | Error path; never claim persistence succeeded. |
+| Lease expiry | `failed`; never automatically requeued. |
 
 ## Authentication and configuration
 
@@ -246,12 +232,12 @@ The Langfuse session ID is the remediation job UUID and trace name is
 - MCP 401: check only the remediation token pair.
 - `run_ansible` says check required: rerun check after the latest file write;
   compare session ID and playbook filename.
-- Immediate `needs_review`: inspect job error, raw output, tool-call audit, and
+- Immediate `failed`: inspect job error, raw output, tool-call audit, and
   current Kubernetes state before considering retry.
 - Artifacts missing from result: inspect `remediator.write_file` audit success
   and internal artifact endpoint.
-- Model reports success but job needs review: confirm an audited live
-  `check=false` call succeeded and direct verification completed.
+- Job says succeeded: read output and tool audits for actual execution and recovery;
+  status only indicates final output completion.
 
 ## Source map
 
@@ -260,7 +246,7 @@ The Langfuse session ID is the remediation job UUID and trace name is
 | `app/api.py` | Authenticated async job submission/status. |
 | `app/schema.py` | Snapshot hash, approval, job/result validation. |
 | `app/store.py` | Internal job, lease, tool audit, artifact client. |
-| `app/worker.py` | Claim, heartbeat, execution, `needs_review`. |
+| `app/worker.py` | Claim, heartbeat, execution, `failed`. |
 | `app/engine.py` | Tool allowlist, live-run gate, Langfuse, result parsing. |
 | `app/prompt/agent.py` | Required validation/check/live/verification workflow. |
 | `app/registry/tool.py` | MCP discovery, calls, and audit interception. |

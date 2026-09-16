@@ -8,12 +8,15 @@ from .rubric import KindRubric, Rubric
 
 
 SUMMARY_FIELDS = (
+    "methodology_version",
+    "policy_hash",
     "run",
     "scenario",
     "kind",
     "job_id",
     "workflow_id",
     "status",
+    "is_failed",
     "alignment",
     "overall_score",
     "metric_outcome",
@@ -22,11 +25,14 @@ SUMMARY_FIELDS = (
 )
 
 RUBRIC_IDENTITY_FIELDS = (
+    "methodology_version",
+    "policy_hash",
     "run",
     "scenario",
     "job_id",
     "workflow_id",
     "status",
+    "is_failed",
     "alignment",
 )
 
@@ -69,159 +75,29 @@ def rubric_score_rows(
 
 
 def write_run_report(path: Path, grade: dict[str, Any], rubric: Rubric) -> None:
-    lines = [
-        f"# Grade: {grade['run']}",
-        "",
-        f"- Scenario: `{grade.get('scenario') or 'unknown'}`",
-        f"- Status: `{grade['status']}`",
-    ]
-    if grade.get("reason"):
-        lines.append(f"- Reason: {_text(grade['reason'])}")
-    if grade["status"] != "graded":
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return
-
-    lines.extend(["", "## Summary"])
-    lines.extend(_score_matrix_section(grade, rubric.kind("rca"), "RCA rubric scores"))
-    lines.extend(
-        _combined_remediation_section(
-            [grade],
-            rubric.kind("remediation"),
-            "Remediation rubric scores and metrics",
-            heading="###",
-        )
-    )
-    lines.extend(["", "## RCA outputs", ""])
-    lines.extend(_job_table(grade.get("rca_jobs") or [], remediation=False))
-    lines.extend(_criterion_sections(grade.get("rca_jobs") or [], "RCA"))
-    lines.extend(["", "## Remediation outputs", ""])
-    lines.extend(_job_table(grade.get("remediation_jobs") or [], remediation=True))
-    lines.extend(_criterion_sections(grade.get("remediation_jobs") or [], "Remediation"))
-    lines.extend(_penalty_sections(grade.get("remediation_jobs") or []))
-
-    for job in grade.get("remediation_jobs") or []:
-        metrics = job.get("metrics") or {}
-        if not metrics.get("families"):
-            continue
-        lines.extend(
-            [
-                "",
-                f"### Metrics for remediation `{job.get('id') or 'unknown'}`",
-                "",
-                f"Anchor: `{metrics.get('anchor')}`; outcome: `{metrics.get('outcome')}`.",
-                "",
-                "| Metric | Policy | Before | After | Change | Assessment |",
-                "| --- | --- | ---: | ---: | ---: | --- |",
-            ]
-        )
-        for name, family in metrics["families"].items():
-            lines.append(
-                "| "
-                + " | ".join(
-                    [
-                        _cell(name),
-                        _cell(family.get("policy")),
-                        _number(family.get("before_median")),
-                        _number(family.get("after_median")),
-                        _percent(family.get("relative_change")),
-                        _cell(family.get("assessment")),
-                    ]
-                )
-                + " |"
-            )
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    lines = [f"# Semantic diagnostics: {grade['run']}", '',
+             f"Scenario: `{grade.get('scenario')}`. Semantic status: `{grade['status']}`.", '',
+             str(grade.get('reason') or ''), '',
+             'Semantic scores describe evaluable final outputs only. Service recovery provenance is retained separately in grade.json.']
+    for kind in ('rca', 'remediation'):
+        jobs = grade.get(kind + '_jobs') or []
+        lines.extend(_score_matrix_section(grade, rubric.kind(kind), kind.upper() + ' rubric scores'))
+        lines.extend(_criterion_sections(jobs, kind.upper()))
+        if kind == 'remediation':
+            lines.extend(_penalty_sections(jobs))
+    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
-def write_global_report(
-    path: Path, grades: list[dict[str, Any]], rubric: Rubric
-) -> None:
-    graded = [item for item in grades if item.get("status") == "graded"]
-    skipped = [item for item in grades if item.get("status") != "graded"]
-    rca = [job for item in graded for job in item.get("rca_jobs") or []]
-    remediation = [
-        job for item in graded for job in item.get("remediation_jobs") or []
-    ]
-    non_evaluable = [
-        (item["run"], "rca", job)
-        for item in graded
-        for job in item.get("rca_jobs") or []
-        if (job.get("alignment") or {}).get("verdict") == "not_evaluable"
-    ] + [
-        (item["run"], "remediation", job)
-        for item in graded
-        for job in item.get("remediation_jobs") or []
-        if job.get("final_grade") == "not_evaluable"
-    ]
-    rca_kind = rubric.kind("rca")
-    remediation_kind = rubric.kind("remediation")
-    lines = [
-        "# Grader report",
-        "",
-        "## Summary",
-    ]
-    lines.extend(_score_table_section(grades, rca_kind, "RCA rubric scores", heading="###"))
-    lines.extend(
-        _combined_remediation_section(
-            grades,
-            remediation_kind,
-            "Remediation rubric scores and metrics",
-            heading="###",
-        )
-    )
-    lines.extend(
-        [
-        "",
-        "## Overview",
-        "",
-        f"- Runs discovered: {len(grades)}",
-        f"- Runs graded: {len(graded)}",
-        f"- Runs skipped: {len(skipped)}",
-        f"- RCA outputs: {len(rca)}",
-        f"- RCA aligned: {_count(rca, 'alignment', 'aligned')}",
-        f"- RCA not aligned: {_count(rca, 'alignment', 'not_aligned')}",
-        f"- RCA not evaluable: {_count(rca, 'alignment', 'not_evaluable')}",
-        f"- RCA mean overall score: {_mean_score(rca)}",
-        *_mean_criterion_bullets(grades, rca_kind, "RCA"),
-        f"- Remediation outputs: {len(remediation)}",
-        f"- Remediation aligned: {_count(remediation, 'alignment', 'aligned')}",
-        f"- Remediation not aligned: {_count(remediation, 'alignment', 'not_aligned')}",
-        f"- Remediation alignment not evaluable: "
-        f"{_count(remediation, 'alignment', 'not_evaluable')}",
-        f"- Remediation mean overall score: {_mean_score(remediation)}",
-        *_mean_criterion_bullets(grades, remediation_kind, "Remediation"),
-        f"- Remediation metric good: "
-        f"{_count_nested(remediation, 'metrics', 'outcome', 'good')}",
-        f"- Remediation metric not good: "
-        f"{_count_nested(remediation, 'metrics', 'outcome', 'not_good')}",
-        f"- Remediation metric not evaluable: "
-        f"{_count_nested(remediation, 'metrics', 'outcome', 'not_evaluable')}",
-        f"- Final good remediations: {_count(remediation, 'final_grade', 'good')}",
-        f"- Final not-good remediations: "
-        f"{_count(remediation, 'final_grade', 'not_good')}",
-        f"- Final non-evaluable remediations: "
-        f"{_count(remediation, 'final_grade', 'not_evaluable')}",
-        ]
-    )
+def write_global_report(path: Path, grades: list[dict[str, Any]], rubric: Rubric) -> None:
+    lines = ['# Semantic diagnostics', '',
+             'Evaluable-output means exclude missing and unfinished results; they are not incident success rates.', '']
+    for kind in ('rca', 'remediation'):
+        jobs = [j for g in grades for j in g.get(kind + '_jobs', [])]
+        missing = sum(j.get('rubric') is None for j in jobs)
+        lines.extend([f"{kind.upper()}: {len(jobs)} exported jobs; {missing} without evaluable semantic scores.", ''])
+        lines.extend(_score_table_section(grades, rubric.kind(kind), kind.upper() + ' rubric scores', heading='###'))
     lines.extend(_global_penalty_section(grades))
-    if skipped:
-        lines.extend(["", "## Skipped runs", ""])
-        for item in skipped:
-            lines.append(
-                f"- `{item['run']}`: {_text(item.get('reason') or 'ungraded')}"
-            )
-    if non_evaluable:
-        lines.extend(["", "## Non-evaluable jobs", ""])
-        for run, kind, job in non_evaluable:
-            job_alignment_reason = (job.get("alignment") or {}).get("reason")
-            metric_reason = (job.get("metrics") or {}).get("reason")
-            reason = "; ".join(
-                str(value) for value in (job_alignment_reason, metric_reason) if value
-            )
-            lines.append(
-                f"- `{run}` / `{kind}` / `{job.get('id') or 'unknown'}`: "
-                f"{_text(reason or 'not evaluable')}"
-            )
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
 def _job_table(jobs: list[dict[str, Any]], *, remediation: bool) -> list[str]:
@@ -517,11 +393,14 @@ def _rubric_score_row(
     scored = job.get("rubric") or {}
     criteria = scored.get("criteria") or {}
     row: dict[str, Any] = {
+        "methodology_version": (grade.get("research") or {}).get("methodology_version"),
+        "policy_hash": (grade.get("research") or {}).get("policy_hash"),
         "run": grade.get("run"),
         "scenario": grade.get("scenario"),
         "job_id": job.get("id"),
         "workflow_id": job.get("workflow_id"),
         "status": job.get("status"),
+        "is_failed": job.get("status") == "failed",
         "alignment": (job.get("alignment") or {}).get("verdict"),
         "overall_score": scored.get("overall_score"),
         "rubric_score": scored.get("rubric_score"),
