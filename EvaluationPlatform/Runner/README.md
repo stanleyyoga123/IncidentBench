@@ -209,3 +209,11 @@ Every new run saves resolved settings and original configuration layers before p
 The [Sock Shop scenario set](docs/scenario.md#sock-shop-scenarios) mirrors all 23 Online Boutique fault families, with a dedicated `resources/suites/sock-shop.json` suite and paired agent/no-agent entries.
 
 Final cleanup also uncordons the archived placement nodes after worker shutdown and successful chaos removal. Each node is checked for schedulability and recorded in `node-cleanup.json`; failure blocks the next batch run. See [final node cleanup](docs/experiment-visibility.md#final-node-cleanup) for failure and interruption behavior.
+
+### CPU-constrained Sock Shop startup
+
+The headroom overlay retains orders' 100m CPU limit but allows 15 minutes for
+its startup probe and 20 minutes for deployment progress. Runner reads each
+deployment's progress deadline and waits at least ten minutes, or that deadline
+plus 60 seconds when longer. Readiness checks still have to pass before baseline
+and chaos begin. Normal-profile probe settings are unchanged.

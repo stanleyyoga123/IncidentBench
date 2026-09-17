@@ -23,6 +23,13 @@ patches:
     kind: Deployment
     name: orders
   patch: |-
+    # Cold Java startup at 100m CPU needs more than the canonical five minutes.
+    - op: replace
+      path: /spec/template/spec/containers/0/startupProbe/failureThreshold
+      value: 180
+    - op: add
+      path: /spec/progressDeadlineSeconds
+      value: 1200
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/cpu
       value: 100m

@@ -299,15 +299,31 @@ class ApplicationDeploymentController:
     def wait_for_rollouts(self, namespace: str) -> dict:
         destination = self.artifacts.commands
         list_result = self.kubectl.run(
-            ["get", "deployments", "-n", namespace, "-o", "name"]
+            ["get", "deployments", "-n", namespace, "-o", "json"]
         )
         stdout_parts = [f"$ {' '.join(list_result.command)}\n{list_result.stdout}"]
         stderr_parts = [f"$ {' '.join(list_result.command)}\n{list_result.stderr}"]
         returncode = list_result.returncode
         failed_command = list(list_result.command) if not list_result.succeeded else None
         if list_result.succeeded:
-            for deployment in filter(None, map(str.strip, list_result.stdout.splitlines())):
-                result = self.kubectl.rollout_status(deployment, namespace)
+            try:
+                deployments = json.loads(list_result.stdout)["items"]
+                rollout_targets = [
+                    (
+                        "deployment.apps/" + item["metadata"]["name"],
+                        # Keep the normal ten-minute wait, but let an explicitly
+                        # longer progress deadline expire before kubectl does.
+                        f"{max(600, int(item.get('spec', {}).get('progressDeadlineSeconds', 540)) + 60)}s",
+                    )
+                    for item in deployments
+                ]
+            except (ValueError, TypeError, KeyError) as exc:
+                rollout_targets = []
+                returncode = 2
+                failed_command = list(list_result.command)
+                stderr_parts.append(f"Invalid deployment rollout metadata: {exc}")
+            for deployment, timeout in rollout_targets:
+                result = self.kubectl.rollout_status(deployment, namespace, timeout=timeout)
                 stdout_parts.append(f"$ {' '.join(result.command)}\n{result.stdout}")
                 stderr_parts.append(f"$ {' '.join(result.command)}\n{result.stderr}")
                 if not result.succeeded:
@@ -327,7 +343,6 @@ class ApplicationDeploymentController:
                 "<deployments-from-namespace>",
                 "-n",
                 namespace,
-                "--timeout=10m",
             ],
             "failed_command": failed_command,
             "returncode": returncode,

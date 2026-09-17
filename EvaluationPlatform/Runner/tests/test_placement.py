@@ -127,6 +127,30 @@ class PlacementControllerTests(unittest.TestCase):
             root,
         )
 
+    def test_rollout_wait_respects_long_progress_deadline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = self.controller(Path(tmp), [(0, json.dumps({"items": [
+                {"metadata": {"name": "front-end"}, "spec": {}},
+                {"metadata": {"name": "orders"}, "spec": {"progressDeadlineSeconds": 1200}},
+            ]}), "")])
+            calls = []
+            def rollout(deployment, namespace, timeout):
+                calls.append((deployment, namespace, timeout))
+                return CommandResult(("kubectl", "rollout", "status", deployment), 0)
+            controller.kubectl.rollout_status = rollout
+            result = controller.wait_for_rollouts("sock-shop")
+            self.assertEqual(result["returncode"], 0)
+            self.assertEqual(calls, [
+                ("deployment.apps/front-end", "sock-shop", "600s"),
+                ("deployment.apps/orders", "sock-shop", "1260s"),
+            ])
+
+    def test_rollout_wait_rejects_invalid_deployment_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = self.controller(Path(tmp), [(0, "not-json", "")])
+            result = controller.wait_for_rollouts("sock-shop")
+            self.assertEqual(result["returncode"], 2)
+
     def test_node_preflight_accepts_healthy_nodes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
