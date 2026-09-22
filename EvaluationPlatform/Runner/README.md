@@ -212,7 +212,7 @@ Final cleanup also uncordons the archived placement nodes after worker shutdown 
 
 ### CPU-constrained Sock Shop startup
 
-The headroom overlay retains orders' 100m CPU limit but allows 15 minutes for
+The headroom overlay sets orders' CPU request and limit to 200m and allows 15 minutes for
 its startup probe and 20 minutes for deployment progress. Runner reads each
 deployment's progress deadline and waits at least ten minutes, or that deadline
 plus 60 seconds when longer. Readiness checks still have to pass before baseline

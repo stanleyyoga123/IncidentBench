@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .time_scope import chaos_intervals, job_scope, VERSION as TIME_SCOPE_VERSION
+
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
@@ -256,7 +258,12 @@ def _grade_run(
         evidence = records(run_folder, 'observations', run_id)
     except (ValueError, KeyError, TypeError, OSError):
         evidence = []
+    try:
+        grading_intervals = chaos_intervals(metadata)
+    except (ValueError, TypeError, KeyError):
+        grading_intervals = []
     for job in rca_jobs + remediation_jobs:
+        job['_time_scope'] = job_scope(job, grading_intervals)
         job['_grading_observations'] = [e for e in evidence if e.get('data', {}).get('job_id') == job.get('id')][:100]
     penalty_set = penalty_set_for(penalties, scenario_name)
     cache.update(_cache_metadata(config.model, rubric.source_hash))
@@ -311,6 +318,8 @@ def _grade_run(
         "configuration": {
             "prompt_version": PROMPT_VERSION,
             "semantic_eligibility": "succeeded-or-failed-with-final-result-v1",
+            "time_scope": TIME_SCOPE_VERSION,
+            "chaos_intervals_epoch": grading_intervals,
             "model": config.model,
             "model_revision": config.model_revision,
             "judge_max_tokens": config.judge_max_tokens,
@@ -350,6 +359,12 @@ def _grade_job(
         "result": result,
         "rubric": None,
     }
+    if '_time_scope' in job:
+        base['time_scope'] = job['_time_scope']
+        if not job['_time_scope']['included']:
+            base['alignment'] = {'verdict': 'not_evaluable', 'reason': job['_time_scope']['reason'],
+                                 'cached': False, 'cache_key': None}
+            return base
     if config.operational_only:
         base['alignment'] = {'verdict': 'not_evaluable', 'reason': 'semantic grading skipped (--operational-only)', 'cached': False, 'cache_key': None}
         return base

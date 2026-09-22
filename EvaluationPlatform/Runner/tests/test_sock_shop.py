@@ -185,6 +185,6 @@ def test_sock_shop_full_suite_matches_boutique_fault_families_and_valid_targets(
     deployments = {doc['metadata']['name']: doc for doc in docs if doc['kind'] == 'Deployment'}
     for name in ('front-end', 'orders', 'catalogue'):
         resources = deployments[name]['spec']['template']['spec']['containers'][0]['resources']
-        assert resources['requests']['cpu'] == resources['limits']['cpu'] == '100m'
+        assert resources['requests']['cpu'] == resources['limits']['cpu'] == ('200m' if name == 'orders' else '100m')
     for name in ('carts-db', 'orders-db', 'user-db', 'catalogue-db', 'session-db', 'rabbitmq'):
         assert deployments[name]['spec']['replicas'] == 1

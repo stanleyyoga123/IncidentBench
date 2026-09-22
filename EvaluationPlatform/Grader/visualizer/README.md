@@ -4,10 +4,10 @@ This standalone package renders Prometheus metrics and the archived lifecycle
 of each evaluation run. It does not inspect agent reasoning and does not
 contact the cluster, model, or other services.
 
-From `EvaluationPlatform/Runner/`, run:
+From `EvaluationPlatform/Grader/` (or a standalone Grader root), run:
 
 ```bash
-PYTHONPATH=. python -m visualizer
+python -m visualizer --input results/sock-shop-1 --output visualizations/new-assessment
 ```
 
 The default input is `results/result-3` and the default output is

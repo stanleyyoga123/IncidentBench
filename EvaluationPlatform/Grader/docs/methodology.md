@@ -18,10 +18,8 @@ non-evaluable. Failed-job scores describe output quality, not execution success.
 The job CSVs retain `status` and add `is_failed` (`True` for `failed`, otherwise
 `False`). Run configuration records
 `semantic_eligibility=succeeded-or-failed-with-final-result-v1`; unchanged judge
-payloads retain their content-addressed checkpoints. Compact semantic means
-include eligible failed-job scores. The historical `analyzer.py` success-only
-statistics still explicitly filter succeeded jobs; use `research_summary.md`
-for this inclusive assessment. Operational measurements are computed independently of
+payloads retain their content-addressed checkpoints. Scenario-table score means include eligible failed-job scores; use the job CSVs
+for scored denominators and per-run JSON for operational outcomes. Operational measurements are computed independently of
 job success, completion time and judge availability. `--operational-only` skips
 the judge entirely and still produces operational reports and job dispositions.
 
@@ -34,10 +32,12 @@ invent a passed check. Each 30-second baseline bin requires 90% CSV coverage
 and at least 100 requests.
 
 The observation window starts at the first non-idle chaos step's
-`active_started_at` and ends at `metadata.metrics.end`. The start records that
+`active_started_at` and ends at the earlier of recorded cleanup, the step duration cap, or the telemetry end. Idle gaps and post-chaos observation are excluded. The start records that
 Runner applied the schedules; it is **not observed physical fault onset**.
 Missing recorded boundaries are unevaluable, never replaced with job timestamps
-or configured durations. Failed/interrupted infrastructure runs are invalid.
+or configured durations. Failed/interrupted infrastructure runs fail validity checks when reached.
+Earlier missing-boundary or missing-counter checks can instead return
+`not_evaluable`; always retain the source run status alongside the reason.
 
 ## Exact request counts and latency limitations
 
@@ -117,7 +117,9 @@ alongside the outcome. Lower CPU/memory utilization is not itself recovery.
 
 ## Denominators, safety and uncertainty
 
-`incidents.csv` contains every run; `incidents.json` contains counts. Report
+`csvs/scenario_table.csv` contains one row per run; operational outcomes are
+retained in each run's `grade.json` under `research.operational`. When aggregating
+those outcomes yourself, report
 proxy-recovered, proxy-unresolved, no-observed-degradation, insufficient-evidence
 and invalid counts separately. Among assessable degraded incidents report
 S/(S+F). Also report conservative missing-outcome bounds S/(S+F+U) through
@@ -163,37 +165,29 @@ cannot establish actual service recovery or absence of harm.
 - [Google SRE: implementing SLOs](https://sre.google/workbook/implementing-slos/): good/total event ratios.
 - [NIST bootstrap](https://itl.nist.gov/div898/software/dataplot/refman1/auxillar/bootfit.htm): resampling independent experimental units when repeats exist.
 
-## Compact reporting layer
+## Current reporting and denominators
 
-`research_summary.md`, `research_summary.json`, and `paper_metrics.csv` supplement
-existing reports without changing recovery calculations or schema-2 fields.
-Semantic quality is computed as a mean of evaluable job scores within each run,
-then a mean across runs with scores. Criterion means use the same two stages and
-publish their individual run denominators. This prevents retry-heavy runs from
-dominating the summary. It is conditional output quality, not a success rate.
-Failed penalty judgments are excluded from final-score means even when the
-underlying rubric classification succeeded. Scored/exported job counts and runs
-with scores expose this selection; missing values are not assigned zero.
+Normal grading writes five CSVs in `csvs/`, per-run JSON/Markdown/cache files,
+and `logs/grader.log`. See [metrics.md](metrics.md) for their contents. There is
+no automatically generated aggregate research summary or paper-metrics file.
 
-Operational results are grouped by policy hash and measurement basis. Recovery
-time is a recovered-only median, explicitly labeled and never described as overall
-MTTR. Client impact remains per run with measured seconds and coverage; unequal
-exposure counts are not pooled. No causal conclusion, confidence interval, or
-universal good/bad cutoff is generated from this partial sample. Judge calibration
-is not inferred from model availability or successful structured responses.
+Scenario-table maxima/means use evaluable succeeded and failed job scores within
+each run; remediation scores include penalties. Session counts include all jobs,
+not only scored jobs. Means exclude unavailable/judge-failed scores. Keep runs
+as experimental units when performing additional campaign-level aggregation;
+do not let runs with more retries receive more weight accidentally.
 
-The summary also counts failed client and per-workload checks in qualified
-30-second proxy bins, to explain unresolved outcomes. These overlapping counts
-are diagnostic only; they do not change scores or serve as experimental sample
-sizes. Final-result availability (succeeded or failed jobs with nonempty result objects) is
-reported independently of successful LLM judging, including in operational-only
-reports. Very small positive percentages display as `<0.1%`, never as zero;
-CSV/JSON retain full numeric values.
+Top-level `graded`, job `succeeded`, semantic alignment and operational recovery
+are separate concepts. A startup-failed run can still be `graded` with empty
+job lists and unavailable windows. Current remediation success records output
+completion, not verified recovery. Legacy per-job metric/final-grade fields stay
+`not_evaluable`; use `research.operational` for the run-level recovery proxy.
 
 ## Paired front-end scenario table
 
-`csvs/scenario_table.csv` contains the original twelve requested columns plus three
-appended worst-window columns (P95, paired 5xx, UTC location). Each row is one
+`csvs/scenario_table.csv` contains 18 columns: the twelve scenario/score/baseline/best-window/session fields,
+three worst-window fields (P95, paired 5xx, UTC location), and three 5xx
+imputation counts. Each row is one
 archived run, with maximum and mean scored-job outputs and exported session
 counts. Failed jobs with scores are included; remediation totals include
 penalties. Missing/judge-failed scores are excluded from means, not replaced with
@@ -227,8 +221,8 @@ per-workload full-baseline comparisons.
 
 The current CLI writes only `runs/`, `logs/grader.log` and five CSVs under `csvs/`:
 summary, RCA rubric scores, remediation rubric scores, window comparison and
-scenario table. The aggregate incident, paper-metrics and research-summary
-artifacts described in older sections above are retired from normal generation;
+scenario table. Aggregate incident, paper-metrics and research-summary
+artifacts are retired from normal generation;
 existing historical files remain intact. Per-run schema-2 JSON retains evidence.
 
 By explicit user request, descriptive window calculations now impute an absent
@@ -242,3 +236,32 @@ window comparisons and paired front-end selection use the rule. CSVs expose
 baseline/selected-window imputed-sample counts, with a policy column in the
 window CSV and the policy recorded in per-run paired-window JSON. Recovery
 calculations continue using original evidence without this imputation.
+
+
+### Chaos-only grading scope
+
+Grading uses `scheduled-chaos-only-v1`: each non-idle step starts at its recorded
+`active_started_at` and ends at the earlier of `cleanup_started_at` or start plus
+its recorded `duration` (seconds). A one-hour step is therefore capped at 60
+minutes; earlier cleanup shortens it. Both actual start and cleanup timestamps
+are required; planned duration alone never proves the step ran. Missing or invalid
+boundaries are unevaluable. Performance measurements also stop at telemetry end.
+
+Baseline telemetry remains a reference for comparisons. Chaos metrics, recovery
+streaks, diagnostic summaries and resource integrals exclude baseline, idle gaps,
+cleanup and post-chaos observation. Complete windows must fit inside one chaos
+interval. Archived Prometheus rolling samples may still contain lookback data
+from before their timestamp; raw request-level intervals cannot be reconstructed.
+
+RCA/remediation scores and scenario session counts include only outputs whose
+`completed_at` falls in `[chaos_start, chaos_end)`. Outputs completing exactly at
+the end are excluded. Excluded jobs retain their original lifecycle status and
+an explicit `time_scope` reason in `grade.json`; the judge is not called for them.
+The notebook applies the same filter to historical grades and exposes excluded
+session counts. Historical grade files and judge caches are not rewritten by
+notebook execution. Whole-run cumulative client mean/P95 summaries are omitted
+from chaos-only metrics.
+
+The effective `policy_hash` hashes both the policy and `time_scope` version, so
+chaos-only recovery is not pooled with historical post-chaos recovery.
+`source_policy_hash` retains the hash of the unchanged source policy.

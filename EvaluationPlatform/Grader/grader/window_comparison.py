@@ -1,6 +1,8 @@
 """Descriptive baseline versus sliding scheduled-chaos windows, using archives only."""
 from __future__ import annotations
 
+from .time_scope import chaos_intervals
+
 import csv
 import math
 from bisect import bisect_left, bisect_right
@@ -96,13 +98,8 @@ def compare_windows(root, window_minutes=5.0):
         result['step_seconds'] = step
         result['baseline'] = {'start': timestamp(begin), 'end': timestamp(baseline_end)}
         candidates = []
-        for index, fault in enumerate(faults):
-            start = epoch(fault.get('active_started_at'))
-            # Never silently extend chaos through cleanup or an unrecorded end.
-            if not fault.get('cleanup_started_at'):
-                result['limitations'].append(f'Chaos step {index + 1} omitted: cleanup start is missing.')
-                continue
-            end = min(epoch(fault['cleanup_started_at']), deadline)
+        for start, recorded_end in chaos_intervals(metadata):
+            end = min(recorded_end, deadline)
             if not baseline_end <= start < end:
                 raise ValueError('invalid chaos interval')
             result['chaos_intervals'].append({'start': timestamp(start), 'end': timestamp(end)})

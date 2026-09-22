@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from statistics import median
 
 from .research import read, epoch
+from .time_scope import chaos_intervals, contains, VERSION
 
 
 def timestamp(value):
@@ -98,7 +99,7 @@ def windows(root, metadata):
     metrics = metadata.get('metrics') or read(root / 'metrics/metrics.json', {})
     begin = epoch(metrics.get('start'))
     baseline_end = begin + float(metadata['baseline_seconds'])
-    deadline = epoch(metrics.get('end'))
+    deadline = min(epoch(metrics.get('end')), chaos_intervals(metadata)[-1][1])
     steps = metadata.get('chaos_steps', [])
     faults = [s for s in steps if s.get('chaos') and not s.get('idle')]
     if not faults:
@@ -113,10 +114,10 @@ def evaluate_archive(root, p, metadata):
     result = {'status': 'not_evaluable', 'reason': None, 'measurement_basis': 'archive_service_recovery_proxy',
               'recovered': None, 'recovery_seconds': None, 'active_fault_recovery': None,
               'proxy_recovered': None, 'proxy_recovery_seconds': None, 'censored': None,
-              'baseline': None, 'harm': None, 'intervals': [],
+              'baseline': None, 'harm': None, 'intervals': [], 'time_scope': VERSION,
               'limitations': [
                   'Latency is assessed separately for each baseline-active service; no application-wide interval P95 is reconstructed.',
-                  'Locust CSV percentiles are retained as cumulative diagnostics, not differenced into interval percentiles.',
+                  'Whole-run Locust CSV percentiles are excluded; interval percentiles cannot be reconstructed from cumulative percentiles.',
                   'Chaos active_started_at records schedule application, not observed fault activation. Active-fault recovery and causal benefit are unverified.',
                   'No independent safety assessment, action verification or matched agents-off experiment is required for this descriptive proxy.']}
     def unavailable(reason, status='not_evaluable'):
@@ -124,12 +125,12 @@ def evaluate_archive(root, p, metadata):
         return result
     try:
         rows, source = client_history(root)
-        result['client_summary'] = client_summary(root)
-        # Preserve client totals even when timing or service evidence is incomplete.
-        if len(rows) >= 2:
-            result['client_observed_totals'] = counter_window(rows, rows[0]['t'], rows[-1]['t'])
-            result['client_observed_totals']['source'] = source
         begin, base_end, onset, deadline, metrics, faults = windows(root, metadata)
+        spans = [(a, min(b, deadline)) for a, b in chaos_intervals(metadata) if a < deadline]
+        observation_seconds = sum(b-a for a,b in spans)
+        # Whole-run cumulative summaries cannot establish chaos-only percentiles.
+        result['client_summary'] = None
+        result['limitations'].append('Whole-run client mean/P95 omitted: cumulative summaries include baseline and post-chaos data.')
         base_start = base_end - p['baseline_seconds']
         if base_start < begin:
             return unavailable('baseline shorter than evaluation window', 'invalid')
@@ -146,7 +147,8 @@ def evaluate_archive(root, p, metadata):
         result.update(baseline=base, timing={'baseline_start': timestamp(base_start), 'baseline_end': timestamp(base_end),
                       'scheduled_fault_start': timestamp(onset), 'observation_end': timestamp(deadline),
                       'source': 'metadata.json#metrics,baseline_seconds,chaos_steps'},
-                      observation_seconds=deadline-onset, sources=[source, 'metadata.json',
+                      chaos_intervals=[{'start': timestamp(a), 'end': timestamp(b)} for a,b in spans],
+                      observation_seconds=observation_seconds, sources=[source, 'metadata.json',
                           'metrics/response_time_p95_seconds.json', 'metrics/traffic_rps.json'])
         if base['coverage'] < p['minimum_coverage'] or any(b['coverage'] < p['minimum_coverage'] or (b['attempted'] or 0) < p['minimum_requests'] for b in baseline_bins):
             return unavailable('baseline client counters have insufficient coverage or requests')
@@ -173,7 +175,20 @@ def evaluate_archive(root, p, metadata):
                             'successful_rps': base['successful_rps'] * p['throughput_fraction'],
                             'service_latency_multiplier': p['latency_multiplier'],
                             'service_traffic_fraction': p['throughput_fraction']}
-        harm = counter_window(rows, onset, deadline)
+        parts = [counter_window(rows, a, b) for a, b in spans]
+        harm = dict(parts[0])
+        if len(parts) > 1:
+            measured = sum(part['measured_seconds'] for part in parts)
+            known = all(part['attempted'] is not None for part in parts)
+            attempted = sum(part['attempted'] for part in parts) if known else None
+            failed = sum(part['failed'] for part in parts) if known else None
+            harm = {'attempted': attempted, 'failed': failed,
+                    'failure_ratio': failed / attempted if attempted else None,
+                    'successful_rps': (attempted-failed)/measured if known and measured else None,
+                    'measured_seconds': measured, 'counter_reset': any(part['counter_reset'] for part in parts),
+                    'coverage': sum(part['coverage']*(b-a) for part,(a,b) in zip(parts,spans))/observation_seconds,
+                    'segments': parts}
+        result['client_observed_totals'] = {**harm, 'source': source, 'time_scope': VERSION}
         result['harm'] = {**harm, 'coverage_adequate': harm['coverage'] >= p['minimum_coverage'],
                           'slow_requests_lower_bound': None, 'slow_requests_upper_bound': None, 'source': source}
         result['limitations'].append('Slow-request counts cannot be derived from archived percentiles; failed counts cover only the reported measured endpoints.')
@@ -185,6 +200,9 @@ def evaluate_archive(root, p, metadata):
         aligned_start = begin + math.ceil((onset-begin) / p['interval_seconds']) * p['interval_seconds']
         for i in range(int((deadline-aligned_start) // p['interval_seconds'])):
             start = aligned_start + i*p['interval_seconds']; end = start+p['interval_seconds']
+            if not contains(spans, start, end):
+                streak = 0
+                continue
             client = counter_window(rows, start, end)
             qualified = client['coverage'] >= p['minimum_coverage']
             client_ok = (client['attempted'] or 0) >= p['minimum_requests'] and client['failure_ratio'] is not None and client['failure_ratio'] <= result['limits']['failure_ratio'] and client['successful_rps'] >= result['limits']['successful_rps']
@@ -209,7 +227,7 @@ def evaluate_archive(root, p, metadata):
                 first_candidate = end-p['sustain_seconds']
             result['intervals'].append({'start': timestamp(start), 'end': timestamp(end), **client,
                                         'qualified': qualified, 'healthy': healthy, 'services': checks})
-        result['coverage'] = valid_seconds/(deadline-onset)
+        result['coverage'] = valid_seconds/observation_seconds
         result['service_coverage'] = {'missing': [list(k) for k in sorted(missing_services)], 'source': 'metrics/*.json'}
         if result['coverage'] < p['minimum_coverage']:
             return unavailable('incident client/service telemetry coverage insufficient')
@@ -263,10 +281,11 @@ def error_ratios(root):
     """Exact label/time matches only; absent 5xx series remains unknown."""
     traffic = metric_series(root, 'traffic_rps')
     errors = metric_series(root, 'http_5xx_rate')
+    spans = chaos_intervals(read(root / 'metadata.json', {}))
     result = []
     for key, series in traffic.items():
         rates = dict(series)
-        ratios = [(t,v/rates[t]) for t,v in errors.get(key, []) if rates.get(t, 0) > 0 and v <= rates[t]]
+        ratios = [(t,v/rates[t]) for t,v in errors.get(key, []) if contains(spans, t) and rates.get(t, 0) > 0 and v <= rates[t]]
         result.append({'namespace': key[0], 'workload': key[1], 'samples': len(ratios),
                        'time_median': median(v for t,v in ratios) if ratios else None,
                        'maximum': max((v for t,v in ratios), default=None),

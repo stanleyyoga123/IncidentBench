@@ -125,8 +125,10 @@ warm-up, and activation grace are additional to the incident/recovery window.
 | 22 | `sock-shop-pod-orders-cpu-headroom-all-one-hour` | pod-orders-cpu-headroom-all |
 | 23 | `sock-shop-pod-catalogue-cpu-headroom-all-one-hour` | pod-catalogue-cpu-headroom-all |
 
-The three CPU-headroom scenarios use `cpu-constrained-six-node`: front-end,
-orders and catalogue each have CPU request and limit set to 100m. Topology and
+The three CPU-headroom scenarios use `cpu-constrained-six-node`: front-end and
+catalogue have CPU request and limit set to 100m; orders uses 200m for both
+to support Java startup, with a 15-minute startup-probe allowance and a
+20-minute deployment progress deadline. Topology and
 singleton database replicas stay inherited from the canonical profile. Bounded
 HPAs (minimum 2, maximum 6) cover catalogue, orders, payment and shipping,
 providing editable bounds for capacity-loss and bandwidth remediation. CPU

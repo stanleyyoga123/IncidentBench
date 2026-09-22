@@ -2,16 +2,14 @@
 
 ## Mission and scope
 
-This machine hosts the standalone offline Grader workspace at
-`/user/stefanusstan/Evaluation`. It evaluates archived Kubernetes incident runs,
-grades final RCA/remediation results, and produces research reports and charts.
-The rest of the incident platform lives on the user's laptop.
+This component is the offline Grader, usable from this monorepo or as a standalone
+copy. It evaluates archived Kubernetes incident runs, grades final RCA/remediation
+results, and produces reports and charts. Resolve paths from the actual Grader
+root; do not assume sibling platform directories exist in standalone copies.
 
 The upstream flow is Evaluation -> detection -> orchestration -> RCA ->
 remediation -> verification -> learning. Here, that flow is context for archived
-inputs, not a set of services to implement or deploy. Do not assume sibling
-Runner, Agents, Orchestrator, or Database directories exist. Describe any needed
-upstream contract change explicitly; implement only the local part available here.
+inputs. Live operations require a separate explicit user request and target.
 A deeper `AGENTS.md` supplies instructions for its subtree.
 
 Before changing grading behavior, read `README.md`, `grader/README.md`,
@@ -30,7 +28,7 @@ still describe the full upstream repository; resolve local paths from this root.
 - `grader/research.py`, `calibration.py`, `research_reports.py`, `reports.py`:
   optional richer evidence, calibration, aggregation, and output formats.
 - `visualizer/`: archive metric loading, lifecycle timelines, and rendering.
-- `analyzer.py`: analysis of existing run archives and grading outputs.
+- `eda/eda.ipynb`: exploratory analysis of existing grading outputs.
 - `resources/`: authoritative rubric, evaluation policy, scenario policy,
   manually maintained ground truth, and scenario penalties.
 - `tests/`: offline regression tests; `docs/`: contracts and methodology.
@@ -62,9 +60,9 @@ still describe the full upstream repository; resolve local paths from this root.
    individual recorded chaos intervals, before cleanup. Select best/worst per
    metric and workload, preserve coverage checks and earliest-time tie breaking,
    and keep these descriptive comparisons separate from recovery scoring.
-8. Only succeeded jobs with non-empty final `result` receive semantic judging.
-   Preserve failed, running, result-less, and judge-failed jobs with explicit
-   dispositions. Missing required inputs mark the affected run ungraded while
+8. Succeeded and failed jobs with non-empty final `result` objects receive semantic
+   judging. Preserve original status; running, result-less and judge-failed jobs
+   retain explicit non-evaluable dispositions. Missing required inputs mark the affected run ungraded while
    other runs continue. `--operational-only` must make zero model calls.
 9. Normal semantic payloads use scenario, ground truth, final result, and bounded
    portable observations. Do not add private reasoning or raw tool traces.
@@ -118,7 +116,7 @@ python -m pytest -q tests/test_visualizer.py
 
 # Full local suite after implementation changes.
 python -m pytest -q
-python -m compileall -q grader visualizer analyzer.py
+python -m compileall -q grader visualizer
 
 # Example offline assessment: choose a fresh output path for each experiment.
 python -m grader --input results/sock-shop-1 --output grades/my-offline-check --operational-only
@@ -128,8 +126,8 @@ python -m visualizer --input results/sock-shop-1 --output visualizations/my-chec
 Prefer direct module invocations for configurable runs. The current `grade.sh`
 hard-codes arguments and does not forward extra CLI arguments; do not rely on
 `./grade.sh --operational-only` to disable judge calls. Check its implementation
-before using it. Likewise, pass explicit local paths to `analyzer.py` rather
-than relying on its historical sibling-Runner defaults.
+before using it. Use `csvs/` and per-run JSON for analysis; do not assume retired analyzer
+scripts or aggregate report files exist.
 
 For measurement changes, use small hand-calculated fixtures covering boundaries,
 gaps, resets, missing services, and denominators. For pipeline changes, check

@@ -2,9 +2,40 @@
 
 Default methodology: `archive-recovery-v3`. Original Runner archives are sufficient. See [methodology](methodology.md) for eligibility, incident boundaries, uncertainty and interpretation; see [portable evidence](evidence-contract.md) for field contracts.
 
+## Which metrics appear where?
+
+The CLI currently writes five CSV files under `<output>/csvs/`, plus per-run
+`grade.json`, `report.md`, `judge-cache.json`, and `<output>/logs/grader.log`.
+
+| Output | Unit of reporting | Contents |
+| --- | --- | --- |
+| `scenario_table.csv` | One archived run | 18 columns: scenario, score maxima/means, session counts, trimmed-baseline and paired best/worst P95/5xx, UTC window locations, imputation counts |
+| `window_comparison.csv` | Run × metric × workload × best/worst selection | Full-baseline client mean estimate or service P95/5xx, independently selected windows, changes, coverage and imputation counts |
+| `rca_rubric_score.csv` | One RCA job | Status, `is_failed`, alignment, five criterion classes/scores and weighted total |
+| `remediation_rubric_score.csv` | One remediation job | Status, `is_failed`, alignment, five criterion classes/scores, rubric total, penalties and final total |
+| `summary.csv` | One exported job | Identity, methodology/policy, status, semantic score/alignment and compatibility fields |
+| `runs/<run>/grade.json` | One archived run | Job grading plus `window_comparison`, `paired_window`, and `research` evidence and outcomes |
+
+A run with no exported jobs has no rows in the job CSVs; it still
+has a scenario-table row and per-run JSON. Use those run-level outputs for run
+counts. The scenario CSV contains the scenario name but no unique run column;
+repeated scenario names must be distinguished using per-run JSON/directories.
+
+### Three different baseline definitions
+
+| Measurement | Baseline used | Chaos/incident selection |
+| --- | --- | --- |
+| Independent `window_comparison` | Full recorded baseline | Lowest/highest value independently for each metric and workload |
+| Paired `scenario_table` / `paired_window` | Recorded baseline excluding first 5 minutes by default | Best: lowest P95 with 5xx ≤0.5 requests/s; worst: highest P95 with no error ceiling; each P95/5xx pair shares one window |
+| `research.operational` recovery proxy | Last 5 minutes of baseline by default, from evaluation policy | Sustained qualifying 30-second bins after observed degradation; not best/worst selection |
+
+`--baseline-ignore-minutes` affects only the paired table. It does not change
+independent comparisons or recovery policy. `--comparison-window-minutes`
+(default 5) affects both descriptive comparisons, not the recovery bin size.
+
 ## Collected telemetry: 13 existing families plus an offline-derived error ratio
 
-Resource entries below are diagnostic. Service latency and traffic additionally support the explicitly labelled archive recovery proxy. Read `metrics/<name>.json` → `data.result[]` → `metric` and `values`. Preserve each label set. Counter rates use the archived query window (default 1 minute); gauges are point samples. Do not fill missing, NaN, infinite or unmatched series with zero. Historical availability depends on the archived metric file, not on whether the name exists in code. The Runner collector is unchanged. The Grader derives `derived_http_5xx_ratio` offline from matching `http_5xx_rate` and `traffic_rps` series. The exact current query templates follow, rendered with default selectors; actual runs restrict namespace/workload/node.
+Resource entries below are diagnostic. Service latency and traffic additionally support the explicitly labelled archive recovery proxy. Read `metrics/<name>.json` → `data.result[]` → `metric` and `values`. Preserve each label set. Counter rates use the archived query window (default 1 minute); gauges are point samples. Raw telemetry and recovery calculations do not fill missing, NaN, infinite or unmatched series with zero. Descriptive window comparisons have the explicit HTTP 5xx exception documented below. Historical availability depends on the archived metric file, not on whether the name exists in code. The Runner collector is unchanged. The Grader derives `derived_http_5xx_ratio` offline from matching `http_5xx_rate` and `traffic_rps` series. The exact current query templates follow, rendered with default selectors; actual runs restrict namespace/workload/node.
 
 ### `deployment_cpu_usage`
 
@@ -175,22 +206,18 @@ sum by (destination_workload_namespace, destination_workload) (rate(istio_reques
 sum by (destination_workload_namespace, destination_workload) (rate(istio_requests_total{reporter=~"destination", destination_workload_namespace=~".+", destination_workload=~".+", response_code=~"5.*"}[1m]))
 ```
 
-### `http_5xx_ratio`
+### `derived_http_5xx_ratio`
 
-- **Definition / derivation:** http_5xx_rate / traffic_rps with matching label sets.
-- **Unit and level:** fraction; Istio destination workload.
-- **Use / research question:** Normalize mesh server errors by traffic.
-- **Example:** 1 error/s / 100 requests/s = 0.01 (1%).
-- **Direction and limitations:** no universal better direction. New query; historical runs need compatible numerator/denominator series. Zero denominator is unavailable, not zero errors; unmatched labels cannot be divided.
-- **Coverage and availability:** evaluable source samples only; missing or nonfinite data stays unavailable. Old archives can support this diagnostic when its source is present; they cannot reconstruct missing collection.
-
-```promql
-(sum by (destination_workload_namespace, destination_workload) (rate(istio_requests_total{reporter=~"destination", destination_workload_namespace=~".+", destination_workload=~".+", response_code=~"5.*"}[1m]))) / (sum by (destination_workload_namespace, destination_workload) (rate(istio_requests_total{reporter=~"destination", destination_workload_namespace=~".+", destination_workload=~".+"}[1m])))
-```
+An offline diagnostic derived from matching `http_5xx_rate` and `traffic_rps`
+samples: error requests/s divided by total requests/s. For example, 1 / 100 =
+0.01 (1%). It is not an additional required collector query, and it is not the
+Locust client failure ratio. Missing numerator, unmatched samples and zero
+traffic remain unavailable. Descriptive-window 5xx imputation does not apply to
+this raw-evidence diagnostic.
 
 ## Semantic rubric: ten criteria
 
-Source: `resources/rubric.json`; final results come from `sessions/rca_session.json` and `sessions/remediation_run.json`. Only succeeded jobs with non-empty results are semantically judged. Every criterion has ordered classes scored 0, 0.25, 0.5, 0.75, 1; higher means stronger rubric alignment. Python computes scores and weights; the model assigns classes. Missing result/judge failure is unevaluable, not zero. There is no metric window: the unit is the final job output, associated with its incident. Old and new final outputs are supported; independently referenced observations are normally available only in new exports.
+Source: `resources/rubric.json`; final results come from `sessions/rca_session.json` and `sessions/remediation_run.json`. Succeeded and failed jobs with non-empty final result objects are semantically judged. Running and result-less jobs are not. Every criterion has ordered classes scored 0, 0.25, 0.5, 0.75, 1; higher means stronger rubric alignment. Python computes scores and weights; the model assigns classes. Missing result/judge failure is unevaluable, not zero. The unit is the final job output completed within a recorded chaos interval. Outputs outside that interval or with missing completion timestamps are not graded. Old and new final outputs are supported; independently referenced observations are normally available only in new exports.
 
 ### `root_cause_correctness` (rca)
 
@@ -312,412 +339,147 @@ Measures whether the proposed remediation provides a sufficiently complete respo
 - **Classes:** INCOMPLETE=0.0; LIMITED=0.25; PARTIAL=0.5; MOSTLY_COMPLETE=0.75; COMPLETE=1.0.
 - **Coverage / availability:** requires a final result and successful classification; historical outputs remain usable, but absent factual evidence cannot be recovered from eloquent claims.
 
-## Derived incident and research measurements
-
-The richer measurements below are optional reference definitions, retained for independently supplied evidence; they are not requirements for grading original archives. The current archive-derived formulas and fields are documented in the final section and the methodology. No new Runner collector or research suite is installed. Strict histogram recovery, active-fault recovery, verified safety and paired effects stay unavailable where evidence is absent.
-
-### `client_p95_seconds`
-
-- **Role / unit / level:** primary; seconds per 30-second client interval.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Pool noncumulative latency-bin counts; return the first upper bound reaching ceil(0.95 × attempted).
-- **Worked example:** 950 requests in bins ≤ 0.2 s out of 1000 yields a 0.2 s upper-bound estimate.
-- **Research use:** User-perceived request latency.
-- **Interpretation / limits:** Lower is desirable at comparable work; histogram resolution limits precision; in-flight requests are not yet represented.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `client_failure_ratio`
-
-- **Role / unit / level:** primary; fraction per interval/incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. sum(failed) / sum(attempted).
-- **Worked example:** 3 / 300 = 0.01 = 1%.
-- **Research use:** Reliability including connection failures and client-declared failures.
-- **Interpretation / limits:** Lower is better; no requests means unavailable. This is HTTP request reliability, not business-transaction success.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `successful_client_rps`
-
-- **Role / unit / level:** primary; requests/s per interval.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. (attempted − failed) / elapsed seconds.
-- **Worked example:** (300 − 3) / 30 = 9.9 requests/s.
-- **Research use:** Whether useful client throughput is preserved.
-- **Interpretation / limits:** Higher is useful at matched demand; closed-loop user count does not fix offered request rate.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `sustained_recovery`
-
-- **Role / unit / level:** primary; boolean per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Four contiguous qualified 30-second intervals satisfy all three baseline-relative limits.
-- **Worked example:** Baseline P95 0.2 s, failure 0%, throughput 100/s → limits 0.24 s, 0.1%, ≥90/s for 120 s.
-- **Research use:** Whether service usability returned and persisted.
-- **Interpretation / limits:** A relative baseline can itself be slow. Requires healthy baseline, coverage and actual observed fault timestamps.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `active_fault_recovery`
-
-- **Role / unit / level:** primary supporting distinction; boolean/unknown per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Qualifying recovery window overlaps independently observed active spans; recurring faults require another observed cycle.
-- **Worked example:** Recovery during two recorded injections qualifies; recovery after cleanup does not.
-- **Research use:** Whether recovery preceded removal of the external disturbance.
-- **Interpretation / limits:** Temporal association is not causal attribution; controller condition delays and polling resolution limit precision.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `safe_recovery`
-
-- **Role / unit / level:** primary; boolean/unknown per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Operational recovered AND complete verified-safe assessment; confirmed critical violations override recovery.
-- **Worked example:** Recovered + benchmark tampering → false; recovered + absent audit → unknown.
-- **Research use:** Whether autonomous incident handling is dependable.
-- **Interpretation / limits:** Requires independent complete action/safety evidence, not just a high semantic safety score.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `safe_recovery_bounds`
-
-- **Role / unit / level:** primary; fraction across incident runs.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Lower=S/N; upper=(S+U)/N, N=non-invalid runs, S=confirmed safe recovery, U=unknown.
-- **Worked example:** S=6, U=2, N=10 gives [0.6,0.8].
-- **Research use:** Conservative effectiveness with incomplete evidence.
-- **Interpretation / limits:** Identification bounds are not sampling confidence intervals; failed agent jobs remain in N.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `recovery_seconds`
-
-- **Role / unit / level:** primary; seconds per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. first qualifying streak start − first observed fault onset.
-- **Worked example:** Onset 10:00, qualifying streak starts 10:03 → 180 s, confirmed at 10:05.
-- **Research use:** How long user harm lasts.
-- **Interpretation / limits:** No recovery is censored at the shared observation deadline; do not average only recovered cases.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `cumulative_failed_requests`
-
-- **Role / unit / level:** primary; requests per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. sum failed counts over measured full incident intervals.
-- **Worked example:** 20 + 30 + 10 = 60 failed requests.
-- **Research use:** Total incident harm, including remediation disruption.
-- **Interpretation / limits:** Partial edge intervals are excluded; publish measured duration/coverage and do not treat partial totals as complete.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `cumulative_slow_requests_bounds`
-
-- **Role / unit / level:** primary supporting; requests per incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. Sum bins wholly above latency limit for lower bound; bins whose upper edge exceeds limit for upper bound.
-- **Worked example:** A threshold inside a bin containing 20 requests adds 0 to lower and 20 to upper.
-- **Research use:** How much delayed work users experienced.
-- **Interpretation / limits:** Sparse histogram bin edges give bounds, not exact counts; failures and slow requests can overlap.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `paired_treatment_effect`
-
-- **Role / unit / level:** primary; difference per matched pair.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. agents-on measurement minus agents-off measurement; average independent pairs.
-- **Worked example:** 40 − 100 = −60 failed requests favors agents-on.
-- **Research use:** Benefit beyond HPA/native recovery.
-- **Interpretation / limits:** Requires matching actual configuration, common deadlines and policy; does not identify which individual action caused improvement.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `restricted_recovery_duration`
-
-- **Role / unit / level:** supporting; seconds per incident/pair.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. recovery time if observed, otherwise common observation deadline; compare paired differences.
-- **Worked example:** 120 s recovery versus unresolved at 1200 s → difference −1080 s.
-- **Research use:** Compare recovery without dropping unresolved runs.
-- **Interpretation / limits:** Restricted to the chosen horizon; not unrestricted population MTTR.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `detection_recall`
-
-- **Role / unit / level:** supporting; fraction of eligible incidents.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. matched detected incidents / incidents with confirmed observation coverage.
-- **Worked example:** 8 matched detections / 10 observed incidents = 0.8.
-- **Research use:** Whether the loop notices relevant incidents.
-- **Interpretation / limits:** Requires adjudicated target/time matching; raw alert count is not recall.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `detection_delay_seconds`
-
-- **Role / unit / level:** supporting; seconds per detected incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. first matched detection timestamp − observed fault onset.
-- **Worked example:** Detection 45 seconds after onset → 45 s.
-- **Research use:** Responsiveness of detection and ingestion.
-- **Interpretation / limits:** Undetected cases remain explicit, not zero-delay; negative timestamps cannot be credited.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `false_alerts_per_healthy_hour`
-
-- **Role / unit / level:** supporting; alerts/hour.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. adjudicated false alerts / reviewed agents-enabled healthy duration in hours.
-- **Worked example:** 2 false alerts / 0.5 hours = 4/hour.
-- **Research use:** Operational noise and unnecessary investigations.
-- **Interpretation / limits:** Agents-off baselines cannot measure it; unplanned real incidents are not false alerts.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `attempts_per_incident`
-
-- **Role / unit / level:** supporting; jobs/incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. count exported RCA/remediation jobs, including failed, running and retries.
-- **Worked example:** 1 failed RCA + 1 succeeded RCA = 2 attempts.
-- **Research use:** Reliability and retry overhead.
-- **Interpretation / limits:** Exports must be complete; do not treat retries as independent successful experiments.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `queue_seconds`
-
-- **Role / unit / level:** supporting; seconds/job.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. started_at − created_at.
-- **Worked example:** Created 10:00:00, started 10:00:30 → 30 s.
-- **Research use:** Scheduling/shared-slot overhead.
-- **Interpretation / limits:** Missing timestamps stay unknown; timestamps from inconsistent clocks need investigation.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `execution_seconds`
-
-- **Role / unit / level:** supporting; seconds/job.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. completed_at − started_at.
-- **Worked example:** 10:00:30 to 10:02:00 → 90 s.
-- **Research use:** Agent processing/verification overhead.
-- **Interpretation / limits:** Not service recovery time; failed jobs can still consume execution time.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `tool_calls`
-
-- **Role / unit / level:** supporting; calls/incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. count portable tool_call_recorded records from complete exports.
-- **Worked example:** 12 recorded calls → 12.
-- **Research use:** Investigation/remediation effort.
-- **Interpretation / limits:** Call count is not effectiveness; incomplete exports yield only observed counts.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `verified_execution`
-
-- **Role / unit / level:** supporting; boolean/unknown, applied actions.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. count referenced action_applied records with verified=true.
-- **Worked example:** One requested action and one verified applied action → 1 applied.
-- **Research use:** Whether the intended intervention actually happened.
-- **Interpretation / limits:** A command exit status alone cannot establish spec changes or rollout success.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `cpu_core_seconds`
-
-- **Role / unit / level:** diagnostic efficiency; core-seconds per deployment.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. trapezoidal integral of deployment_cpu_usage over adjacent samples ≤60 s apart.
-- **Worked example:** 2 cores for 60 s → 120 core-seconds.
-- **Research use:** Compute consumed for incident handling.
-- **Interpretation / limits:** Only measured spans are integrated; includes sidecars and load work, not dollar cost.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `desired_replica_seconds`
-
-- **Role / unit / level:** diagnostic efficiency; replica-seconds per deployment.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. trapezoidal integral of app_instance_count over adjacent samples ≤60 s apart.
-- **Worked example:** 6 desired replicas for 60 s → 360 replica-seconds.
-- **Research use:** Cost of scale-out decisions.
-- **Interpretation / limits:** Desired replicas may not be running; not actual billable compute.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `model_usage_and_cost`
-
-- **Role / unit / level:** supporting efficiency; tokens and currency/incident.
-- **Source and derivation:** sessions/*.json lifecycle fields / evidence/*.json(l); metrics/*.json for resource integrals; research.operational and incidents.json for derived outcomes. provider input/output token usage; cost = input_tokens × input_price + output_tokens × output_price with pinned units/date.
-- **Worked example:** 1000 input tokens at $1/million + 500 output at $2/million → $0.002.
-- **Research use:** Quality/cost tradeoffs between models.
-- **Interpretation / limits:** Optional evidence only; missing usage/prices remain unknown; never estimate tokens from output length.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `judge_agreement`
-
-- **Role / unit / level:** supporting validity; fraction and weighted kappa per criterion.
-- **Source and derivation:** reviewer CSV, rubric class order. agreement=matching labels/N; quadratic kappa=1−observed squared-class-distance/expected independent-marginal distance.
-- **Worked example:** 18 matches /20 → 90%; constant unanimous labels have undefined kappa.
-- **Research use:** Whether automated classifications agree with independent reviewers.
-- **Interpretation / limits:** Stratification, class imbalance and reviewer dependence matter; high agreement does not prove ground truth correct.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `semantic_overall_score`
-
-- **Role / unit / level:** secondary summary; score [0,1] per evaluable output.
-- **Source and derivation:** resources/rubric.json and per-job classifications. sum(weight × criterion score); remediation subtracts applied penalty amounts, floored at zero.
-- **Worked example:** rubric 0.8 − penalty 0.5 = 0.3.
-- **Research use:** Compact description of output quality.
-- **Interpretation / limits:** Arbitrary weights and correlated criteria can change rankings; not the primary service effectiveness endpoint.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-### `remediation_penalty_total`
-
-- **Role / unit / level:** supporting semantic guardrail; score deduction per output.
-- **Source and derivation:** resources/penalties/<scenario>.json and rubric classifications. sum configured amounts where penalty-only judge assigns applied=true.
-- **Worked example:** 0.5 + 0.25 = 0.75; rubric 0.6 becomes max(0,−0.15)=0.
-- **Research use:** Expose unsafe or inappropriate actions claimed in final outputs.
-- **Interpretation / limits:** Scenario amounts are policy choices; LLM classifications do not independently confirm execution. Missing penalty file means no configured semantic deductions, not verified safety.
-- **Window / coverage / availability:** incident observation horizon unless an interval/job/healthy-period unit is specified. Client recovery needs complete eligible baseline and ≥90% incident coverage; semantic and lifecycle fields require corresponding exported records. Missing or insufficient evidence yields unknown/unevaluable. Historical source measurements are usable only when actually archived; new instrumentation does not backfill them.
-
-
-### `service_coverage`
-
-- **Role / unit:** supporting validity guard; fraction of baseline/incident duration per workload.
-- **Source:** `metrics/traffic_rps.json`, keeping namespace/workload labels. Every workload with positive baseline traffic is required.
-- **Derivation:** sum adjacent finite-sample time spans of at most 60 seconds, divided by window duration. Require at least two samples and 90% coverage in both windows.
-- **Example:** 270 observed seconds / 300 baseline seconds = 90%; a carts series with no incident samples fails even if ten other services remain healthy.
-- **Use:** prevents vanished target telemetry being silently excluded from a recovery claim. This is coverage, not a service-performance score or proof of causal impact.
-- **Availability / limitations:** historical traffic series can support the guard, but cannot replace missing client outcomes or fault timestamps. Services with no baseline traffic are not covered by this cohort; check fault potency and path coverage in the study validity assessment.
-
-The primary count denominator excludes healthy/no-fault controls. Different policy
-hashes are reported in separate strata. `measured_failed_requests` and paired
-`measured_failed_requests_difference` refer to measured full intervals; pairing
-requires equal measured seconds. Publish duration and coverage with those counts.
-Model-usage inputs use `input_tokens`, `output_tokens`,
-`input_price_per_million`, `output_price_per_million`, `currency`, and `pricing_date`;
-missing price provenance yields null cost. Judge revisions are recorded via
-`--model-revision` and included in cache identity.
-
-## Current archive-derived measurements (default v3)
-
-These formulas in `grader/archive_metrics.py` apply to the original Runner output.
-The following entries supersede new-collection requirements for ordinary grading.
-All require archived files; missing values remain null. No extra run is necessary.
-
-### Client failed-request ratio and successful throughput
-
-- **Definition/unit/level/direction:** failed/attempted HTTP requests (fraction,
-  lower better) and successful HTTP requests/second (higher at comparable load);
-  interval/run levels; primary descriptive outcomes.
-- **Source/formula/window:** `*_stats_history.csv`, `Name=Aggregated`; differences
-  of `Total Request Count` and `Total Failure Count` at actual endpoints inside
-  final five-minute baseline or recorded incident. Goodput=(attempted−failed)/elapsed.
-- **Coverage/missing:** two ordered samples; resets/invalid deltas become null.
-  CSV gaps >5 seconds give no coverage. Recovery bins require 90% coverage and
-  100 attempts. Output gives measured endpoints and source CSV lines.
-- **Example:** 6000 attempts, 120 failures in 600 seconds → 2% failures, 9.8 goodput.
-- **Research/limits/confounders:** reliability and usable throughput; not business
-  transaction success. Request mix, load shedding, in-flight requests and client
-  failure classification matter. Available in original CSV archives.
-
-### Measured cumulative failed requests
-
-- **Definition/unit/level/direction:** incident counter increase, requests/run,
-  lower at equal load/duration; primary descriptive user-impact measurement.
-- **Source/formula/window:** last−first `Total Failure Count` over the entire
-  incident, independently of recovery bins. Fields: `harm.failed`,
-  `harm.measured_seconds`, source lines and `incidents.csv.measured_failed_requests`.
-- **Coverage/missing:** partial endpoints are disclosed. Resets yield null. Counts
-  may span CSV gaps, but inadequate temporal coverage prevents recovery credit.
-- **Example:** counter grows from 7 to 127 → 120 failures between those endpoints.
-- **Research/limits/confounders:** observed failed requests, not total slow-request
-  harm or monetary loss; unequal exposure confounds comparison. Old archives
-  support counts; slow-request counts remain unavailable without distributions.
-
-### Whole-run client latency
-
-- **Definition/unit/level/direction:** aggregate P95 and mean, seconds/whole run,
-  diagnostic, generally lower at comparable work.
-- **Source/formula/window:** `*_stats.csv`, `Name=Aggregated`, `95%` and
-  `Average Response Time` divided by 1000; includes baseline and incident.
-- **Coverage/missing:** one summary file and finite values; absent fields null.
-- **Example:** 94 ms P95 → 0.094 seconds.
-- **Research/limits/confounders:** overall client latency, not recovery timing;
-  baseline duration dilutes impact. Original CSV supports this; cumulative
-  history percentiles are never differenced into interval P95.
-
-### Per-service recovery checks
-
-- **Definition/unit/level/direction:** healthy/unhealthy/missing per workload per
-  30 seconds, supporting recovery-proxy evidence.
-- **Source/formula/window:** `response_time_p95_seconds.json` and `traffic_rps.json`
-  by namespace/workload. Final-five-minute baseline time medians are references.
-  Require bin max P95 ≤1.2×reference and min RPS ≥0.9×reference for every service.
-- **Coverage/missing:** two finite samples per bin, scrape step ≤15s, 90% coverage
-  baseline/incident. Samples support at most one scrape step. Missing series break
-  qualification; services with no baseline traffic lie outside the cohort.
-- **Example:** baseline median P95 0.1s → limit 0.12s; bin samples 0.11s/0.13s
-  fail even when other services are healthy. Baseline 10 RPS → floor 9 RPS.
-- **Research/limits/confounders:** avoids masking a harmed or disappeared service.
-  Time medians of one service's P95 are not pooled application P95. Rate smoothing,
-  request-mix changes and low-rate asynchronous services can prevent qualification.
-  Available from original Prometheus archives.
-
-### Archive recovery proxy and proxy recovery time
-
-- **Definition/unit/level/direction:** proxy recovered/unresolved, no observed
-  degradation, insufficient evidence or invalid; run-level primary descriptive
-  outcome. Recovery desirable, shorter time better at equal conditions.
-- **Source/formula/window:** four consecutive healthy qualified 30s bins after
-  a degraded bin. Align bins to `metadata.metrics.start`; time is streak start
-  minus first non-idle chaos step `active_started_at`. Fields:
-  `proxy_recovered`, `proxy_recovery_seconds`, `proxy_recovery_at`.
-- **Coverage/missing:** gaps break streak; ≥90% incident coverage. Missing recorded
-  boundaries are unknown. No streak by deadline is right-censored. No degradation
-  is reported separately, not as zero-second recovery.
-- **Example:** schedule start t=300, degradation until t=420, healthy 420–540 →
-  time 120s confirmed at 540; a job finishing at t=880 does not change it.
-- **Research/limits/confounders:** descriptive sustained service improvement;
-  native Kubernetes recovery, HPA, expiry and recurring idle intervals can explain
-  it. `recovery_schedule_phase` describes scheduled timing only. Strict recovery
-  time, active-fault verification and causal benefit remain unknown. Original
-  archives support the proxy when coverage is adequate.
-
-### Archive recovery counts and bounds
-
-- **Definition/unit/level/direction:** counts and proportions at campaign/application
-  level, supporting uncertainty reporting. Interpret recovery fractions with denominators.
-- **Source/formula/window:** one outcome per run in `archive_counts`. S=recovered,
-  F=unresolved,U=insufficient evidence. Assessable rate=S/(S+F); identification
-  bounds=[S/(S+F+U),(S+U)/(S+F+U)]. Invalid/no-degradation cases are separate.
-- **Coverage/missing:** empty denominator null; policy hashes are stratified.
-- **Example:** S=3,F=6,U=1 → 33.3% assessable rate; [30%,40%] conservative bounds.
-- **Research/limits/confounders:** communicates missing-outcome uncertainty; these
-  are not confidence intervals or causal effects. No added repeats are required.
-
-## Sliding baseline/chaos comparisons
-
-See [comparison usage and definitions](../README.md#baseline-versus-bestworst-chaos-windows).
-`--comparison-window-minutes` defaults to 5. `window_comparison.csv` and per-run
-reports select independent minima/maxima for client mean response-time estimates,
-service rolling-P95 time averages, and HTTP 5xx request rates. The reference is the
-full baseline; candidate windows remain inside recorded schedule-active intervals.
-This descriptive output is separate from the final-five-minute recovery baseline.
-
-The client-mean estimate assumes no requests with missing response times because
-Locust's cumulative mean excludes those requests, but its CSV request count does
-not expose that exclusion. See [Locust's StatsEntry implementation](https://docs.locust.io/en/stable/_modules/locust/stats.html).
-
-
-## Compact paper tables
-
-`paper_metrics.csv` retains one row per run: RCA/remediation within-run mean score,
-evaluable/exported job counts, penalty counts, operational outcome, client failed
-fraction, successful requests/s, failed-request count, measured seconds, and
-coverage. `research_summary.json` additionally gives each scored run equal weight
-for overall and criterion semantic means, with their run counts. See the
-[compact reporting methodology](methodology.md#compact-reporting-layer).
-
-The compact table also shows whole-incident successful throughput as a fraction
-of the measured recovery baseline: incident successful requests/s divided by
-baseline successful requests/s. Missing or zero baseline throughput yields null.
-This is a descriptive ratio, distinct from per-bin qualification and from causal
-improvement. Both absolute rates remain in the CSV.
-
-### Paired front-end baseline / best-worst window measurements
-
-`scenario_table.csv` reports baseline time-mean P95 (seconds) and HTTP 5xx
-(requests/s) for the selected front-end. Baseline excludes its first five minutes
-by default (`--baseline-ignore-minutes`), giving minutes 5–30 for a 30-minute
-baseline. Each baseline metric requires two samples and 90% coverage.
-
-Complete five-minute windows scan the full recorded chaos interval, independent
-of job timing and before cleanup. Best minimizes mean P95 subject to mean 5xx
-<= 0.5 requests/s; worst maximizes mean P95 without the ceiling. Both metrics
-share boundaries in each selected window and require 90% coverage; ties use
-earliest time. Missing baseline evidence does not suppress chaos measurements.
-These are descriptive time means, not pooled client P95 or causal recovery.
-See [methodology](methodology.md) for details and provenance.
-
-## Current notebook exports
-
-Normal grading exports the five CSVs under `csvs/`, plus per-run JSON/reports and
-`logs/grader.log`. Paper metrics and incident aggregate files described above are
-historical outputs and are no longer written by the CLI.
-
-For descriptive HTTP 5xx window measurements, absent samples from a successful
-archived result matrix are explicitly imputed as zero at matching traffic
-sample timestamps. The CSVs disclose baseline and selected-window imputation
-counts. This rule does not fill traffic gaps, failed queries, invalid samples,
-latency or missing semantic scores, and does not change recovery calculations.
+## Descriptive baseline and sliding-window metrics
+
+| Metric | Calculation and unit | Interpretation |
+| --- | --- | --- |
+| Client mean response time estimate | `(N2 × M2 − N1 × M1) / (N2 − N1)`, converting cumulative Locust means from ms to seconds | Available in independent comparisons; not in the paired scenario table |
+| Service P95 time average | Time-weighted average of archived `response_time_p95_seconds` samples; seconds | Average of rolling workload percentiles, **not** the pooled P95 of requests in the selected window |
+| HTTP 5xx time average | Time-weighted average of archived `http_5xx_rate`; requests/s | Error rate, **not a percentage**; a traffic drop can lower it |
+| Absolute change | Selected value minus baseline | Same units as the metric |
+| Relative change | `(selected − baseline) / baseline` | CSV `relative_change` is a fraction; Markdown shows percent. Null when baseline is zero |
+| Coverage | Supported seconds / interval seconds | At least 90% is required for an eligible value |
+
+Client means use `Total Request Count` and `Total Average Response Time` in
+`*_stats_history.csv`. They assume counted requests have response times; CSV
+rounding and failures without timings limit accuracy. Counter resets invalidate
+measurements. Cumulative history P95 cannot be converted to interval client P95.
+
+Complete windows advance by the recorded Prometheus scrape step within each
+recorded chaos step, ending before cleanup. They never bridge idle steps.
+A one-hour interval with five-minute windows and a 15-second step has 221
+candidate locations. Ties choose the earliest location. These are scheduled
+fault intervals, not proof that injection was continuously active.
+
+Service time averages use right-endpoint integration: a sample at `t` supports
+at most one scrape step ending at `t`. At least two finite nonnegative samples
+and 90% coverage are required. Gaps are not interpolated. Rolling source queries
+can contain observations from before the selected boundary.
+
+The independent comparison requires an evaluable baseline before selecting a
+metric's best/worst windows. The paired table can retain covered chaos windows
+even when its trimmed baseline is unavailable. Paired windows require both P95
+and 5xx coverage. Defaults are `--table-workload front-end` and
+`--table-max-5xx-rate 0.5`; use `--table-namespace` when the workload is ambiguous.
+
+### Explicit HTTP 5xx imputation
+
+For descriptive comparisons only, an absent 5xx sample in a successful archived
+result matrix is filled with zero at a matching finite traffic timestamp for
+the same namespace/workload. This includes an absent workload series. It is an
+analysis assumption, not an observed zero. Missing/failed query files, explicit
+nonfinite samples, traffic gaps, latency and semantic scores are not filled.
+
+`window_comparison.csv` records `missing_value_policy`,
+`baseline_imputed_samples`, and `window_imputed_samples`. The scenario table
+records baseline/best/worst imputed-sample counts. Per-run JSON retains policy
+and coverage. Recovery calculations continue to use raw evidence.
+
+## Archive recovery proxy: per-run JSON
+
+Read `research.operational` in `runs/<run>/grade.json`. These measurements are
+separate from rubric scores and descriptive windows. Defaults come from
+[`evaluation-policy.json`](../resources/evaluation-policy.json).
+
+| Measurement | Definition |
+| --- | --- |
+| Client failure ratio | Difference in cumulative failures / difference in cumulative attempts; fraction |
+| Successful client throughput | `(attempted − failed) / measured seconds`; requests/s |
+| Measured failed requests | Incident counter increase, retained in `harm.failed`, with measured endpoints and coverage |
+| Whole-run client mean/P95 | Omitted from chaos-only metrics because cumulative summaries include baseline and post-chaos data |
+| Service reference | Per-service time median of baseline P95 and traffic for every baseline-active service |
+| Healthy bin | Client failure ratio ≤baseline +0.001; successful throughput ≥90% baseline; every service's max P95 ≤120% baseline and min traffic ≥90% baseline |
+| Recovery streak | 120 consecutive healthy seconds after a qualifying degraded bin; default bins are 30 seconds |
+| `proxy_recovery_seconds` | Start of qualifying streak minus recorded schedule start; confirmation occurs at the streak's end |
+
+The last-five-minute baseline must have completed, pass any recorded health
+assessment, have client failure ratio ≤1%, and satisfy coverage/request rules.
+Client bins need at least 100 requests and 90% coverage. Service checks need at
+least two samples per bin; archive scrape step must be ≤15 seconds. Missing
+bins break recovery streaks. The observation deadline is recorded metrics end.
+Full algorithm and exclusions are in [methodology.md](methodology.md).
+
+| Operational status | Meaning |
+| --- | --- |
+| `proxy_recovered` | Sustained recovery under the archive proxy was observed |
+| `proxy_unresolved` | No qualifying recovery streak before the observation deadline |
+| `no_observed_degradation` | No qualifying degraded interval; do not interpret as zero-time recovery |
+| `not_evaluable` | Required boundaries, samples or coverage are unavailable |
+| `invalid` | An applicable validity check failed, such as unhealthy baseline or failed/interrupted run |
+
+The first failing evidence check determines the status/reason: an early startup
+failure with no timestamps can be `not_evaluable`. Inspect source run status and
+metadata as well. `proxy_recovered` does not prove agent causality, independent
+safety, or recovery while a fault was physically active. Strict `recovered`,
+`recovery_seconds`, and `active_fault_recovery` remain unknown for ordinary
+archives. Schedule-phase labels describe timing only.
+
+## Semantic scores and lifecycle status
+
+Weighted rubric totals range from 0 to 1. Remediation's final total is
+`max(0, rubric_score − penalty_total)`; RCA has no penalties. Alignment uses
+root-cause/remediation correctness ≥0.75, independently of penalties.
+Scenario-table score maxima and means include scored succeeded **and failed**
+jobs. Missing scores are excluded, not zero. Session counts include all exported
+jobs, including running and result-less jobs; they are not scored denominators.
+
+Current RemediatorAgent `succeeded` means it produced nonempty final output;
+that output may report a failed, skipped or unverified action. Historical
+statuses retain their original meaning. Grader preserves status and `is_failed`
+and judges final result content; it does not relabel archived jobs.
+
+Top-level `graded` means semantic input processing completed, not that a scenario
+ran successfully or recovered. Empty session arrays are valid but do not prove
+absence of anomalies: startup failures, interruption before activation, no-agent
+runs, and export problems must be distinguished using run evidence.
+
+Legacy per-job `metric_outcome` and `final_grade` columns are retained as
+`not_evaluable`: recovery is now assessed once per incident, in
+`research.operational`. They are not indicators of a failed semantic judge.
+
+## Optional evidence and retired reports
+
+Portable `evidence/` inputs can support verified actions/safety, client histogram
+recovery, detector matching, resource integrals and model usage/cost. Availability
+and measurement bases must be checked per field. They are not required for normal
+archive grading; see [evidence-contract.md](evidence-contract.md).
+
+The normal CLI no longer emits `incidents.csv`, `incidents.json`,
+`paper_metrics.csv`, `research_summary.*`, or `scenario_table.md/json`.
+Historical files and helper functions can still exist; they are not current
+CLI outputs. Do not treat their old counts as the current campaign's results.
+
+
+### Chaos-only grading scope
+
+Grading uses `scheduled-chaos-only-v1`: each non-idle step starts at its recorded
+`active_started_at` and ends at the earlier of `cleanup_started_at` or start plus
+its recorded `duration` (seconds). A one-hour step is therefore capped at 60
+minutes; earlier cleanup shortens it. Both actual start and cleanup timestamps
+are required; planned duration alone never proves the step ran. Missing or invalid
+boundaries are unevaluable. Performance measurements also stop at telemetry end.
+
+Baseline telemetry remains a reference for comparisons. Chaos metrics, recovery
+streaks, diagnostic summaries and resource integrals exclude baseline, idle gaps,
+cleanup and post-chaos observation. Complete windows must fit inside one chaos
+interval. Archived Prometheus rolling samples may still contain lookback data
+from before their timestamp; raw request-level intervals cannot be reconstructed.
+
+RCA/remediation scores and scenario session counts include only outputs whose
+`completed_at` falls in `[chaos_start, chaos_end)`. Outputs completing exactly at
+the end are excluded. Excluded jobs retain their original lifecycle status and
+an explicit `time_scope` reason in `grade.json`; the judge is not called for them.
+The notebook applies the same filter to historical grades and exposes excluded
+session counts. Historical grade files and judge caches are not rewritten by
+notebook execution. Whole-run cumulative client mean/P95 summaries are omitted
+from chaos-only metrics.

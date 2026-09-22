@@ -23,7 +23,7 @@ patches:
     kind: Deployment
     name: orders
   patch: |-
-    # Cold Java startup at 100m CPU needs more than the canonical five minutes.
+    # Cold Java startup with constrained CPU needs more than the canonical five minutes.
     - op: replace
       path: /spec/template/spec/containers/0/startupProbe/failureThreshold
       value: 180
@@ -32,10 +32,10 @@ patches:
       value: 1200
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/cpu
-      value: 100m
+      value: 200m
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
-      value: 100m
+      value: 200m
 - target:
     group: apps
     version: v1

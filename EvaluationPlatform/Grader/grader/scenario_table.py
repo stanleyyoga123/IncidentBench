@@ -31,6 +31,7 @@ COLUMNS = (
 
 
 def score_summary(jobs):
+    jobs = [job for job in jobs if job.get('time_scope', {}).get('included', True)]
     scores = [(job.get('rubric') or {}).get('overall_score') for job in jobs
               if job.get('status') in ('succeeded', 'failed')
               and (job.get('alignment') or {}).get('verdict') in ('aligned', 'not_aligned')]
@@ -77,7 +78,7 @@ def write_scenario_table(output, grades, *, csv_only=False):
     notes = [
         'One row per archived run; repeated scenario names remain separate experimental runs.',
         'Scores range from 0 to 1. Maxima and means use scored succeeded and failed jobs; remediation scores include penalties. Missing scores are excluded, not replaced with zero.',
-        'Session counts include every exported job, including running and result-less jobs. Scored counts are recorded in scenario_table.json.',
+        'Session counts include outputs completed during recorded chaos intervals; excluded exports remain in grade.json with time_scope reasons. Scored counts are recorded in scenario_table.json.',
         'P95 is a time average of archived rolling P95 samples, not a pooled request percentile. HTTP 5xx is requests/second, not a percentage.',
         'Baseline excludes its initial five minutes by default, configurable with --baseline-ignore-minutes. Missing baseline values do not suppress covered chaos windows.',
         'Best minimizes mean P95 subject to the configured 5xx ceiling. Worst maximizes mean P95 over all covered windows, without that ceiling. Ties use earliest time.',

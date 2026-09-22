@@ -1,6 +1,8 @@
 """Evidence-based incident outcomes. Never infer observations from agent prose."""
 from __future__ import annotations
 
+from .time_scope import chaos_intervals, contains, VERSION
+
 import hashlib
 import json
 import math
@@ -191,20 +193,28 @@ def operational(root, p, events, run_id, metadata):
         deadline = onset + planned
     if onset < end or deadline <= onset:
         return unavailable('invalid fault/observation ordering', 'invalid')
-    guard = service_coverage(root, cutoff - p['baseline_seconds'], cutoff, onset, deadline, p)
+    spans = [(max(onset, a), min(deadline, b)) for a, b in chaos_intervals(metadata)
+             if max(onset, a) < min(deadline, b)]
+    if not spans:
+        return unavailable('no recorded chaos interval overlaps observed fault')
+    deadline = spans[-1][1]
+    guards = [service_coverage(root, cutoff - p['baseline_seconds'], cutoff, a, b, p) for a,b in spans]
+    guard = {'status': 'complete' if all(g['status'] == 'complete' for g in guards) else 'incomplete',
+             'segments': guards}
+    result['time_scope'] = VERSION
     result['service_coverage'] = guard
     if guard['status'] != 'complete':
         return unavailable('baseline-active service telemetry is missing or incomplete')
-    result['observation_seconds'] = deadline - onset
+    result['observation_seconds'] = sum(b-a for a,b in spans)
     result['fault_onset'] = faults[0]['timestamp']
     limits = {'p95_seconds': base['p95_seconds'] * p['latency_multiplier'],
               'failure_ratio': base['failure_ratio'] + p['failure_ratio_allowance'],
               'successful_rps': base['successful_rps'] * p['throughput_fraction']}
     result['limits'] = limits
-    incident = [r for r in rows if epoch(r['start']) >= onset and epoch(r['end']) <= deadline]
+    incident = [r for r in rows if contains(spans, epoch(r['start']), epoch(r['end']))]
     valid = [r for r in incident if qualified(r, p)]
     measured_seconds = sum(epoch(r['end']) - epoch(r['start']) for r in valid)
-    coverage = measured_seconds / (deadline - onset)
+    coverage = measured_seconds / result['observation_seconds']
     result['coverage'] = coverage
     result['harm'] = {**summary(incident), 'measured_seconds': sum(epoch(r['end']) - epoch(r['start']) for r in incident),
                       'coverage_adequate': coverage >= p['minimum_coverage'],
@@ -262,7 +272,8 @@ def evaluate_incident(root, override=None):
             raise
         p = policy()
         policy_error = True
-    result = {'methodology_version': p['methodology_version'], 'policy_hash': digest(p), 'policy': p,
+    result = {'methodology_version': p['methodology_version'], 'policy_hash': digest({'policy': p, 'time_scope': VERSION}), 'policy': p,
+              'source_policy_hash': digest(p), 'time_scope': VERSION,
               'policy_source': 'override' if override else 'archived' if archived_policy.exists() else 'default',
               'inventory': inventory(root), 'limitations': [], 'safety': {'status': 'unverified'},
               'execution': {'status': 'unverified', 'applied_actions': None}, 'safe_recovery': None,
@@ -383,27 +394,32 @@ def supporting(root, events, actions, op):
 
 
 def resource_usage(root):
+    spans = chaos_intervals(read(root / 'metadata.json', {}))
     output = {}
     for name in ('deployment_cpu_usage', 'app_instance_count'):
         data = read(root / 'metrics' / (name + '.json'), {})
         rows = []
         for series in data.get('data', {}).get('result', []):
-            samples = [(float(t), float(v)) for t, v in series.get('values', []) if math.isfinite(float(v))]
-            integral = sum((b[0] - a[0]) * (a[1] + b[1]) / 2 for a, b in zip(samples, samples[1:]) if 0 < b[0] - a[0] <= 60)
+            samples = [(float(t), float(v)) for t, v in series.get('values', []) if math.isfinite(float(v)) and contains(spans, float(t))]
+            integral = sum((b[0] - a[0]) * (a[1] + b[1]) / 2 for a, b in zip(samples, samples[1:]) if 0 < b[0] - a[0] <= 60 and contains(spans, a[0], b[0]))
             rows.append({'labels': series.get('metric', {}), 'integral': integral if len(samples) > 1 else None})
         output[name] = rows
     return output
 
 
 def diagnostics(root):
-    """Preserve workload series; never aggregate service percentiles into app latency."""
+    """Summarize chaos-only workload samples, preserving each label set."""
+    try:
+        spans = chaos_intervals(read(root / 'metadata.json', {}))
+    except (ValueError, TypeError, KeyError):
+        return {'status': 'not_evaluable', 'reason': 'missing or invalid chaos boundaries'}
     output = {}
     for path in sorted((root / 'metrics').glob('*.json')):
         try:
             data = read(path, {})
             series = []
             for row in data.get('data', {}).get('result', []):
-                values = [(float(t), float(v)) for t,v in row.get('values', []) if math.isfinite(float(t)) and math.isfinite(float(v))]
+                values = [(float(t), float(v)) for t,v in row.get('values', []) if math.isfinite(float(t)) and math.isfinite(float(v)) and contains(spans, float(t))]
                 series.append({'labels': row.get('metric', {}), 'samples': len(values),
                                'minimum': min((v for t,v in values), default=None),
                                'maximum': max((v for t,v in values), default=None),

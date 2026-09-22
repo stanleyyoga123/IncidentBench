@@ -1,4 +1,29 @@
-# Offline validation of archive-recovery-v3
+# Grader validation guide
+
+## Current checks
+
+Documentation-only updates need a source/path review, not live grading. Compare
+CLI defaults in `grader/cli.py`, CSV columns in `reports.py` and
+`scenario_table.py`, calculations in `window_comparison.py` and
+`archive_metrics.py`, and policy/rubric JSON under `resources/`.
+
+For implementation changes, run from the Grader root:
+
+```bash
+python -m pytest -q
+python -m compileall -q grader visualizer
+```
+
+Focused fixtures include semantic failed-job eligibility, independent and paired
+windows, baseline exclusions, explicit 5xx imputation, coverage/gaps, counter
+resets, output layout and operational-only behavior. Never overwrite historical
+archives or grading outputs when performing an offline assessment.
+
+## Historical validation: 2026-09-15
+
+The following is a dated record, not the current test count, campaign inventory,
+or current output-file contract. Several aggregate report files mentioned here
+are no longer generated; see [metrics.md](metrics.md).
 
 Validated on 2026-09-15. The Runner research instrumentation, policy/schema
 extensions, added CPU paired suites and healthy scenarios were rolled back.
