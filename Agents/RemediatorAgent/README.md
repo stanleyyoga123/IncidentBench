@@ -27,3 +27,13 @@ endpoint before parsing. Any nonempty final output completes as `succeeded`;
 this means output completion, not successful execution or verified recovery.
 Execution errors and recovery observations remain in the output and tool audits.
 Empty output or errors preventing durable completion remain `failed`.
+
+## Container image
+
+Set `IMAGE_REGISTRY` and `IMAGE_TAG` before using this component's build or
+deploy script. For example, `IMAGE_REGISTRY=ghcr.io/my-org` and
+`IMAGE_TAG=v1.0.0` produce an image under that registry and tag. The build
+script pushes it; the deploy script renders the same reference into the
+first-party Kubernetes manifest before applying it. The checked-in
+`incidentbench.invalid/*:configure-me` reference is a non-pullable marker.
+Third-party images are unaffected.

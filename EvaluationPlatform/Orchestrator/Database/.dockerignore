@@ -1,0 +1,23 @@
+# Only source files required by this component image enter the build context.
+*
+!Dockerfile
+!requirements.txt
+!alembic.ini
+!migrations/
+!migrations/**
+!run.sh
+
+# Keep local credentials and generated files out of included source folders.
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+**/kubeconfig*
+**/.vault-password
+**/secret.yml
+**/secret.yaml
+**/.ipynb_checkpoint
+**/.ipynb_checkpoints

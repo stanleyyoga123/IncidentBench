@@ -6,6 +6,12 @@ if (( $# != 0 )); then
   exit 2
 fi
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd -- "$script_dir/../.." && pwd)"
+source "$root_dir/deployment/image_config.sh"
+validate_image_settings
+render_image_manifest "$script_dir/kubernetes/manifest.yaml" "remediator-agent" >/dev/null
+
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "Error: kubectl is required." >&2
   exit 1
@@ -17,7 +23,6 @@ if [[ -z "$context" ]]; then
   exit 1
 fi
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 secret_file="$script_dir/kubernetes/secret.yml"
 secret_example="$script_dir/kubernetes/secret.example.yml"
 
@@ -35,7 +40,8 @@ if ! kubectl get namespace agents >/dev/null 2>&1; then
   exit 1
 fi
 
+
 kubectl apply -f "$secret_file"
 kubectl apply -f "$script_dir/kubernetes/configmap.yaml"
-kubectl apply -f "$script_dir/kubernetes/manifest.yaml"
+render_image_manifest "$script_dir/kubernetes/manifest.yaml" "remediator-agent" | kubectl apply -f -
 kubectl rollout status deployment/remediator-agent --namespace agents --timeout=5m

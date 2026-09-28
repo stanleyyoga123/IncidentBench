@@ -2,13 +2,14 @@
 set -euo pipefail
 
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$ROOT/deployment/image_config.sh"
 readonly COMPONENTS="mcp-tools learning-agent rca-agent remediator-agent agent-orchestrator anomaly-detector database-job runner"
 
 usage() {
   echo "Usage: $0 [all | COMPONENT ...]"
   echo "Build and push component images (default: all)."
   echo "Components: $COMPONENTS"
-  echo "Set PLATFORM to override linux/amd64. Requires Docker Buildx and registry login."
+  echo "Set IMAGE_REGISTRY and IMAGE_TAG. Set PLATFORM to override linux/amd64. Requires Docker Buildx and registry login."
 }
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
@@ -41,6 +42,8 @@ for component in "${selected[@]}"; do
   fi
   scripts+=("$script")
 done
+
+validate_image_settings
 
 for script in "${scripts[@]}"; do
   echo "Building and pushing: $script"

@@ -39,3 +39,37 @@ After rotating the DatabaseJob password, rerun `EvaluationPlatform/Orchestrator/
 PostgreSQL stores its role password in the persistent data volume, so the
 script rolls the StatefulSet and synchronizes that role over its local socket
 before migration.
+
+## Cluster topology
+
+The bundled inventory and canonical placement profiles assume one control-plane
+node, a dedicated tools node with `role=tools`, and six service workers named
+`worker-node-1` through `worker-node-6` with `role=services`. Observability and
+agent workloads use the tools label; application placement and network probes
+use the service label.
+
+The inventory example uses placeholder hostnames, and Runner's
+`config/environment.example.json` uses documentation IP addresses. Copy them to
+the ignored local inventory and environment files, then supply real SSH addresses,
+users, and Kubernetes node InternalIPs. Service DNS names ending in
+`.svc.cluster.local` are in-cluster defaults.
+
+To use another topology, update these together:
+
+- Initialization inventory, role labels, and platform node selectors;
+- Runner environment `node_ips` keys and values;
+- application placement profiles and their node bindings;
+- scenario chaos selectors and peer-delay schedules referencing those nodes.
+
+Changing addresses alone does not adapt a scenario targeting a specific node.
+Validate every selected scenario before running an experiment.
+
+## Image configuration
+
+Every first-party build and deploy script requires `IMAGE_REGISTRY` and
+`IMAGE_TAG`, supplied through the shell (see `deployment/image.env.example`).
+The scripts share `deployment/image_config.sh` for naming and validation.
+Checked-in workload YAML uses `incidentbench.invalid/<component>:configure-me`
+markers; deploy scripts replace them only in the streamed manifest. Upstream
+images such as PostgreSQL keep their own references. No public first-party image
+registry is assumed. Build/push the chosen version before deploying it.

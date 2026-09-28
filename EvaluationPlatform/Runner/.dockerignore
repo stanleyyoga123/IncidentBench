@@ -10,3 +10,19 @@ config/environment.json
 .env.*
 .venv/
 __pycache__/
+
+# Runner builds use the repository-root .dockerignore; these also protect local contexts.
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+**/kubeconfig*
+**/.vault-password
+**/secret.yml
+**/secret.yaml
+**/.ipynb_checkpoint
+**/.ipynb_checkpoints
+kubernetes/secret.yml

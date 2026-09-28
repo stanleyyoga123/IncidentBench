@@ -1,0 +1,31 @@
+{
+  "run": "demo-sock-1",
+  "scenario": "demo-network-delay",
+  "status": "graded",
+  "rca_jobs": [
+    {
+      "id": "demo-sock-1-rca",
+      "status": "succeeded",
+      "completed_at": "2026-01-01T00:12:00Z",
+      "rubric": {
+        "overall_score": 0.9
+      },
+      "alignment": {
+        "verdict": "aligned"
+      }
+    }
+  ],
+  "remediation_jobs": [
+    {
+      "id": "demo-sock-1-remediation",
+      "status": "succeeded",
+      "completed_at": "2026-01-01T00:15:00Z",
+      "rubric": {
+        "overall_score": 0.9
+      },
+      "alignment": {
+        "verdict": "aligned"
+      }
+    }
+  ]
+}

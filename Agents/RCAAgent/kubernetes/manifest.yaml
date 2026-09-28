@@ -11,7 +11,7 @@ spec:
       nodeSelector: {role: tools}
       containers:
         - name: rca-agent
-          image: stanleyyoga123/rca-agent:dev
+          image: incidentbench.invalid/rca-agent:configure-me
           imagePullPolicy: Always
           ports: [{name: http, containerPort: 8081}]
           envFrom: [{secretRef: {name: rca-agent-secrets}}]

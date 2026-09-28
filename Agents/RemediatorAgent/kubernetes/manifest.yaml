@@ -11,7 +11,7 @@ spec:
       nodeSelector: {role: tools}
       containers:
         - name: remediator-agent
-          image: stanleyyoga123/remediator-agent:dev
+          image: incidentbench.invalid/remediator-agent:configure-me
           imagePullPolicy: Always
           ports: [{name: http, containerPort: 8082}]
           envFrom: [{secretRef: {name: remediator-agent-secrets}}]

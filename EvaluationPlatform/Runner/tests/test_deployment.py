@@ -41,7 +41,7 @@ def test_evaluation_owns_runner_secrets_playbook_and_deploy_script():
     assert pod["spec"]["serviceAccountName"] == "evaluation-runner"
     assert pod["spec"]["nodeSelector"] == {"role": "tools"}
     container = pod["spec"]["containers"][0]
-    assert container["image"] == "stanleyyoga123/evaluation:dev"
+    assert container["image"] == "incidentbench.invalid/evaluation:configure-me"
     assert container["workingDir"] == "/workspace/EvaluationPlatform/Runner"
     env = {item["name"]: item["value"] for item in container["env"]}
     assert "POSTGRES_DSN" not in env
@@ -72,6 +72,6 @@ def test_evaluation_owns_runner_secrets_playbook_and_deploy_script():
     assert "kubernetes/pod.yaml" in deploy
 
     build = (ROOT / "scripts/build.sh").read_text()
-    assert "stanleyyoga123/evaluation:dev" in build
+    assert 'image_ref "evaluation"' in build
     assert "EvaluationPlatform/Runner/Dockerfile" in build or "Dockerfile" in build
     assert "--push" in build

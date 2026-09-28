@@ -20,7 +20,7 @@ spec:
         role: tools
       containers:
         - name: anomaly-detector
-          image: stanleyyoga123/anomaly-detector:dev
+          image: incidentbench.invalid/anomaly-detector:configure-me
           imagePullPolicy: Always
           ports:
             - name: http

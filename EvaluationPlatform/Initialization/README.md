@@ -40,6 +40,15 @@ the committed `++++++++` placeholders only after copying each component's
 `kubernetes/secret.example.yml` to ignored `kubernetes/secret.yml`, and never
 commit populated Secrets.
 
+## Supported topology
+
+The bundled scenarios expect a control-plane node, one tools node labelled
+`role=tools`, and six service workers named `worker-node-1` through
+`worker-node-6`, labelled `role=services`. Hostnames in `inventory.example.ini`
+are placeholders. For another layout, update inventory and labels together with
+Runner's node-IP mapping, application placement profiles, and chaos selectors.
+See the [topology guide](../../docs/infrastructure.md#cluster-topology).
+
 ## Provision a cluster
 
 Create the restricted Evaluation cleaner key once:
@@ -80,17 +89,20 @@ ansible-playbook playbooks/istio.yml
 
 ## Build images
 
-Build component images from their component directories. The Evaluation image
-must use the workspace root as its Docker build context because application
-profiles may resolve workspace-owned manifests and MCPTools namespace-access
-policy:
+From the repository root, copy `deployment/image.env.example` to ignored
+`deployment/image.env`, customize `IMAGE_REGISTRY` and `IMAGE_TAG`, then use the
+same settings for building and deploying:
 
 ```bash
-docker build -f EvaluationPlatform/Runner/Dockerfile -t <registry>/agent-evaluator:<tag> .
-docker build -f EvaluationPlatform/Orchestrator/Database/Dockerfile -t <registry>/database-job:<tag> EvaluationPlatform/Orchestrator/Database
+source deployment/image.env
+./build.sh
 ```
 
-Set immutable image tags in component manifests before a reproducible release.
+Images are named `IMAGE_REGISTRY/<component>:IMAGE_TAG`. Runner's build script
+uses the repository root as its context; the other components use their own
+folders. Docker allowlists/exclusions keep local credentials out of build inputs.
+Component deploy scripts render image markers in memory, so do not apply
+marker-bearing workload YAML directly. Initialization has no component image.
 
 ## Runtime boundary
 

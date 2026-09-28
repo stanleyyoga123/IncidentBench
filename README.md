@@ -131,19 +131,26 @@ system's recorded behavior under these experiments.
 
 ## Try the project
 
-**Explore without a cluster.** Start with the report above. With the archived
-`results/` and `grades/` available locally, install the Grader requirements and
-regenerate the report from the repository root:
+**Explore without a cluster.** Install the Grader requirements and run the
+small [synthetic reporting demo](EvaluationPlatform/Grader/eda/README.md#offline-demonstration)
+from a fresh clone:
 
 ```bash
 python -m pip install -r EvaluationPlatform/Grader/requirements.txt
-python EvaluationPlatform/Grader/eda/report.py
+python EvaluationPlatform/Grader/eda/report.py \
+  --results-dir EvaluationPlatform/Grader/examples/report-demo/results \
+  --grades-dir EvaluationPlatform/Grader/examples/report-demo/grades \
+  --apps sock-shop online-boutique \
+  --output EvaluationPlatform/Grader/eda/exports/demo/report.md
 ```
 
-This reads existing grades and recomputes performance offline without invoking
-the semantic judge. For new archived runs, see the
-[Grader guide](EvaluationPlatform/Grader/README.md), including its
-`--operational-only` mode and visualization commands.
+The bundled fixture contains illustrative scores, not research results. It
+makes no model or cluster calls; absent telemetry remains unknown. Full research
+archives and grades are intentionally excluded from Git. With your own archives
+under the Grader's `results/` and `grades/`, run
+`python EvaluationPlatform/Grader/eda/report.py` to regenerate the real-data
+report. See the [Grader guide](EvaluationPlatform/Grader/README.md) for new runs,
+`--operational-only` assessment, and visualization commands.
 
 **Demonstrate the live workflow.** On a prepared evaluation cluster, the
 [three-application CPU smoke suite](EvaluationPlatform/Runner/resources/suites/cpu-smoke.json)
@@ -177,8 +184,17 @@ execution, live tracking, and extension interfaces.
 
 ## Deployment and operations
 
-The guides above describe each component. Expand this checklist for deployment
-order, image builds, agent operations, and experiment commands.
+The bundled scenarios assume a control-plane node, a tools node labelled
+`role=tools`, and six service workers named `worker-node-1` through
+`worker-node-6`, labelled `role=services`. For another topology, adapt the
+inventory, node-IP mapping, application placement overlays, and chaos selectors
+together. See [topology configuration](docs/infrastructure.md#cluster-topology).
+Example addresses are placeholders; keep actual addresses and credentials in
+ignored local configuration.
+
+Builds and deployments require the same explicit `IMAGE_REGISTRY` and
+`IMAGE_TAG`. Checked-in first-party image references are markers, not published
+images. Expand the checklist for configuration and execution commands.
 
 <details>
 <summary>Deployment checklist and commands</summary>
@@ -194,20 +210,27 @@ For an existing deployment, stop the detector and job workers before deploying t
 
 ## Build component images
 
-From the project root, build and push all eight component images, or select
-individual components:
+Copy [deployment/image.env.example](deployment/image.env.example) to the ignored
+`deployment/image.env`, set a registry/namespace you can push to and a versioned
+tag, and load it into your shell. Use the same file for component and root scripts:
 
 ```bash
+cp deployment/image.env.example deployment/image.env
+# Edit deployment/image.env with your registry and chosen version.
+source deployment/image.env
 ./build.sh
 ./build.sh rca-agent mcp-tools
 ./build.sh database-job runner
 PLATFORM=linux/arm64 ./build.sh learning-agent
 ```
 
-Run `./build.sh --help` for component names. Docker Buildx and registry login
-with push access to the existing `stanleyyoga123/*:dev` repositories are required.
-The default platform is `linux/amd64`; builds run sequentially and stop on the
-first failure. Initialization and Grader have no component Docker images.
+Run `./build.sh --help` for component names. Each image is named
+`IMAGE_REGISTRY/<component>:IMAGE_TAG`. Docker Buildx and registry login with
+push access are required. Make images publicly pullable if you want other users
+to deploy them without registry credentials; this repository does not publish
+images automatically. The default platform is `linux/amd64`; builds run
+sequentially and stop on the first failure. Initialization and Grader have no
+component Docker images.
 
 Individual scripts also work from the project root, for example
 `./Agents/RCAAgent/build.sh` or
@@ -226,8 +249,11 @@ Deployments and waits for readiness so ConfigMap and Secret changes take effect.
 Populate each component's ignored `kubernetes/secret.yml` first. The script uses
 kubectl's current context; run it when evaluations and agent jobs are idle. It
 stops on failure without rollback. It does not build images, deploy the Runner,
-install infrastructure, or execute database migrations. Image tags come from
-the manifests. For existing application namespace bindings, the MCPTools script
+install infrastructure, or execute database migrations. First-party image markers
+are rendered in memory using `IMAGE_REGISTRY` and `IMAGE_TAG`; source manifests
+and upstream image references remain unchanged. Missing or invalid settings fail
+before deployment. Use the component scripts rather than applying marker-bearing
+workload YAML directly. For existing application namespace bindings, the MCPTools script
 also accepts `APPLICATION_NAMESPACES="online-boutique teastore sock-shop"`.
 
 ## Scale down the agent platform

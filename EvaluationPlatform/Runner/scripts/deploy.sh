@@ -6,6 +6,12 @@ if (( $# != 0 )); then
   exit 2
 fi
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd -- "$script_dir/../../.." && pwd)"
+source "$root_dir/deployment/image_config.sh"
+validate_image_settings
+render_image_manifest "$script_dir/../kubernetes/pod.yaml" "evaluation" >/dev/null
+
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "Error: kubectl is required." >&2
   exit 1
@@ -17,7 +23,6 @@ if [[ -z "$context" ]]; then
   exit 1
 fi
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 secret_file="$script_dir/../kubernetes/secret.yml"
 secret_example="$script_dir/../kubernetes/secret.example.yml"
 pod_file="$script_dir/../kubernetes/pod.yaml"
@@ -76,6 +81,7 @@ if (( s3_placeholders != 0 && s3_placeholders != 4 )); then
   exit 1
 fi
 
+
 awk '
   /^---[[:space:]]*$/ { doc++ }
   doc < 2 { print }
@@ -97,6 +103,6 @@ if [[ ! -f "$inventory_file" ]]; then
 fi
 kubectl -n agents create configmap evaluation-runner-inventory \
   --from-file="inventory.ini=$inventory_file" --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -f "$pod_file"
+render_image_manifest "$pod_file" "evaluation" | kubectl apply -f -
 kubectl wait --for=condition=Ready pod/evaluation-runner \
   --namespace agents --timeout=5m

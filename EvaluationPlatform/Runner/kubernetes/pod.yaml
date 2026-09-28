@@ -36,7 +36,7 @@ spec:
   terminationGracePeriodSeconds: 30
   containers:
     - name: evaluation-runner
-      image: stanleyyoga123/evaluation:dev
+      image: incidentbench.invalid/evaluation:configure-me
       imagePullPolicy: Always
       command: ["sleep"]
       args: ["infinity"]

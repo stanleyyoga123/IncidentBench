@@ -11,7 +11,7 @@ spec:
       nodeSelector: {role: tools}
       containers:
         - name: agent-orchestrator
-          image: stanleyyoga123/agent-orchestrator:dev
+          image: incidentbench.invalid/agent-orchestrator:configure-me
           imagePullPolicy: Always
           ports: [{name: http, containerPort: 8080}]
           envFrom: [{secretRef: {name: agent-orchestrator-secrets}}]

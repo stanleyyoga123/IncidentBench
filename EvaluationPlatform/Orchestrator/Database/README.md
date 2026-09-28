@@ -52,15 +52,19 @@ script rolls the StatefulSet and synchronizes the role password over its local
 socket before migration. It withholds migration pod logs because they may
 contain sensitive values.
 
-Build and push the development image referenced by `kubernetes/job.yaml`:
+Set `IMAGE_REGISTRY` and `IMAGE_TAG` to your registry namespace and release
+tag before building or deploying. For example, `ghcr.io/my-org` and `v1.0.0`
+produce `ghcr.io/my-org/database-job:v1.0.0`. The checked-in Job uses a
+non-pullable `incidentbench.invalid` marker that `deploy.sh` replaces in memory
+with this image reference. Build and push it with:
 
 ```bash
 ./build.sh
 ```
 
 The default target platform is `linux/amd64`; override it with `PLATFORM` when
-needed. Docker authentication for the `stanleyyoga123` namespace must already
-be configured.
+needed. Docker authentication for your chosen registry must already be
+configured.
 
 For a local database, copy `.env.example` to the ignored `.env`, replace every
 placeholder, then run from this directory:

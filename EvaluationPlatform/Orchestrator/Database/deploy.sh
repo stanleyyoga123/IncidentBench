@@ -2,12 +2,16 @@
 set -Eeuo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly ROOT_DIR="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
+source "$ROOT_DIR/deployment/image_config.sh"
+validate_image_settings
 readonly NAMESPACE="agents"
 readonly SECRET_FILE="${SCRIPT_DIR}/kubernetes/secret.yml"
 readonly SECRET_EXAMPLE="${SCRIPT_DIR}/kubernetes/secret.example.yml"
 readonly POSTGRES_FILE="${SCRIPT_DIR}/kubernetes/postgres.yaml"
 readonly CONFIGMAP_FILE="${SCRIPT_DIR}/kubernetes/configmap.yaml"
 readonly JOB_FILE="${SCRIPT_DIR}/kubernetes/job.yaml"
+render_image_manifest "${JOB_FILE}" "database-job" >/dev/null
 readonly POSTGRES_STATEFULSET="anomaly-detector-postgres"
 readonly CURRENT_JOB="database-migration-20260817-0002"
 readonly OBSOLETE_JOB="database-migration-20260817-0001"
@@ -42,6 +46,15 @@ if awk '
   fail "replace every ++++++++ placeholder in kubernetes/secret.yml before deploying"
 fi
 
+
+if command -v sha256sum >/dev/null 2>&1; then
+  secret_checksum="$(sha256sum "${SECRET_FILE}" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  secret_checksum="$(shasum -a 256 "${SECRET_FILE}" | awk '{print $1}')"
+else
+  fail "sha256sum or shasum is required"
+fi
+
 legacy_agent_present=false
 if kubectl get deployment cloudagent -n "${NAMESPACE}" >/dev/null 2>&1; then
   legacy_agent_present=true
@@ -62,14 +75,6 @@ fi
 
 kubectl apply -f "${SECRET_FILE}"
 kubectl apply -f "${POSTGRES_FILE}"
-
-if command -v sha256sum >/dev/null 2>&1; then
-  secret_checksum="$(sha256sum "${SECRET_FILE}" | awk '{print $1}')"
-elif command -v shasum >/dev/null 2>&1; then
-  secret_checksum="$(shasum -a 256 "${SECRET_FILE}" | awk '{print $1}')"
-else
-  fail "sha256sum or shasum is required"
-fi
 
 kubectl patch statefulset "${POSTGRES_STATEFULSET}" \
   -n "${NAMESPACE}" \
@@ -102,7 +107,7 @@ kubectl delete job "${CURRENT_JOB}" "${OBSOLETE_JOB}" \
   -n "${NAMESPACE}" \
   --ignore-not-found=true \
   --wait=true
-kubectl apply -f "${JOB_FILE}"
+render_image_manifest "${JOB_FILE}" "database-job" | kubectl apply -f -
 
 if ! kubectl wait "job/${CURRENT_JOB}" \
   -n "${NAMESPACE}" \

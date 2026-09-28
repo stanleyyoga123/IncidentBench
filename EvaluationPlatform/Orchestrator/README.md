@@ -30,3 +30,13 @@ The bundled Runner uses authenticated [evaluation APIs](docs/evaluation-api.md)
 for durable serial ownership, maintenance, full reset and consistent session export.
 Orchestrator remains available while configured workers are stopped. Database
 deployment and additive migrations live in `Database/`; runtime code remains DML-only.
+
+## Container image
+
+Set `IMAGE_REGISTRY` and `IMAGE_TAG` before using this component's build or
+deploy script. For example, `IMAGE_REGISTRY=ghcr.io/my-org` and
+`IMAGE_TAG=v1.0.0` produce an image under that registry and tag. The build
+script pushes it; the deploy script renders the same reference into the
+first-party Kubernetes manifest before applying it. The checked-in
+`incidentbench.invalid/*:configure-me` reference is a non-pullable marker.
+Third-party images are unaffected.

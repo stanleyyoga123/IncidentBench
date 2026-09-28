@@ -19,7 +19,7 @@ spec:
         role: tools
       containers:
         - name: migration
-          image: stanleyyoga123/database-job:dev
+          image: incidentbench.invalid/database-job:configure-me
           imagePullPolicy: Always
           envFrom:
             - configMapRef:

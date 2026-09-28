@@ -40,6 +40,32 @@ Duplicate run names in different archive directories produce an error instead
 of silently selecting one. No judge calls occur and input files are unchanged.
 Ungraded archives still contribute performance metrics and session counts;
 semantic scores remain unknown until grades exist.
+Input locations in the public Markdown and notebook configuration display use
+Grader-relative paths. Inputs outside the checkout appear as an external input
+label so a generated report does not disclose a workstation directory tree.
+
+## Offline demonstration
+
+From `EvaluationPlatform/Grader/`, run this on a fresh checkout after installing
+the Grader requirements:
+
+```bash
+python eda/report.py \
+  --results-dir examples/report-demo/results \
+  --grades-dir examples/report-demo/grades \
+  --apps sock-shop online-boutique \
+  --output /tmp/incidentbench-demo-report.md
+```
+
+Open `/tmp/incidentbench-demo-report.md` and the companion
+`/tmp/incidentbench-demo-report-applications.png`. The fixture is deliberately
+**synthetic**: two made-up completed runs demonstrate a score above and below
+the 0.8 threshold, timing, denominators, and application comparison. It is not
+an experiment result or evidence about IncidentBench performance. There are no
+telemetry series in the fixture, so P95, 5xx, and window tolerance remain
+`Unknown` with their evaluable denominator at zero. No cluster, judge, or network
+connection is used. Actual raw archives and grades are intentionally not bundled;
+the checked-in `report.md` is a curated example from the local research run.
 
 The report contains per-scenario maximum/average scores, chaos-only session
 counts, time from chaos start to the first highest-scoring output, baseline and

@@ -1,0 +1,13 @@
+{
+  "status": "completed",
+  "started_at": "2026-01-01T00:00:00Z",
+  "chaos_steps": [
+    {
+      "chaos": [
+        "synthetic-demo-fault"
+      ],
+      "active_started_at": "2026-01-01T00:10:00Z",
+      "cleanup_started_at": "2026-01-01T00:20:00Z"
+    }
+  ]
+}

@@ -28,4 +28,4 @@ def test_deploy_and_build_scripts_are_guarded():
     deploy = (ROOT / "deploy.sh").read_text()
     assert "kubectl config current-context" in deploy
     assert "++++++++" in deploy
-    assert "stanleyyoga123/learning-agent:dev" in (ROOT / "build.sh").read_text()
+    assert 'image_ref "learning-agent"' in (ROOT / "build.sh").read_text()

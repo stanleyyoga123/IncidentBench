@@ -173,7 +173,7 @@ Scenario means weight each evaluable run equally; pooled session means weight ea
 
 Workload: `front-end`; namespace: `sock-shop`. 23 attempts; 23 selected scenario/run rows; 23 completed selected runs.
 
-Archives: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/results/sock-shop`. Grades: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/grades/sock-shop`.
+Archives: `results/sock-shop`. Grades: `grades/sock-shop`.
 
 ### Aggregate metrics (all selected runs)
 
@@ -386,7 +386,7 @@ Archives: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Gr
 
 Workload: `frontend`; namespace: `online-boutique`. 23 attempts; 21 selected scenario/run rows; 21 completed selected runs.
 
-Archives: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/results/online-boutique`. Grades: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/grades/online-boutique`.
+Archives: `results/online-boutique`. Grades: `grades/online-boutique`.
 
 ### Aggregate metrics (all selected runs)
 
@@ -587,7 +587,7 @@ Archives: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Gr
 
 Workload: `teastore-webui`; namespace: `teastore`. 23 attempts; 23 selected scenario/run rows; 21 completed selected runs.
 
-Archives: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/results/teastore`. Grades: `/Users/home/Universities/ResearchProject/Agents/EvaluationPlatform/Grader/grades/teastore`.
+Archives: `results/teastore`. Grades: `grades/teastore`.
 
 ### Aggregate metrics (all selected runs)
 

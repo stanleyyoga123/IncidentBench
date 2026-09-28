@@ -19,6 +19,14 @@ from eda.report_analysis import numeric_summaries
 APPLICATIONS = {'sock-shop': 'front-end', 'online-boutique': 'frontend', 'teastore': 'teastore-webui'}
 
 
+def display_source_path(path: Path) -> str:
+    """Describe an input without publishing a local machine's directory tree."""
+    try:
+        return path.resolve().relative_to(GRADER_ROOT).as_posix()
+    except ValueError:
+        return f'external input ({path.name})'
+
+
 def cell(value):
     if pd.isna(value):
         return 'Unknown'
@@ -46,7 +54,7 @@ def application_report(name, grades, archives, config):
     lines = [f'## {name}', f'Workload: `{config.workload}`; namespace: `{config.namespace}`. '
              f'{len(all_runs)} attempts; {len(scenarios)} selected scenario/run rows; '
              f'{int(scenarios.run_completed.sum())} completed selected runs.',
-             f'Archives: `{archives}`. Grades: `{grades}`.',
+             f'Archives: `{display_source_path(archives)}`. Grades: `{display_source_path(grades)}`.',
              '### Aggregate metrics (all selected runs)', table(totals, {'metric':'Metric','count':'Count','evaluable':'Evaluable denominator',
                                                    'percent_of_evaluable':'Percent of evaluable'})]
     for kind, title in [('rca', 'RCA'), ('remediation', 'Remediation')]:

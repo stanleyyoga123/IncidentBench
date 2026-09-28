@@ -49,11 +49,19 @@ on the first error. Each agent Deployment is restarted and awaited so mounted
 ConfigMaps and Secret environment changes are loaded, including namespace
 monitoring changes. Use it when evaluations and agent jobs are idle.
 
+Load the image settings used to build and push this version first:
+
 ```bash
+source deployment/image.env
 ./deploy.sh
 ```
 
-This applies the current local manifests and their image tags. Build/push images
+The required `IMAGE_REGISTRY` and `IMAGE_TAG` select the same first-party images
+for build and deployment. Copy `deployment/image.env.example` to ignored
+`deployment/image.env` and customize it. Workload manifests contain image markers;
+component deploy scripts replace only these markers in memory. Apply them through
+the scripts, not directly through `kubectl apply -f`.
+Build/push images
 with the individual component `build.sh` scripts beforehand when required.
 Platform initialization, database migrations, application/Runner deployment,
 and automatic rollback are outside this command's scope. If a component fails,

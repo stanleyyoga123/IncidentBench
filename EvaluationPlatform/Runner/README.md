@@ -217,3 +217,13 @@ its startup probe and 20 minutes for deployment progress. Runner reads each
 deployment's progress deadline and waits at least ten minutes, or that deadline
 plus 60 seconds when longer. Readiness checks still have to pass before baseline
 and chaos begin. Normal-profile probe settings are unchanged.
+
+## Container image
+
+Set `IMAGE_REGISTRY` and `IMAGE_TAG` before using this component's build or
+deploy script. For example, `IMAGE_REGISTRY=ghcr.io/my-org` and
+`IMAGE_TAG=v1.0.0` produce an image under that registry and tag. The build
+script pushes it; the deploy script renders the same reference into the
+first-party Kubernetes manifest before applying it. The checked-in
+`incidentbench.invalid/*:configure-me` reference is a non-pullable marker.
+Third-party images are unaffected.

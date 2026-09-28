@@ -131,6 +131,7 @@ explicit CLI overrides are supported. Ground truth is never generated during gra
 - [Visualizer](visualizer/README.md)
 - [Scenario metrics report notebook](eda/report.ipynb)
 - [Markdown report CLI](eda/README.md) — run `python eda/report.py` to generate `eda/report.md`.
+- [Offline synthetic reporting demo](eda/README.md#offline-demonstration) — renders a report and application chart from two small prepared examples without a judge or cluster. The example is not research data.
 - [Original exploratory notebook](eda/eda.ipynb)
 
 ## Scenario metrics notebook

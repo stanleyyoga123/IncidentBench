@@ -13,6 +13,8 @@ if (( $# != 0 )); then
 fi
 
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$ROOT/deployment/image_config.sh"
+validate_image_settings
 # Component scripts own their Secrets, ConfigMaps, RBAC, Services and workloads.
 components=(
   'Agents/MCPTools|mcp-tools-investigation mcp-tools-remediation'

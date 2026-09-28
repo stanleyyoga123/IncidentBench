@@ -6,6 +6,13 @@ if (( $# != 0 )); then
   exit 2
 fi
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd -- "$script_dir/../.." && pwd)"
+source "$root_dir/deployment/image_config.sh"
+validate_image_settings
+render_image_manifest "$script_dir/kubernetes/investigation.yaml" "mcp-tools" >/dev/null
+render_image_manifest "$script_dir/kubernetes/remediation.yaml" "mcp-tools" >/dev/null
+
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "Error: kubectl is required." >&2
   exit 1
@@ -17,7 +24,6 @@ if [[ -z "$context" ]]; then
   exit 1
 fi
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 secret_file="$script_dir/kubernetes/secret.yml"
 secret_example="$script_dir/kubernetes/secret.example.yml"
 
@@ -36,6 +42,7 @@ for namespace in agents utility; do
     exit 1
   fi
 done
+
 
 kubectl apply -f "$secret_file"
 kubectl apply -f "$script_dir/kubernetes/configmap.yaml"
@@ -71,8 +78,8 @@ for namespace in $application_namespaces; do
   fi
 done
 kubectl apply -f "$script_dir/kubernetes/network-probes.yaml"
-kubectl apply -f "$script_dir/kubernetes/investigation.yaml"
-kubectl apply -f "$script_dir/kubernetes/remediation.yaml"
+render_image_manifest "$script_dir/kubernetes/investigation.yaml" "mcp-tools" | kubectl apply -f -
+render_image_manifest "$script_dir/kubernetes/remediation.yaml" "mcp-tools" | kubectl apply -f -
 
 kubectl rollout status daemonset/mcp-tools-network-probe-overlay --namespace utility --timeout=5m
 kubectl rollout status daemonset/mcp-tools-network-probe-underlay --namespace utility --timeout=5m

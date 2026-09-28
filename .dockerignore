@@ -9,7 +9,9 @@ EvaluationPlatform/Runner/evaluation
 EvaluationPlatform/Runner/results
 
 **/kubernetes/secret.yml
+**/kubernetes/secret.yaml
 **/.env
+**/.env.*
 **/*.env
 **/inventory.ini
 **/vault.yml
@@ -17,3 +19,10 @@ EvaluationPlatform/Runner/results
 **/*.pem
 **/*.key
 **/kubeconfig*
+**/.vault-password
+**/.ipynb_checkpoint
+**/.ipynb_checkpoints
+EvaluationPlatform/Grader/results
+EvaluationPlatform/Grader/grades
+EvaluationPlatform/Grader/visualizations
+EvaluationPlatform/Grader/eda/exports

@@ -14,6 +14,8 @@ def fixture_workspace(tmp_path):
     root = tmp_path / 'workspace'
     root.mkdir()
     shutil.copyfile(WORKSPACE / 'deploy.sh', root / 'deploy.sh')
+    (root / 'deployment').mkdir()
+    shutil.copyfile(WORKSPACE / 'deployment/image_config.sh', root / 'deployment/image_config.sh')
     for component in COMPONENTS:
         folder = root / component
         (folder / 'kubernetes').mkdir(parents=True)
@@ -31,7 +33,13 @@ def fixture_workspace(tmp_path):
                        'if [[ "$*" == "config current-context" ]]; then echo test-cluster; fi\n')
     kubectl.chmod(0o755)
     log = tmp_path / 'commands'
-    env = {**os.environ, 'PATH': str(binary) + ':' + os.environ['PATH'], 'LOG': str(log)}
+    env = {
+        **os.environ,
+        'PATH': str(binary) + ':' + os.environ['PATH'],
+        'LOG': str(log),
+        'IMAGE_REGISTRY': 'registry.example.test/team',
+        'IMAGE_TAG': 'v1',
+    }
     return root, log, env
 
 
@@ -71,3 +79,25 @@ def test_component_failure_stops_later_deployments(tmp_path):
     assert 'deploy Agents/RemediatorAgent' not in lines
     assert 'deploy Agents/AnomalyDetector' not in lines
     assert 'No automatic rollback' in result.stderr
+
+
+@pytest.mark.parametrize(
+    'settings',
+    [
+        {'IMAGE_REGISTRY': '', 'IMAGE_TAG': 'v1'},
+        {'IMAGE_REGISTRY': 'registry.example.test/team', 'IMAGE_TAG': ''},
+        {'IMAGE_REGISTRY': 'registry.example.test/team;bad', 'IMAGE_TAG': 'v1'},
+        {'IMAGE_REGISTRY': 'registry.example.test/team', 'IMAGE_TAG': 'bad tag'},
+    ],
+)
+def test_invalid_image_settings_stop_before_kubectl_or_component_deploy(tmp_path, settings):
+    root, log, env = fixture_workspace(tmp_path)
+    env.update(settings)
+
+    result = subprocess.run(
+        ['bash', str(root / 'deploy.sh')], env=env, capture_output=True, text=True
+    )
+
+    assert result.returncode != 0
+    assert 'IMAGE_' in result.stderr
+    assert not log.exists()

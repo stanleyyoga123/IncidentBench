@@ -292,15 +292,15 @@ def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
         assert "--context" not in content
 
 
-def test_dev_images_use_docker_hub_and_always_pull():
+def test_first_party_images_require_configuration_and_always_pull():
     expected_images = {
-        "anomaly-detector": "stanleyyoga123/anomaly-detector:dev",
-        "agent-orchestrator": "stanleyyoga123/agent-orchestrator:dev",
-        "learning-agent": "stanleyyoga123/learning-agent:dev",
-        "rca-agent": "stanleyyoga123/rca-agent:dev",
-        "remediator-agent": "stanleyyoga123/remediator-agent:dev",
-        "mcp-tools-investigation": "stanleyyoga123/mcp-tools:dev",
-        "mcp-tools-remediation": "stanleyyoga123/mcp-tools:dev",
+        "anomaly-detector": "incidentbench.invalid/anomaly-detector:configure-me",
+        "agent-orchestrator": "incidentbench.invalid/agent-orchestrator:configure-me",
+        "learning-agent": "incidentbench.invalid/learning-agent:configure-me",
+        "rca-agent": "incidentbench.invalid/rca-agent:configure-me",
+        "remediator-agent": "incidentbench.invalid/remediator-agent:configure-me",
+        "mcp-tools-investigation": "incidentbench.invalid/mcp-tools:configure-me",
+        "mcp-tools-remediation": "incidentbench.invalid/mcp-tools:configure-me",
     }
     for name, image in expected_images.items():
         container = resources("Deployment")[name]["spec"]["template"]["spec"][

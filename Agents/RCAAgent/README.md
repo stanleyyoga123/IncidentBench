@@ -28,3 +28,13 @@ Generated final text is saved through Orchestrator's authenticated job-output
 endpoint before parsing or verification. Failed jobs retain `raw_output` in
 session exports; Remediator also retains its parsed `result` when recovery
 verification fails. Failure status remains separate from generated claims.
+
+## Container image
+
+Set `IMAGE_REGISTRY` and `IMAGE_TAG` before using this component's build or
+deploy script. For example, `IMAGE_REGISTRY=ghcr.io/my-org` and
+`IMAGE_TAG=v1.0.0` produce an image under that registry and tag. The build
+script pushes it; the deploy script renders the same reference into the
+first-party Kubernetes manifest before applying it. The checked-in
+`incidentbench.invalid/*:configure-me` reference is a non-pullable marker.
+Third-party images are unaffected.
