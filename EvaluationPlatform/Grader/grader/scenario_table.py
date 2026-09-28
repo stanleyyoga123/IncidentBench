@@ -21,12 +21,8 @@ COLUMNS = (
     ('remediation_sessions', 'Number of Remediation sessions'),
     ('mean_rca_score', 'Avg whole RCA job score'),
     ('mean_remediation_score', 'Avg whole Remediation job score'),
-    ('worst_p95_seconds', 'Worst rolling window p95 response time (s)'),
-    ('worst_5xx_rps', 'Worst rolling window 5xx rate (requests/s)'),
-    ('worst_window_location', 'Worst window location'),
     ('baseline_5xx_imputed_samples', 'Baseline 5xx imputed samples'),
     ('best_5xx_imputed_samples', 'Best window 5xx imputed samples'),
-    ('worst_5xx_imputed_samples', 'Worst window 5xx imputed samples'),
 )
 
 
@@ -45,7 +41,6 @@ def table_row(grade):
     paired = grade.get('paired_window') or {}
     baseline = paired.get('baseline') or {}
     best = paired.get('best') or {}
-    worst = paired.get('worst') or {}
     rca = score_summary(grade.get('rca_jobs') or [])
     remediation = score_summary(grade.get('remediation_jobs') or [])
     return {
@@ -55,18 +50,15 @@ def table_row(grade):
         'baseline_5xx_rps': baseline.get('http_5xx_rps'),
         'best_p95_seconds': best.get('p95_seconds'), 'best_5xx_rps': best.get('http_5xx_rps'),
         'window_location': f"{best['start']} → {best['end']}" if best else None,
-        'worst_p95_seconds': worst.get('p95_seconds'), 'worst_5xx_rps': worst.get('http_5xx_rps'),
-        'worst_window_location': f"{worst['start']} → {worst['end']}" if worst else None,
         'baseline_5xx_imputed_samples': baseline.get('http_5xx_imputed_samples', 0),
         'best_5xx_imputed_samples': best.get('http_5xx_imputed_samples', 0),
-        'worst_5xx_imputed_samples': worst.get('http_5xx_imputed_samples', 0),
         'rca_sessions': rca['count'], 'remediation_sessions': remediation['count'],
         'mean_rca_score': rca['mean'], 'mean_remediation_score': remediation['mean'],
     }
 
 
 def write_scenario_table(output, grades, *, csv_only=False):
-    """Write the original 12 columns plus paired worst-window values; keep denominators and provenance alongside."""
+    """Write paired baseline and best-window values with denominators and provenance."""
     output.mkdir(parents=True, exist_ok=True)
     rows = [table_row(grade) for grade in grades]
     with (output / 'scenario_table.csv').open('w', newline='', encoding='utf-8') as handle:
@@ -81,8 +73,8 @@ def write_scenario_table(output, grades, *, csv_only=False):
         'Session counts include outputs completed during recorded chaos intervals; excluded exports remain in grade.json with time_scope reasons. Scored counts are recorded in scenario_table.json.',
         'P95 is a time average of archived rolling P95 samples, not a pooled request percentile. HTTP 5xx is requests/second, not a percentage.',
         'Baseline excludes its initial five minutes by default, configurable with --baseline-ignore-minutes. Missing baseline values do not suppress covered chaos windows.',
-        'Best minimizes mean P95 subject to the configured 5xx ceiling. Worst maximizes mean P95 over all covered windows, without that ceiling. Ties use earliest time.',
-        'Each pair of best/worst-window metrics come from the same complete window within one recorded chaos interval, before cleanup. These descriptive measurements do not change recovery scoring.',
+        'Best minimizes mean P95 subject to the configured 5xx ceiling. Ties use earliest time.',
+        'Best-window P95 and 5xx come from the same complete window within one recorded chaos interval, before cleanup. These descriptive measurements do not change recovery scoring.',
     ]
     def cell(value):
         if value is None:
@@ -97,7 +89,17 @@ def write_scenario_table(output, grades, *, csv_only=False):
     lines += ['', '## Measurement provenance', '']
     provenance = []
     for grade, row in zip(grades, rows):
-        paired = grade.get('paired_window') or {}
+        paired = dict(grade.get('paired_window') or {})
+        paired.pop('worst', None)
+        paired.pop('worst_selection', None)
+        description = paired.get('description')
+        if isinstance(description, str):
+            paired['description'] = description.replace('; worst is highest mean P95 without 5xx ceiling', '')
+        reason = paired.get('reason')
+        if reason == 'No covered window meets the mean 5xx-rate threshold; worst window remains available.':
+            paired['reason'] = 'No covered window meets the mean 5xx-rate threshold.'
+            if paired.get('best') is None:
+                paired['status'] = 'not_evaluable'
         provenance.append({'run': grade['run'], 'row': row, 'paired_window': paired,
                            'rca': score_summary(grade.get('rca_jobs') or []),
                            'remediation': score_summary(grade.get('remediation_jobs') or [])})

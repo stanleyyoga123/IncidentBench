@@ -81,7 +81,7 @@ def compare_windows(root, window_minutes=5.0):
     result = {'schema_version': 1, 'status': 'not_evaluable', 'window_seconds': duration,
               'minimum_coverage': .9, 'baseline': None, 'chaos_intervals': [], 'rows': [],
               'limitations': [
-                  'Best/worst are independent per metric and workload; ties select the earliest window. Lower is better for these metrics; low traffic can also lower error rates.',
+                  'Best is selected independently per metric and workload; ties select the earliest window. Lower is better for these metrics; low traffic can also lower error rates.',
                   'P95 values are time averages of archived per-service rolling P95 estimates, not pooled request percentiles. HTTP 5xx rate is requests/s, not a failure percentage.',
                   'Client mean is estimated from differences of cumulative count times cumulative mean. CSV rounding affects it; it assumes every counted request has a response time (Locust CSV omits the missing-response-time count).',
                   'Missing HTTP 5xx samples are imputed as zero only at recorded traffic timestamps; imputed counts are disclosed. This is an analysis assumption, not a measured zero.',
@@ -117,13 +117,12 @@ def compare_windows(root, window_minutes=5.0):
                     measurements.append({**item, 'start': timestamp(start), 'end': timestamp(end)})
             row = {'metric': metric, 'label': label, 'unit': unit, 'namespace': namespace,
                    'workload': workload, 'baseline': baseline, 'eligible_windows': len(measurements),
-                   'best': None, 'worst': None}
+                   'best': None}
             if baseline['value'] is not None and measurements:
-                for kind, select in [('best', min), ('worst', max)]:
-                    chosen = dict(select(measurements, key=lambda x: x['value']))
-                    chosen['absolute_change'] = chosen['value'] - baseline['value']
-                    chosen['relative_change'] = chosen['absolute_change'] / baseline['value'] if baseline['value'] else None
-                    row[kind] = chosen
+                chosen = dict(min(measurements, key=lambda x: x['value']))
+                chosen['absolute_change'] = chosen['value'] - baseline['value']
+                chosen['relative_change'] = chosen['absolute_change'] / baseline['value'] if baseline['value'] else None
+                row['best'] = chosen
             result['rows'].append(row)
 
         for metric, (label, unit) in METRICS.items():
@@ -186,15 +185,17 @@ def markdown(comparison):
     lines += ['| Metric / workload | Unit | Baseline | Window | Value | Change | Change % | UTC start → end | Coverage |',
               '| --- | --- | ---: | --- | ---: | ---: | ---: | --- | ---: |']
     for row in comparison['rows']:
-        for kind in ('best', 'worst'):
-            item = row[kind] or {}
-            change = item.get('relative_change')
-            identity = '/'.join(x for x in [row['namespace'], row['workload']] if x)
-            cells = [f"{row['label']} / {identity}", row['unit'], fmt(row['baseline']['value']), kind,
-                     fmt(item.get('value')), fmt(item.get('absolute_change')), fmt(change * 100 if change is not None else None),
-                     f"{item.get('start', 'unknown')} → {item.get('end', 'unknown')}", fmt(item.get('coverage'))]
-            lines.append('| ' + ' | '.join(str(c).replace('|', '\\|') for c in cells) + ' |')
-    return '\n'.join(lines + ['', *['- ' + s for s in comparison['limitations']], ''])
+        item = row.get('best') or {}
+        change = item.get('relative_change')
+        identity = '/'.join(x for x in [row['namespace'], row['workload']] if x)
+        cells = [f"{row['label']} / {identity}", row['unit'], fmt(row['baseline']['value']), 'best',
+                 fmt(item.get('value')), fmt(item.get('absolute_change')), fmt(change * 100 if change is not None else None),
+                 f"{item.get('start', 'unknown')} → {item.get('end', 'unknown')}", fmt(item.get('coverage'))]
+        lines.append('| ' + ' | '.join(str(c).replace('|', '\\|') for c in cells) + ' |')
+    limitations = [s.replace('Best/worst are independent per metric and workload',
+                             'Best is selected independently per metric and workload')
+                   for s in comparison['limitations']]
+    return '\n'.join(lines + ['', *['- ' + s for s in limitations], ''])
 
 
 def write_comparisons(output, grades):
@@ -205,17 +206,16 @@ def write_comparisons(output, grades):
         with path.open('a') as handle:
             handle.write('\n' + markdown(comparison))
         for row in comparison['rows']:
-            for kind in ('best', 'worst'):
-                item = row[kind] or {}
-                rows.append({'run': grade['run'], 'metric': row['metric'], 'namespace': row['namespace'],
-                             'workload': row['workload'], 'unit': row['unit'], 'window_seconds': comparison['window_seconds'],
-                             'baseline_start': comparison['baseline']['start'], 'baseline_end': comparison['baseline']['end'],
-                             'baseline': row['baseline']['value'], 'baseline_coverage': row['baseline']['coverage'],
-                             'missing_value_policy': 'zero_at_recorded_traffic_timestamps' if row['metric'] == 'http_5xx_rate' else 'no_imputation',
-                             'baseline_imputed_samples': row['baseline'].get('imputed_samples', 0),
-                             'window_imputed_samples': item.get('imputed_samples', 0),
-                             'selection': kind, 'eligible_windows': row['eligible_windows'],
-                             **{k: item.get(k) for k in ('start', 'end', 'value', 'absolute_change', 'relative_change', 'coverage')}})
+            item = row.get('best') or {}
+            rows.append({'run': grade['run'], 'metric': row['metric'], 'namespace': row['namespace'],
+                         'workload': row['workload'], 'unit': row['unit'], 'window_seconds': comparison['window_seconds'],
+                         'baseline_start': comparison['baseline']['start'], 'baseline_end': comparison['baseline']['end'],
+                         'baseline': row['baseline']['value'], 'baseline_coverage': row['baseline']['coverage'],
+                         'missing_value_policy': 'zero_at_recorded_traffic_timestamps' if row['metric'] == 'http_5xx_rate' else 'no_imputation',
+                         'baseline_imputed_samples': row['baseline'].get('imputed_samples', 0),
+                         'window_imputed_samples': item.get('imputed_samples', 0),
+                         'selection': 'best', 'eligible_windows': row['eligible_windows'],
+                         **{k: item.get(k) for k in ('start', 'end', 'value', 'absolute_change', 'relative_change', 'coverage')}})
     csv_output = output / 'csvs'
     csv_output.mkdir(parents=True, exist_ok=True)
     fields = ['run', 'metric', 'namespace', 'workload', 'unit', 'window_seconds',
@@ -241,9 +241,8 @@ def paired_frontend_window(root, comparison, workload='front-end', namespace=Non
         'minimum_coverage': .9, 'max_5xx_rate': max_5xx_rate,
         'http_5xx_missing_value_policy': 'zero_at_recorded_traffic_timestamps',
         'selection': 'lowest_p95_with_5xx_at_or_below_threshold_then_earliest',
-        'namespace': namespace, 'workload': workload, 'baseline': None, 'best': None, 'worst': None,
+        'namespace': namespace, 'workload': workload, 'baseline': None, 'best': None,
         'baseline_ignore_minutes': baseline_ignore_minutes,
-        'worst_selection': 'highest_p95_across_all_covered_windows_then_earliest',
         'candidate_windows': 0, 'covered_windows': 0, 'eligible_windows': 0,
         'description': f'{namespace + "/" if namespace else ""}{workload}; {duration / 60:g}-minute windows; '
                        f'mean 5xx <= {max_5xx_rate:g} requests/s; lowest mean P95, earliest tie',
@@ -274,7 +273,7 @@ def paired_frontend_window(root, comparison, workload='front-end', namespace=Non
             raise ValueError('front-end workload is missing or ambiguous; specify table namespace/workload')
         key = next(iter(identities))
         result['namespace'] = key[0]
-        result['description'] = f'{key[0]}/{key[1]}; {duration / 60:g}-minute windows; mean 5xx <= {max_5xx_rate:g} requests/s; lowest mean P95, earliest tie; worst is highest mean P95 without 5xx ceiling; baseline ignores first {baseline_ignore_minutes:g} minutes'
+        result['description'] = f'{key[0]}/{key[1]}; {duration / 60:g}-minute windows; mean 5xx <= {max_5xx_rate:g} requests/s; lowest mean P95, earliest tie; baseline ignores first {baseline_ignore_minutes:g} minutes'
         samples = {name: data.get(key, []) for name, data in series.items()}
         times = {name: [t for t, _ in values] for name, values in samples.items()}
 
@@ -307,8 +306,6 @@ def paired_frontend_window(root, comparison, workload='front-end', namespace=Non
             if item['p95_seconds'] is None or item['http_5xx_rps'] is None:
                 continue
             result['covered_windows'] += 1
-            if result['worst'] is None or item['p95_seconds'] > result['worst']['p95_seconds']:
-                result['worst'] = item
             if item['http_5xx_rps'] > max_5xx_rate:
                 continue
             result['eligible_windows'] += 1
@@ -321,8 +318,7 @@ def paired_frontend_window(root, comparison, workload='front-end', namespace=Non
         elif not result['covered_windows']:
             result['reason'] = 'No window has sufficient coverage for both P95 and 5xx.'
         else:
-            result['status'] = 'partially_evaluable'
-            result['reason'] = 'No covered window meets the mean 5xx-rate threshold; worst window remains available.'
+            result['reason'] = 'No covered window meets the mean 5xx-rate threshold.'
     except (ValueError, TypeError, KeyError, OSError, AttributeError) as exc:
         result['reason'] = str(exc)
     return result

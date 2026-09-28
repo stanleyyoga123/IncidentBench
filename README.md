@@ -106,7 +106,7 @@ IncidentBench reports three complementary views:
 | View | What it measures |
 | --- | --- |
 | Agent-output quality | RCA and remediation reports scored against scenario-specific expectations, with remediation penalties and explicit unscored outputs. |
-| Application performance | Baseline versus paired best/worst chaos windows, including latency, HTTP 5xx rates, and tolerance outcomes. |
+| Application performance | Baseline versus the selected best chaos window, including latency, HTTP 5xx rate, and tolerance outcome. |
 | Service recovery proxy | Sustained latency, reliability, and throughput behavior derived from archived measurements under a separate recovery policy. |
 
 A successful agent job or high semantic score does not establish that a change

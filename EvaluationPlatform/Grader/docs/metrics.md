@@ -9,8 +9,8 @@ The CLI currently writes five CSV files under `<output>/csvs/`, plus per-run
 
 | Output | Unit of reporting | Contents |
 | --- | --- | --- |
-| `scenario_table.csv` | One archived run | 18 columns: scenario, score maxima/means, session counts, trimmed-baseline and paired best/worst P95/5xx, UTC window locations, imputation counts |
-| `window_comparison.csv` | Run × metric × workload × best/worst selection | Full-baseline client mean estimate or service P95/5xx, independently selected windows, changes, coverage and imputation counts |
+| `scenario_table.csv` | One archived run | 14 columns: scenario, score maxima/means, session counts, trimmed-baseline and paired best P95/5xx, UTC window location, imputation counts |
+| `window_comparison.csv` | Run × metric × workload × best selection | Full-baseline client mean estimate or service P95/5xx, independently selected windows, changes, coverage and imputation counts |
 | `rca_rubric_score.csv` | One RCA job | Status, `is_failed`, alignment, five criterion classes/scores and weighted total |
 | `remediation_rubric_score.csv` | One remediation job | Status, `is_failed`, alignment, five criterion classes/scores, rubric total, penalties and final total |
 | `summary.csv` | One exported job | Identity, methodology/policy, status, semantic score/alignment and compatibility fields |
@@ -25,9 +25,9 @@ repeated scenario names must be distinguished using per-run JSON/directories.
 
 | Measurement | Baseline used | Chaos/incident selection |
 | --- | --- | --- |
-| Independent `window_comparison` | Full recorded baseline | Lowest/highest value independently for each metric and workload |
-| Paired `scenario_table` / `paired_window` | Recorded baseline excluding first 5 minutes by default | Best: lowest P95 with 5xx ≤0.5 requests/s; worst: highest P95 with no error ceiling; each P95/5xx pair shares one window |
-| `research.operational` recovery proxy | Last 5 minutes of baseline by default, from evaluation policy | Sustained qualifying 30-second bins after observed degradation; not best/worst selection |
+| Independent `window_comparison` | Full recorded baseline | Lowest covered value independently for each metric and workload |
+| Paired `scenario_table` / `paired_window` | Recorded baseline excluding first 5 minutes by default | Lowest P95 with 5xx ≤0.5 requests/s; paired P95/5xx values share one window |
+| `research.operational` recovery proxy | Last 5 minutes of baseline by default, from evaluation policy | Sustained qualifying 30-second bins after observed degradation; separate from descriptive window selection |
 
 `--baseline-ignore-minutes` affects only the paired table. It does not change
 independent comparisons or recovery policy. `--comparison-window-minutes`
@@ -367,7 +367,7 @@ and 90% coverage are required. Gaps are not interpolated. Rolling source queries
 can contain observations from before the selected boundary.
 
 The independent comparison requires an evaluable baseline before selecting a
-metric's best/worst windows. The paired table can retain covered chaos windows
+metric's best window. The paired table can retain covered chaos windows
 even when its trimmed baseline is unavailable. Paired windows require both P95
 and 5xx coverage. Defaults are `--table-workload front-end` and
 `--table-max-5xx-rate 0.5`; use `--table-namespace` when the workload is ambiguous.
@@ -382,7 +382,7 @@ nonfinite samples, traffic gaps, latency and semantic scores are not filled.
 
 `window_comparison.csv` records `missing_value_policy`,
 `baseline_imputed_samples`, and `window_imputed_samples`. The scenario table
-records baseline/best/worst imputed-sample counts. Per-run JSON retains policy
+records baseline/best imputed-sample counts. Per-run JSON retains policy
 and coverage. Recovery calculations continue to use raw evidence.
 
 ## Archive recovery proxy: per-run JSON

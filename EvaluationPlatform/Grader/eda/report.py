@@ -65,19 +65,17 @@ def application_report(name, grades, archives, config):
         lines += [f'### {title} metrics per scenario', table(scenarios, columns)]
     lines += ['### Baseline reference', table(scenarios, {'scenario':'Scenario','baseline_p95_seconds':'P95 (s)',
                                                        'baseline_5xx_rps':'5xx (requests/s)'})]
-    for kind in ('best', 'worst'):
-        columns = {'scenario':'Scenario', f'{kind}_p95_seconds':'P95 (s)',
-                   f'{kind}_p95_seconds_difference':'P95 difference (s)',
-                   f'{kind}_p95_seconds_change_percent':'P95 change (%)',
-                   f'{kind}_5xx_rps':'5xx (requests/s)', f'{kind}_5xx_rps_difference':'5xx difference (requests/s)',
-                   f'{kind}_5xx_rps_change_percent':'5xx change (%)', f'{kind}_holistic_pass':'Within tolerance'}
-        lines += [f'### {kind.title()} rolling window versus baseline', table(scenarios, columns)]
+    columns = {'scenario':'Scenario', 'best_p95_seconds':'P95 (s)',
+               'best_p95_seconds_difference':'P95 difference (s)',
+               'best_p95_seconds_change_percent':'P95 change (%)',
+               'best_5xx_rps':'5xx (requests/s)', 'best_5xx_rps_difference':'5xx difference (requests/s)',
+               'best_5xx_rps_change_percent':'5xx change (%)', 'best_holistic_pass':'Within tolerance'}
+    lines += ['### Best rolling window versus baseline', table(scenarios, columns)]
     lines += ['### Window evidence and missing data', table(scenarios, {
         'scenario':'Scenario','window_status':'Window status','window_reason':'Reason',
         'best_window_start':'Best start (UTC)','best_window_end':'Best end (UTC)',
-        'worst_window_start':'Worst start (UTC)','worst_window_end':'Worst end (UTC)',
         'baseline_5xx_imputed_samples':'Baseline imputed 5xx samples',
-        'best_5xx_imputed_samples':'Best imputed 5xx samples','worst_5xx_imputed_samples':'Worst imputed 5xx samples'}),
+        'best_5xx_imputed_samples':'Best imputed 5xx samples'}),
         '### Attempts and exclusions', table(all_runs, {
             'scenario':'Scenario','run':'Run','selected':'Selected','archive_status':'Run status',
             'grade_status':'Grade status','time_scope_status':'Chaos boundaries',
@@ -94,8 +92,7 @@ def comparison_chart(summaries, path=None):
     apps = sorted(app for app in metrics.Application.drop_duplicates() if app != 'Pooled total')
     labels = [('Scenarios/runs with successful RCA', 'RCA scenario'),
               ('Scenarios/runs with successful REMEDIATION', 'Remediation scenario'),
-              ('Holistic performance within tolerance (best window)', 'Best window'),
-              ('Holistic performance within tolerance (worst window)', 'Worst window')]
+              ('Holistic performance within tolerance (best window)', 'Best window')]
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
     colors = ['#2878a8', '#c35b43', '#41966d']
     for ax, group in zip(axes, (labels[:2], labels[2:])):
@@ -152,7 +149,7 @@ def main(argv=None):
              '- Only outputs completed within recorded chaos intervals contribute to scores, counts and timing. Missing boundaries/timestamps are excluded.\n'
              '- Time to first good output means earliest completion among the highest-scoring outputs, measured from recorded chaos start.\n'
              '- Differences are window minus baseline; negative means a decrease. Percentage changes are unknown for zero baselines.\n'
-             '- Best minimizes P95 among windows satisfying the 5xx ceiling; worst maximizes P95 without that ceiling. P95 and 5xx share the selected window.\n'
+             '- Best minimizes P95 among windows satisfying the 5xx ceiling. P95 and 5xx share the selected window; a favorable window does not establish sustained recovery.\n'
              '- P95 is a time average of archived rolling percentiles. Missing 5xx samples may be imputed at recorded traffic timestamps; counts are disclosed.\n'
              '- Holistic totals include completed, evaluable runs only. Unknown values are never zero or success. Session and scenario totals have separate denominators.\n'
              '- This script reads existing grades and recomputes performance offline. Missing grades leave semantic scores unknown; no model calls occur.\n'

@@ -69,7 +69,7 @@ the checked-in `report.md` is a curated example from the local research run.
 
 The report contains per-scenario maximum/average scores, chaos-only session
 counts, time from chaos start to the first highest-scoring output, baseline and
-best/worst P95 and 5xx values and differences, aggregate success counts, and
+best-window P95 and 5xx values and differences, aggregate success counts, and
 attempt/coverage/exclusion details. By default it selects the latest completed
 attempt for each scenario, falling back to the latest attempt when none completed.
 The completed-run analysis reproduces the numeric summary families in

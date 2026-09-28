@@ -78,15 +78,12 @@ def numeric_summaries(all_runs: pd.DataFrame, selected: pd.DataFrame,
                                  "Time max": times.max()})
         performance_rows.append({"Application": application,
                                  "Best tolerance": ratio(runs.best_holistic_pass),
-                                 "Worst tolerance": ratio(runs.worst_holistic_pass),
                                  "Median best P95 change (%)": median_or_nan(runs.best_p95_seconds_change_percent),
-                                 "Median worst P95 change (%)": median_or_nan(runs.worst_p95_seconds_change_percent),
-                                 "Best P95 n": runs.best_p95_seconds_change_percent.count(),
-                                 "Worst P95 n": runs.worst_p95_seconds_change_percent.count()})
+                                 "Best P95 n": runs.best_p95_seconds_change_percent.count()})
     completed['Family'] = completed.scenario.map(fault_family)
     outcomes = {'RCA success': 'rca_has_successful_output',
                 'Remediation success': 'remediation_has_successful_output',
-                'Best tolerance': 'best_holistic_pass', 'Worst tolerance': 'worst_holistic_pass'}
+                'Best tolerance': 'best_holistic_pass'}
     family_rows = []
     for keys, frame in completed.groupby(['Family', 'application'], sort=False):
         family, application = keys
@@ -141,11 +138,8 @@ def numeric_summaries(all_runs: pd.DataFrame, selected: pd.DataFrame,
         performance.loc[len(performance)] = {
             'Application': 'Pooled total',
             'Best tolerance': ratio(completed.best_holistic_pass),
-            'Worst tolerance': ratio(completed.worst_holistic_pass),
             'Median best P95 change (%)': median_or_nan(completed.best_p95_seconds_change_percent),
-            'Median worst P95 change (%)': median_or_nan(completed.worst_p95_seconds_change_percent),
             'Best P95 n': completed.best_p95_seconds_change_percent.count(),
-            'Worst P95 n': completed.worst_p95_seconds_change_percent.count(),
         }
     return {"cohort": cohort, "semantic": semantic,
             "scores": pd.DataFrame(score_rows), "sessions": pd.DataFrame(session_rows),

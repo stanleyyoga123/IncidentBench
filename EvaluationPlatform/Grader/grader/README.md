@@ -187,7 +187,7 @@ csvs/scenario_table.csv
 
 The three job CSVs preserve `status` and `is_failed`. Remediation totals include
 `rubric_score` and `penalty_total`. The scenario CSV has per-run session summaries
-and paired best/worst front-end metrics. Window CSVs disclose zero-imputation
+and paired best front-end metrics. Window CSVs disclose zero-imputation
 counts. Empty input still writes all five CSV headers.
 
 Aggregate Markdown, paper metrics, research-summary and incident files are no
@@ -235,18 +235,18 @@ job lists and an explicit reason.
 
 ### Sliding comparisons
 
-`--comparison-window-minutes 5` configures baseline versus best/worst scheduled-chaos
+`--comparison-window-minutes 5` configures baseline versus best scheduled-chaos
 window comparisons (default five minutes), including in `--operational-only` mode.
-See the [component guide](../README.md#baseline-versus-bestworst-chaos-windows) for
+See the [component guide](../README.md#baseline-versus-best-chaos-windows) for
 metric definitions, missing-data handling, and `window_comparison.csv` fields.
 
 ## Paired scenario table
 
-Each grading run writes `csvs/scenario_table.csv` with 18 columns: scenario;
+Each grading run writes `csvs/scenario_table.csv` with 14 columns: scenario;
 maximum RCA/remediation scores; baseline P95 and 5xx; best-window P95, 5xx and
-UTC location; RCA/remediation session counts; mean RCA/remediation scores;
-worst-window P95, 5xx and UTC location; and baseline/best/worst 5xx imputation
-counts. See the [metric reference](../docs/metrics.md) for definitions.
+UTC location; RCA/remediation session counts; mean RCA/remediation scores; and
+baseline/best 5xx imputation counts. See the [metric reference](../docs/metrics.md)
+for definitions.
 
 The default workload is `front-end`. Use `--table-workload NAME` for another
 entry point and `--table-namespace NAME` if the name occurs in multiple namespaces.
@@ -266,10 +266,9 @@ boundaries are used rather than assuming every archive lasts exactly one hour.
 
 - **Best:** lowest mean P95 among windows with mean 5xx <= 0.5 requests/s;
   override the ceiling with `--table-max-5xx-rate`.
-- **Worst:** highest mean P95 among all covered windows, without a 5xx ceiling.
-- Both selections break ties by earliest time. Each selected P95/5xx pair uses
-  exactly the same window. If no window meets the best threshold, worst may
-  still be available.
+- Ties select the earliest window. The selected P95 and 5xx values use
+  exactly the same window. If no window meets the error ceiling, the best
+  window is unavailable.
 
 P95 is the time mean of archived rolling workload P95 estimates, not a pooled
 client percentile. HTTP 5xx is requests/s, not a percentage. Each reported metric

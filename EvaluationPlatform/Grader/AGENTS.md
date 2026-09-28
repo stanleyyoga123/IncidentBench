@@ -57,8 +57,8 @@ still describe the full upstream repository; resolve local paths from this root.
    Keep denominators and measurement bases explicit. Runs, not jobs or scrape
    samples, are the experimental reporting units.
 7. Sliding comparisons use the full recorded baseline and complete windows within
-   individual recorded chaos intervals, before cleanup. Select best/worst per
-   metric and workload, preserve coverage checks and earliest-time tie breaking,
+   individual recorded chaos intervals, before cleanup. Select the lowest covered
+   value per metric and workload, preserve coverage checks and earliest-time tie breaking,
    and keep these descriptive comparisons separate from recovery scoring.
 8. Succeeded and failed jobs with non-empty final `result` objects receive semantic
    judging. Preserve original status; running, result-less and judge-failed jobs

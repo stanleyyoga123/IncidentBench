@@ -185,9 +185,8 @@ completion, not verified recovery. Legacy per-job metric/final-grade fields stay
 
 ## Paired front-end scenario table
 
-`csvs/scenario_table.csv` contains 18 columns: the twelve scenario/score/baseline/best-window/session fields,
-three worst-window fields (P95, paired 5xx, UTC location), and three 5xx
-imputation counts. Each row is one
+`csvs/scenario_table.csv` contains 14 columns: the twelve scenario/score/baseline/best-window/session fields
+and two 5xx imputation counts. Each row is one
 archived run, with maximum and mean scored-job outputs and exported session
 counts. Failed jobs with scores are included; remediation totals include
 penalties. Missing/judge-failed scores are excluded from means, not replaced with
@@ -206,16 +205,20 @@ windows by default at the recorded scrape step. No window crosses idle gaps or
 cleanup boundaries. Remediation/RCA job timing never restricts these windows.
 For a one-hour interval and 15-second step there are 221 candidate windows.
 Both metrics must meet coverage in the same window. Best is minimum mean P95
-subject to mean 5xx <= 0.5 requests/s. Worst is maximum mean P95 across all covered
-windows, without the ceiling; it can remain available when best is unknown.
-Ties select earliest time. Record both metric values at each selected location.
+subject to mean 5xx <= 0.5 requests/s. If covered candidates exist but none
+meets that ceiling, `paired_window.status` remains `not_evaluable` and the best
+measurement is unavailable. With a valid positive baseline, the EDA counts this
+as a known Best-Window Tolerance failure; without that baseline, tolerance is
+unknown. Ties select earliest time. Both metric values are recorded at the
+selected location.
 
 Baseline eligibility does not gate chaos-window selection. An empty trimmed
 baseline or missing baseline 5xx leaves that baseline value unknown but preserves
-valid best/worst chaos measurements. `paired_window` records the exclusion,
-threshold, boundaries, selection rules, coverage and unknown reasons. This
-additive report preserves schema 2, recovery scoring and the older independent
-per-workload full-baseline comparisons.
+valid best chaos measurements. `paired_window` records the exclusion,
+threshold, boundaries, selection rules, coverage and unknown reasons. The report
+preserves schema 2 and recovery scoring. New outputs omit the retired window
+fields; older schema-2 grades remain readable, with those fields ignored by
+current analysis.
 
 ## Notebook output contract and explicit 5xx imputation
 

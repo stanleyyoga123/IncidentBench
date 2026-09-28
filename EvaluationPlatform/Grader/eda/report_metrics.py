@@ -97,22 +97,21 @@ def performance(paired, config):
               "window_seconds": paired.get("window_seconds"),
               "workload": paired.get("workload"), "namespace": paired.get("namespace"),
               "baseline_start": baseline.get("start"), "baseline_end": baseline.get("end")}
-    for kind in ("best", "worst"):
-        window = paired.get(kind) or {}
-        for source, suffix in (("p95_seconds", "p95_seconds"), ("http_5xx_rps", "5xx_rps"),
-                               ("start", "window_start"), ("end", "window_end"),
-                               ("http_5xx_imputed_samples", "5xx_imputed_samples"),
-                               ("p95_coverage", "p95_coverage"), ("http_5xx_coverage", "5xx_coverage")):
-            result[f"{kind}_{suffix}"] = window.get(source)
-        for metric, source in (("p95_seconds", "p95_seconds"), ("5xx_rps", "http_5xx_rps")):
-            before, after = baseline.get(source), window.get(source)
-            delta = after - before if finite(before) and finite(after) else None
-            fraction = delta / before if delta is not None and before > 0 else None
-            result[f"{kind}_{metric}_difference"] = delta
-            result[f"{kind}_{metric}_change_percent"] = 100 * fraction if fraction is not None else None
-        before, after, errors = baseline.get("p95_seconds"), window.get("p95_seconds"), window.get("http_5xx_rps")
-        assessable = finite(before) and before > 0 and finite(after) and finite(errors)
-        result[f"{kind}_holistic_pass"] = bool(after < before * (1 + config.p95_change_limit) and errors <= config.max_5xx_rps) if assessable else None
+    window = paired.get("best") or {}
+    for source, suffix in (("p95_seconds", "p95_seconds"), ("http_5xx_rps", "5xx_rps"),
+                           ("start", "window_start"), ("end", "window_end"),
+                           ("http_5xx_imputed_samples", "5xx_imputed_samples"),
+                           ("p95_coverage", "p95_coverage"), ("http_5xx_coverage", "5xx_coverage")):
+        result[f"best_{suffix}"] = window.get(source)
+    for metric, source in (("p95_seconds", "p95_seconds"), ("5xx_rps", "http_5xx_rps")):
+        before, after = baseline.get(source), window.get(source)
+        delta = after - before if finite(before) and finite(after) else None
+        fraction = delta / before if delta is not None and before > 0 else None
+        result[f"best_{metric}_difference"] = delta
+        result[f"best_{metric}_change_percent"] = 100 * fraction if fraction is not None else None
+    before, after, errors = baseline.get("p95_seconds"), window.get("p95_seconds"), window.get("http_5xx_rps")
+    assessable = finite(before) and before > 0 and finite(after) and finite(errors)
+    result["best_holistic_pass"] = bool(after < before * (1 + config.p95_change_limit) and errors <= config.max_5xx_rps) if assessable else None
     # Covered candidates rejected by the 5xx ceiling are known failures, not
     # missing evidence. Otherwise the aggregate denominator would be biased.
     if (not paired.get('best') and paired.get('covered_windows', 0) > 0
@@ -226,10 +225,9 @@ def aggregate_report(selected, jobs, config):
         ]:
             rows.append({'metric':label,'count':numerator,'evaluable':denominator,
                          'percent_of_evaluable':100*numerator/denominator if denominator else None})
-    for kind in ('best','worst'):
-        completed = selected[selected['run_completed']]
-        flags = completed[kind+'_holistic_pass'].dropna()
-        rows.append({'metric':f'Holistic performance within tolerance ({kind} window)',
-                     'count':int(flags.astype(bool).sum()),'evaluable':len(flags),
-                     'percent_of_evaluable':100*flags.astype(bool).sum()/len(flags) if len(flags) else None})
+    completed = selected[selected['run_completed']]
+    flags = completed['best_holistic_pass'].dropna()
+    rows.append({'metric':'Holistic performance within tolerance (best window)',
+                 'count':int(flags.astype(bool).sum()),'evaluable':len(flags),
+                 'percent_of_evaluable':100*flags.astype(bool).sum()/len(flags) if len(flags) else None})
     return pd.DataFrame(rows)

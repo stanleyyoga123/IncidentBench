@@ -32,7 +32,9 @@ def test_performance_boundary_zero_and_unknown():
     assert r['best_p95_seconds_change_percent']==pytest.approx(19)
     assert r['best_p95_seconds_difference']==pytest.approx(.19)
     assert r['best_5xx_rps_difference']==.5 and r['best_5xx_rps_change_percent'] is None
-    assert r['best_holistic_pass'] is True and r['worst_holistic_pass'] is False
+    assert r['best_holistic_pass'] is True
+    assert not any(key.startswith('worst_') for key in r)
+    assert performance({'baseline':{'p95_seconds':1},'best':{'p95_seconds':1.2,'http_5xx_rps':.5}},cfg)['best_holistic_pass'] is False
     assert performance({'baseline':{'p95_seconds':0},'best':{'p95_seconds':0,'http_5xx_rps':0}},cfg)['best_holistic_pass'] is None
     assert performance({'baseline':{'p95_seconds':1},'covered_windows':2},cfg)['best_holistic_pass'] is False
     assert performance({'baseline':{'p95_seconds':1},'covered_windows':0},cfg)['best_holistic_pass'] is None

@@ -17,8 +17,8 @@ def test_completed_cohort_excludes_failed_run_from_semantic_counts_and_keeps_aud
                                         ('failed', False, .95, False)]:
         row = {'application': 'sock-shop', 'run': run, 'scenario': f'sock-shop-pod-carts-cpu-{run}',
                'run_completed': completed, 'archive_status': 'completed' if completed else 'failed',
-               'grade_status': 'graded', 'best_holistic_pass': best, 'worst_holistic_pass': False,
-               'best_p95_seconds_change_percent': 1.0, 'worst_p95_seconds_change_percent': 30.0}
+               'grade_status': 'graded', 'best_holistic_pass': best,
+               'best_p95_seconds_change_percent': 1.0}
         for kind in ('rca', 'remediation'):
             row.update({f'{kind}_has_successful_output': True,
                         f'{kind}_max_score': score, f'{kind}_average_score': score,
@@ -37,6 +37,7 @@ def test_completed_cohort_excludes_failed_run_from_semantic_counts_and_keeps_aud
     rca = summaries['semantic'].query("Application == 'sock-shop' and Metric.str.startswith('Successful RCA sessions')")
     assert rca.iloc[0][['Success', 'Evaluable']].tolist() == [1, 1]
     assert summaries['performance'].iloc[0]['Best tolerance'] == '1/1'
+    assert not any('worst' in column.lower() for column in summaries['performance'].columns)
     assert summaries['joint'].query("Output == 'rca' and `Semantic success` == True").iloc[0]['Total'] == 1
 
 
@@ -50,9 +51,8 @@ def test_session_summary_preserves_unknown_chaos_counts(counts, expected_total, 
         row = {'application': 'teastore', 'run': f'run-{index}',
                'scenario': f'teastore-pod-auth-cpu-{index}', 'run_completed': True,
                'archive_status': 'completed', 'grade_status': 'graded',
-               'best_holistic_pass': None, 'worst_holistic_pass': None,
-               'best_p95_seconds_change_percent': None,
-               'worst_p95_seconds_change_percent': None}
+               'best_holistic_pass': None,
+               'best_p95_seconds_change_percent': None}
         for kind in ('rca', 'remediation'):
             row.update({f'{kind}_has_successful_output': None,
                         f'{kind}_max_score': None, f'{kind}_average_score': None,

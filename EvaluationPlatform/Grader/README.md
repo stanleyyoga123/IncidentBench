@@ -3,7 +3,7 @@
 The Grader reads archived evaluation runs and produces three separate assessments:
 
 1. **Semantic output quality:** RCA/remediation rubric scores and remediation penalties.
-2. **Descriptive performance:** baseline versus best/worst sliding chaos windows.
+2. **Descriptive performance:** baseline versus selected best sliding chaos windows.
 3. **Archive service recovery proxy:** sustained latency/reliability/throughput recovery
    under `archive-recovery-v3`, retained in per-run JSON.
 
@@ -57,7 +57,7 @@ forward arguments. Use `python -m grader` for configurable runs. Legacy
 ```
 
 Start with `csvs/scenario_table.csv` for one row per archived run: semantic score
-maxima/means, exported session counts, baseline P95/5xx, paired best/worst windows
+maxima/means, exported session counts, baseline P95/5xx, paired best windows
 and imputation counts. Use `window_comparison.csv` for the client mean estimate
 and independent per-workload comparisons. Detailed recovery outcomes and reasons
 are in `runs/<run>/grade.json` → `research.operational`.
@@ -66,14 +66,14 @@ Normal grading no longer emits aggregate `incidents.*`, `paper_metrics.csv`,
 `research_summary.*`, or `scenario_table.md/json`. Historical files are preserved.
 Job CSVs do not provide a complete run inventory when sessions are empty.
 
-## Baseline versus best/worst chaos windows
+## Baseline versus best chaos windows
 
 There are **two descriptive comparisons**; neither changes recovery scoring:
 
-| Report | Baseline | Best/worst selection |
+| Report | Baseline | Best selection |
 | --- | --- | --- |
-| `window_comparison.csv` / `window_comparison` | Full recorded baseline | Lowest/highest value independently per metric/workload |
-| `scenario_table.csv` / `paired_window` | Baseline minus first 5 minutes by default | Best: lowest P95 with 5xx ≤0.5 requests/s. Worst: highest P95 without that ceiling. P95 and 5xx share the selected window |
+| `window_comparison.csv` / `window_comparison` | Full recorded baseline | Lowest covered value independently per metric/workload |
+| `scenario_table.csv` / `paired_window` | Baseline minus first 5 minutes by default | Lowest P95 with 5xx ≤0.5 requests/s. P95 and 5xx share the selected window |
 
 Windows default to five minutes (`--comparison-window-minutes`, positive fractional
 values supported). They advance by the recorded scrape step inside individual
@@ -141,7 +141,7 @@ threshold (strictly greater than 0.8 by default), P95 relative-change tolerance
 (<20% by default), 5xx ceiling (≤0.5 requests/s), and window/baseline settings
 in the first code cell. It derives max/mean scores, exported session counts,
 time from chaos start to the earliest completed highest-scoring output, signed
-best/worst baseline differences, and aggregate session/scenario success counts.
+best-window baseline differences, and aggregate session/scenario success counts.
 
 The notebook recomputes paired windows offline using local archives, without
 calling a judge or changing grades. By default it selects the latest completed
