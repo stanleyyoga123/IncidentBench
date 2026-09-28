@@ -1,5 +1,25 @@
 # Markdown metrics report
 
+## Interactive notebook
+
+Open `report.ipynb` from the Grader checkout and run all cells. One run reads
+`online-boutique`, `sock-shop`, and `teastore` from their respective `grades/`
+and `results/` folders. Each application uses its own entry workload and
+namespace. Scenario selection and aggregate denominators are calculated within
+each application before results are combined. Application comparison tables and
+raw measurement CSVs identify the application; pooled and fault-family totals
+combine applications explicitly. If an application has neither grades nor
+archives, the notebook stops with a named missing-input error so a partial
+report is not mistaken for a complete one.
+
+Edit the shared thresholds and repeat policy in the first code cell. Set
+`SHOW_DETAILS = True` for the attempt audit and `EXPORT = True` to create a
+timestamped `eda/exports/` directory with CSVs, configuration for all three
+applications, and the compact score Markdown table. It reads existing data
+offline and does not call the judge.
+
+## Markdown script
+
 Run from any working directory:
 
 ```bash
@@ -26,6 +46,18 @@ counts, time from chaos start to the first highest-scoring output, baseline and
 best/worst P95 and 5xx values and differences, aggregate success counts, and
 attempt/coverage/exclusion details. By default it selects the latest completed
 attempt for each scenario, falling back to the latest attempt when none completed.
+The completed-run analysis reproduces the numeric summary families in
+`../analysis.md` from the current archives and grades: cohort, semantic success,
+score means, session and timing distributions, window tolerance and P95 changes,
+semantic/performance cross-tabulations, and fault-family comparisons. Pooled rows
+show their denominators. A PNG beside the Markdown report compares application
+scenario success and window tolerance with counts on every bar. The earlier
+per-scenario and all-selected-run tables remain an audit; incomplete selected
+runs are excluded from the completed-run analysis. The notebook uses the same
+summary calculations and displays at most one table in each cell. Completion
+requires completion in metadata or run-status, a zero or absent execution return
+code, and no failed/interrupted status in either source. Session totals sum only
+runs with known in-chaos counts and display how many runs have known counts.
 
 ```bash
 python report.py --window-minutes 5 --score-threshold 0.8 \

@@ -1,18 +1,187 @@
-# Kubernetes incident evaluation platform
+# IncidentBench
 
-Run reproducible load and chaos experiments against a replaceable incident-response solution. The bundled solution detects anomalies, performs RCA and guarded remediation, and learns evidence-linked lessons. Researchers can replace that solution through shell adapters while keeping the runner and grader.
+**A benchmark and evaluation platform for AI-driven Kubernetes incident response.**
 
-```text
-EvaluationPlatform/
-  Initialization/          Cluster, nodes, platform tools, inventory
-  Orchestrator/            Bundled solution HTTP interface and workflow state
-    Database/              PostgreSQL deployment and Alembic migrations
-  Runner/                  Applications, scenarios, load, chaos, hooks, capture
-  Grader/                  Offline grading and visualization
-Agents/                    Detector, RCA, remediation, learning, MCP tools
+IncidentBench turns incident response into an experiment you can run, inspect,
+and compare. It deploys microservice applications, generates user traffic,
+injects controlled faults, and captures how an incident-response system
+investigates and acts. Its grader brings agent-output quality and observed
+application behavior together in reports, timelines, and application comparisons.
+
+The project includes a working reference system that connects anomaly detection,
+root-cause analysis (RCA), guarded remediation, verification, and learning.
+Researchers can plug in another response system through lifecycle adapters while
+reusing the workloads, fault scenarios, evidence capture, and grading pipeline.
+
+[Explore the results](EvaluationPlatform/Grader/eda/report.md) ·
+[Open the analysis notebook](EvaluationPlatform/Grader/eda/report.ipynb) ·
+[Browse the scenarios](EvaluationPlatform/Runner/docs/scenario.md) ·
+[Read the architecture](docs/architecture.md)
+
+## What you can do with IncidentBench
+
+- **Exercise a complete incident-response workflow.** Follow an injected fault
+  from application symptoms through detection, investigation, remediation, and
+  post-action verification.
+- **Run repeatable experiments.** Versioned JSON scenarios define applications,
+  placement, traffic, fault schedules, and response-system lifecycle. Suites
+  support repeated runs and paired agents-enabled/disabled configurations.
+- **Test across applications and fault families.** The standard suites contain
+  **69 configured scenarios across three microservice applications**, covering
+  node and pod resource pressure, network faults, and capacity loss.
+- **Inspect the evidence behind an outcome.** Each run preserves resolved inputs,
+  applied chaos manifests, placement fingerprints, telemetry, lifecycle logs,
+  and exported agent sessions and tool-call audits.
+- **Compare diagnosis, remediation, and service behavior.** Reports expose score
+  maxima and averages, session counts, response timing, latency and error changes,
+  and fault-family comparisons with explicit evaluable denominators.
+- **Evaluate your own response system.** Replace the bundled agents through shell
+  integrations, add applications and fault scenarios, or extend the load shapes
+  and grading resources.
+
+## From fault injection to an inspectable result
+
+```mermaid
+flowchart LR
+    R[Scenario runner] -->|traffic and faults| K[Kubernetes application]
+    K --> T[Metrics, logs and traces]
+    T --> A[Incident-response system]
+    A -->|investigation and remediation| K
+    R --> E[Run archive]
+    T --> E
+    A -->|results and action records| E
+    E --> G[Offline grader]
+    G --> V[Reports, timelines and comparisons]
 ```
 
-Start with [Runner configuration and extension interfaces](EvaluationPlatform/Runner/README.md), [initialization](EvaluationPlatform/Initialization/README.md), [evaluation API](EvaluationPlatform/Orchestrator/docs/evaluation-api.md), and [grading](EvaluationPlatform/Grader/README.md).
+The Runner establishes a baseline, activates the configured response system,
+executes fault and recovery steps, and finalizes the experiment with cleanup and
+evidence capture. The archive can then be analyzed without reconnecting to the
+cluster. Semantic scoring uses a configured model judge; telemetry calculations
+and visualization can run without model calls.
+
+### The bundled reference agent system
+
+```text
+Detect → Investigate → Remediate → Verify → Learn
+            ↑                               │
+            └──── evidence-linked lessons ──┘
+```
+
+The **AnomalyDetector** turns Prometheus signals into incident leads.
+**AgentOrchestrator** durably coordinates the workflow, while **RCAAgent** gathers
+current evidence through **MCPTools**. **RemediatorAgent** validates the RCA
+snapshot, checks current state, creates execution artifacts, runs Ansible check
+mode, performs guarded changes, and verifies the result. **LearningAgent**
+extracts evidence-linked lessons for later investigations; those lessons must
+be checked against current evidence.
+
+Investigation and remediation use separate MCP profiles, credentials, and
+Kubernetes permissions. The investigation profile rejects mutating commands.
+The Orchestrator automatically submits required remediation and serializes RCA,
+remediation, and learning jobs through a shared execution slot. See the
+[runtime flows](docs/flows.md) for the coordination and failure behavior.
+
+## Applications and incident coverage
+
+| Application | Standard scenarios | Entry workload |
+| --- | ---: | --- |
+| [Online Boutique](EvaluationPlatform/Runner/resources/suites/online-boutique.json) | 23 | `frontend` |
+| [Sock Shop](EvaluationPlatform/Runner/resources/suites/sock-shop.json) | 23 | `front-end` |
+| [TeaStore](EvaluationPlatform/Runner/resources/suites/teastore.json) | 23 | `teastore-webui` |
+
+The nine fault families are node CPU pressure, node memory pressure, node network
+delay, node packet loss, pod CPU pressure, pod memory pressure, pod bandwidth
+restriction, pod CPU headroom constraints, and pod capacity loss. Traffic can
+follow constant, burst, sinusoidal, or daily patterns.
+
+These are configured experiments; the number of completed, evaluable runs is
+reported separately. Application workloads and fault targets differ, so
+cross-application results should be read alongside their scenarios and baselines.
+
+## What the evaluation tells you
+
+IncidentBench reports three complementary views:
+
+| View | What it measures |
+| --- | --- |
+| Agent-output quality | RCA and remediation reports scored against scenario-specific expectations, with remediation penalties and explicit unscored outputs. |
+| Application performance | Baseline versus paired best/worst chaos windows, including latency, HTTP 5xx rates, and tolerance outcomes. |
+| Service recovery proxy | Sustained latency, reliability, and throughput behavior derived from archived measurements under a separate recovery policy. |
+
+A successful agent job or high semantic score does not establish that a change
+was applied or that service recovered. Reports preserve these distinctions,
+missing evidence, and measurement denominators. The
+[grading methodology](EvaluationPlatform/Grader/docs/methodology.md) explains
+what each assessment supports.
+
+### See an example
+
+The [generated report](EvaluationPlatform/Grader/eda/report.md) and
+[notebook](EvaluationPlatform/Grader/eda/report.ipynb) show the current experiment
+snapshot, including application comparisons, session and score summaries,
+response timing, and fault-family outcomes. The notebook presents each table
+in its own cell and recomputes measurements from local archives and existing grades.
+
+![Application comparison from the archived experiment snapshot](EvaluationPlatform/Grader/eda/report-applications.png)
+
+The chart compares semantic scenario attainment and frontend window tolerance.
+Labels show successful/evaluable counts; it illustrates the bundled reference
+system's recorded behavior under these experiments.
+
+## Try the project
+
+**Explore without a cluster.** Start with the report above. With the archived
+`results/` and `grades/` available locally, install the Grader requirements and
+regenerate the report from the repository root:
+
+```bash
+python -m pip install -r EvaluationPlatform/Grader/requirements.txt
+python EvaluationPlatform/Grader/eda/report.py
+```
+
+This reads existing grades and recomputes performance offline without invoking
+the semantic judge. For new archived runs, see the
+[Grader guide](EvaluationPlatform/Grader/README.md), including its
+`--operational-only` mode and visualization commands.
+
+**Demonstrate the live workflow.** On a prepared evaluation cluster, the
+[three-application CPU smoke suite](EvaluationPlatform/Runner/resources/suites/cpu-smoke.json)
+provides a focused walkthrough: establish traffic and a baseline, inject CPU
+stress, observe the agent workflow, then inspect the captured evidence and
+reports. Validate its configuration from the Runner directory first:
+
+```bash
+cd EvaluationPlatform/Runner
+python -m testbed.main --suite resources/suites/cpu-smoke.json \
+  --environment config/environment.json --validate-only
+```
+
+Validation is local. After setup, omit `--validate-only` to execute the suite.
+Live bundled experiments reset solution workflow and lesson data, recreate
+application namespaces, and inject faults, so use a dedicated evaluation
+cluster. The [Runner guide](EvaluationPlatform/Runner/README.md) covers setup,
+execution, live tracking, and extension interfaces.
+
+## Repository guide
+
+| Area | Purpose |
+| --- | --- |
+| [Initialization](EvaluationPlatform/Initialization/README.md) | Cluster and node preparation, namespaces, and platform tools. |
+| [Runner](EvaluationPlatform/Runner/README.md) | Applications, traffic, scenarios, chaos, lifecycle integrations, and evidence capture. |
+| [Grader](EvaluationPlatform/Grader/README.md) | Archived-run assessment, plots, reports, and exploratory analysis. |
+| [Orchestrator](EvaluationPlatform/Orchestrator/README.md) | Durable coordination for the reference agents and its evaluation API. |
+| [Database](EvaluationPlatform/Orchestrator/Database/README.md) | PostgreSQL deployment and schema migrations. |
+| [Agents](docs/components.md) | Detection, RCA, remediation, learning, and MCP tool services. |
+| [Documentation](docs/README.md) | Architecture, runtime flows, contracts, and component guides. |
+
+## Deployment and operations
+
+The guides above describe each component. Expand this checklist for deployment
+order, image builds, agent operations, and experiment commands.
+
+<details>
+<summary>Deployment checklist and commands</summary>
 
 ## Prepare a deployment
 
@@ -105,10 +274,12 @@ Run JSON owns experiment behavior. There are no load, timing, deployment, or age
 Install `EvaluationPlatform/Grader/requirements.txt`, then from its directory:
 
 ```bash
-./grade.sh --input ../Runner/results --output grades
-PYTHONPATH=. python -m visualizer --input ../Runner/results --output visualizations
+python -m grader --input ../Runner/results --output grades/my-assessment
+python -m visualizer --input ../Runner/results --output visualizations/my-assessment
 ```
 
 Configure the judge endpoint/model/token using the grader's documented CLI/environment interface. No database or live cluster access is needed for grading. Existing archived run formats remain supported.
 
 If a run fails, consult `run-status.json`, `hooks.json`, and `hooks/`. Ownership remains held after unsafe cleanup or hook failures. Follow [interrupted-run recovery](EvaluationPlatform/Orchestrator/docs/evaluation-api.md#interrupted-run-recovery) before starting another run.
+
+</details>

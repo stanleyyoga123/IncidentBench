@@ -14,6 +14,7 @@ if str(GRADER_ROOT) not in sys.path:
 
 import pandas as pd
 from eda.report_metrics import ReportConfig, aggregate_report, build_report
+from eda.report_analysis import numeric_summaries
 
 APPLICATIONS = {'sock-shop': 'front-end', 'online-boutique': 'frontend', 'teastore': 'teastore-webui'}
 
@@ -46,7 +47,7 @@ def application_report(name, grades, archives, config):
              f'{len(all_runs)} attempts; {len(scenarios)} selected scenario/run rows; '
              f'{int(scenarios.run_completed.sum())} completed selected runs.',
              f'Archives: `{archives}`. Grades: `{grades}`.',
-             '### Aggregate metrics', table(totals, {'metric':'Metric','count':'Count','evaluable':'Evaluable denominator',
+             '### Aggregate metrics (all selected runs)', table(totals, {'metric':'Metric','count':'Count','evaluable':'Evaluable denominator',
                                                    'percent_of_evaluable':'Percent of evaluable'})]
     for kind, title in [('rca', 'RCA'), ('remediation', 'Remediation')]:
         columns = {'scenario':'Scenario', f'{kind}_max_score':'Max score', f'{kind}_average_score':'Average score',
@@ -74,7 +75,44 @@ def application_report(name, grades, archives, config):
             'grade_status':'Grade status','time_scope_status':'Chaos boundaries',
             'rca_exported_sessions':'Exported RCA','rca_excluded_sessions':'Excluded RCA',
             'remediation_exported_sessions':'Exported remediation','remediation_excluded_sessions':'Excluded remediation'})]
-    return '\n\n'.join(lines), totals
+    return '\n\n'.join(lines), totals, all_runs, scenarios, jobs
+
+
+def comparison_chart(summaries, path=None):
+    """Plot application rates with their evaluable counts beside each bar."""
+    import matplotlib.pyplot as plt
+
+    metrics = summaries['semantic']
+    apps = sorted(app for app in metrics.Application.drop_duplicates() if app != 'Pooled total')
+    labels = [('Scenarios/runs with successful RCA', 'RCA scenario'),
+              ('Scenarios/runs with successful REMEDIATION', 'Remediation scenario'),
+              ('Holistic performance within tolerance (best window)', 'Best window'),
+              ('Holistic performance within tolerance (worst window)', 'Worst window')]
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+    colors = ['#2878a8', '#c35b43', '#41966d']
+    for ax, group in zip(axes, (labels[:2], labels[2:])):
+        for index, app in enumerate(apps):
+            for metric_index, (metric, short) in enumerate(group):
+                matching = metrics[(metrics.Application == app) & (metrics.Metric == metric)]
+                y = metric_index * (len(apps) + 1) + index
+                if matching.empty or not matching.iloc[0].Evaluable:
+                    ax.text(1, y, 'Unknown (n=0)', va='center', fontsize=9)
+                    continue
+                row = matching.iloc[0]
+                ax.barh(y, row.Percent, color=colors[index % len(colors)])
+                ax.text(min(row.Percent + 1, 83), y, f'{row.Success}/{row.Evaluable}',
+                        va='center', fontsize=9)
+        ax.set_yticks([m * (len(apps) + 1) + a for m in range(len(group)) for a in range(len(apps))],
+                      [f'{short}: {app}' for _, short in group for app in apps])
+        ax.set_xlim(0, 115)
+        ax.set_xlabel('Successful / evaluable (%)')
+        ax.grid(axis='x', alpha=.2)
+    axes[0].set_title('Semantic scenario attainment')
+    axes[1].set_title('Frontend window tolerance')
+    fig.tight_layout()
+    if path is not None:
+        fig.savefig(path, dpi=160, bbox_inches='tight')
+    return fig
 
 
 def parser():
@@ -112,18 +150,51 @@ def main(argv=None):
              '- This script reads existing grades and recomputes performance offline. Missing grades leave semantic scores unknown; no model calls occur.\n'
              '- Archives are discovered recursively, including preserved local campaigns. The attempts table records which runs were selected.']
     sections, aggregates = [], []
+    analysis_runs, analysis_selected, analysis_jobs = [], [], []
     for name in dict.fromkeys(args.apps):
         archives, grades = args.results_dir/name, args.grades_dir/name
         if not list(archives.rglob('metadata.json')) and not list(grades.glob('runs/*/grade.json')):
             sections.append(f'## {name}\n\n_No archived runs or grades available yet._')
             continue
-        section, totals = application_report(name, grades, archives,
+        section, totals, app_runs, app_selected, app_jobs = application_report(name, grades, archives,
                                              replace(config, workload=APPLICATIONS[name], namespace=name))
         sections.append(section); aggregates.append(totals)
+        for frame in (app_runs, app_selected, app_jobs):
+            frame.insert(0, 'application', name)
+        analysis_runs.append(app_runs)
+        analysis_selected.append(app_selected)
+        analysis_jobs.append(app_jobs)
     if aggregates:
         totals = pd.concat(aggregates).groupby('metric', sort=False, as_index=False)[['count','evaluable']].sum()
         totals['percent_of_evaluable'] = totals['count']/totals['evaluable'].replace(0, float('nan'))*100
-        lines += ['## Aggregate metrics across all applications', table(totals)]
+        lines += ['## Aggregate metrics across all selected runs',
+                  'This all-selected-run aggregate includes selected technical runs that did not complete. The completed-run analysis below uses the primary cohort.',
+                  table(totals)]
+        summaries = numeric_summaries(pd.concat(analysis_runs, ignore_index=True),
+            pd.concat(analysis_selected, ignore_index=True),
+            pd.concat(analysis_jobs, ignore_index=True), config)
+        chart_path = args.output.with_name(args.output.stem + '-applications.png')
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        figure = comparison_chart(summaries, chart_path)
+        import matplotlib.pyplot as plt
+        plt.close(figure)
+        lines += ['## Completed-run analysis',
+                  'The tables below use selected completed runs only. Failed or incomplete selected runs remain in the exclusion audit. '
+                  'Fractions count success over evaluable runs or sessions; unknown scores do not enter semantic denominators. '
+                  'A run completes only when metadata or run-status reports completion, its execution return code is zero or absent, '
+                  'and neither source reports failure or interruption.',
+                  f'![Application comparison]({chart_path.name})']
+        for key, title in [('cohort', 'Cohort'), ('semantic', 'Semantic success and window tolerance'),
+                           ('scores', 'Score means'), ('sessions', 'Sessions and time to maximum score'),
+                           ('performance', 'Window performance'), ('joint', 'Semantic success versus best-window tolerance'),
+                           ('families', 'Fault-family outcomes'), ('family_app', 'Fault families by application'),
+                           ('exclusions', 'Selected technical exclusions')]:
+            lines += [f'### {title}', table(summaries[key])]
+        lines += ['Scenario means weight each evaluable run equally; pooled session means weight each scored output equally. '
+                  'Time quartiles use runs with a scored maximum and available completion time. '
+                  'Known sessions sum runs with a measured chaos-only count; “Session counts known / runs” exposes missing run counts. '
+                  'Best-window P95 medians exclude runs with no admissible best window; those runs remain known tolerance failures. '
+                  'Fault families are parsed from scenario names. These descriptive comparisons do not establish agent-caused recovery.']
     lines += sections
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text('\n\n'.join(lines)+'\n', encoding='utf-8')

@@ -20,6 +20,8 @@ def test_report_ungraded_and_future_application(tmp_path):
     assert 'sample-scenario' in text and 'not_graded' in text
     assert '**3 minutes**' in text and '## teastore' in text
     assert 'Unknown' in text and 'No archived runs or grades available yet' in text
+    assert '## Completed-run analysis' in text
+    assert (tmp_path/'report-applications.png').is_file()
 
 
 def test_markdown_escapes_values():
