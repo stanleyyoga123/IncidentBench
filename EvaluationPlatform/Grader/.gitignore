@@ -1,2 +1,9 @@
 /.venv/
 /results/
+/eda/
+/output/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+/reporting/*.ipynb

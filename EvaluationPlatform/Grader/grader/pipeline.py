@@ -45,12 +45,13 @@ from .rubric import (
 
 LOGGER = logging.getLogger("grader.pipeline")
 DEFAULT_CONCURRENCY = 5
+DEFAULT_OUTPUT_PATH = Path(__file__).resolve().parents[1] / "output" / "grades"
 
 
 @dataclass(frozen=True)
 class GraderConfig:
     input_path: Path = Path("results")
-    output_path: Path = Path("grades")
+    output_path: Path = DEFAULT_OUTPUT_PATH
     ground_truth_path: Path = DEFAULT_GROUND_TRUTH_DIR
     rubric_path: Path = DEFAULT_RUBRIC_PATH
     penalties_path: Path = DEFAULT_PENALTIES_DIR

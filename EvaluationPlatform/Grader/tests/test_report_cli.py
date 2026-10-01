@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from eda.report import main, table
+from reporting.report import main, table
 import pandas as pd
 
 

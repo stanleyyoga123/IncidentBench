@@ -1,7 +1,7 @@
 import json
 import pandas as pd
 import pytest
-from eda.report_metrics import ReportConfig, job_summary, performance, build_report, aggregate_report
+from reporting.report_metrics import ReportConfig, job_summary, performance, build_report, aggregate_report
 
 
 def job(score, completed='2026-09-18T00:02:00Z', status='succeeded', id='a'):
@@ -41,7 +41,7 @@ def test_performance_boundary_zero_and_unknown():
 
 
 def test_repeat_selection_export_counts_and_denominators(tmp_path,monkeypatch):
-    import eda.report_metrics as module
+    import reporting.report_metrics as module
     grades,archives=tmp_path/'grades',tmp_path/'archives'
     for run,state,score,day in [('completed','completed',.9,1),('later-failed','failed',.2,2)]:
         g=grades/'runs'/run; a=archives/run

@@ -13,7 +13,7 @@ from .judge import (
     OpenAICompatibleJudge,
 )
 from .logging_utils import configure_logging
-from .pipeline import DEFAULT_CONCURRENCY, GraderConfig, grade_runs
+from .pipeline import DEFAULT_CONCURRENCY, DEFAULT_OUTPUT_PATH, GraderConfig, grade_runs
 from .penalty import DEFAULT_PENALTIES_DIR
 from .rubric import DEFAULT_RUBRIC_PATH, load_rubric
 
@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Grade final RCA/remediation outputs and remediation metrics."
     )
     parser.add_argument("--input", type=Path, default=Path("results"))
-    parser.add_argument("--output", type=Path, default=Path("grades"))
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument(
         "--ground-truth", type=Path, default=DEFAULT_GROUND_TRUTH_DIR
     )

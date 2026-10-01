@@ -28,11 +28,11 @@ still describe the full upstream repository; resolve local paths from this root.
 - `grader/research.py`, `calibration.py`, `research_reports.py`, `reports.py`:
   optional richer evidence, calibration, aggregation, and output formats.
 - `visualizer/`: archive metric loading, lifecycle timelines, and rendering.
-- `eda/eda.ipynb`: exploratory analysis of existing grading outputs.
+- `reporting/`: Python analysis helpers and Markdown report generation.
 - `resources/`: authoritative rubric, evaluation policy, scenario policy,
   manually maintained ground truth, and scenario penalties.
 - `tests/`: offline regression tests; `docs/`: contracts and methodology.
-- `results/`: source archives. `grades/` and `visualizations/`: generated outputs
+- `results/`: source archives. `output/`: generated grades, visualizations, and reports
   and historical reports. Preserve their existing contents.
 
 ## Evidence and grading invariants
@@ -119,15 +119,17 @@ python -m pytest -q
 python -m compileall -q grader visualizer
 
 # Example offline assessment: choose a fresh output path for each experiment.
-python -m grader --input results/sock-shop-1 --output grades/my-offline-check --operational-only
-python -m visualizer --input results/sock-shop-1 --output visualizations/my-check
+python -m grader --input results/sock-shop-1 --output output/grades/my-offline-check --operational-only
+python -m visualizer --input results/sock-shop-1 --output output/visualizations/my-check
 ```
 
-Prefer direct module invocations for configurable runs. The current `grade.sh`
-hard-codes arguments and does not forward extra CLI arguments; do not rely on
-`./grade.sh --operational-only` to disable judge calls. Check its implementation
-before using it. Use `csvs/` and per-run JSON for analysis; do not assume retired analyzer
-scripts or aggregate report files exist.
+`grade.sh` runs visualization, grading, and Markdown reporting for the three
+applications by default. Select with `--apps` or `--input`, use `--output-root`
+for fresh outputs, and forward grader options after `--`. Use
+`./grade.sh --apps sock-shop --output-root /tmp/grader-check -- --operational-only`
+for a pipeline without judge calls. Direct module invocations remain available.
+Use `csvs/` and per-run JSON for analysis; do not assume retired analyzer scripts
+or aggregate report files exist.
 
 For measurement changes, use small hand-calculated fixtures covering boundaries,
 gaps, resets, missing services, and denominators. For pipeline changes, check

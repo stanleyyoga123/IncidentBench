@@ -11,7 +11,7 @@ penalty definitions for the maintained scenario references.
 From `EvaluationPlatform/Grader/`:
 
 ```bash
-PYTHONPATH=. python -m grader --input results/sock-shop-1 --output grades/new-assessment
+PYTHONPATH=. python -m grader --input results/sock-shop-1 --output output/grades/new-assessment
 ```
 
 The semantic judge defaults to the local OpenAI-compatible vLLM endpoint at
@@ -22,17 +22,21 @@ Run folders are graded concurrently, with five workers by default. Set
 judge requests for the available model-server capacity. Jobs within each run
 remain sequential.
 
-The local `grade.sh` hard-codes its arguments and does not forward extra flags.
-Use direct module invocations for configurable runs:
+The local `grade.sh` runs visualizer → grader → Markdown reporting for
+`online-boutique`, `sock-shop`, and `teastore`. Select with `--apps` or `--input`,
+and pass grader options after `--` (including `--operational-only`). It sets
+each application's entry workload and namespace. See the
+[pipeline guide](../reporting/README.md). Direct module invocations remain
+available for individual grading runs:
 
 ```bash
-python -m grader --input results/sock-shop-1 --output grades/new-assessment --concurrency 10
+python -m grader --input results/sock-shop-1 --output output/grades/new-assessment --concurrency 10
 ```
 
 ```bash
 PYTHONPATH=. python -m grader \
   --input results \
-  --output grades \
+  --output output/grades \
   --ground-truth resources/ground_truth \
   --rubric resources/rubric.json \
   --penalties resources/penalties \
@@ -162,14 +166,17 @@ Per-run `grade.json` retains archive outcomes and their evidence; `grade.json` r
 
 ## Outputs
 
+The default output directory is `output/grades` under the Grader root. The
+pipeline groups grades by application under `output/grades/<app>`.
+
 For each run, the grader writes:
 
-- `grades/runs/<run>/grade.json`: normalized grading inputs, each final job
+- `output/grades/runs/<run>/grade.json`: normalized grading inputs, each final job
   result, rubric classifications and scores, derived alignment, every metric
   diagnostic family summaries and per-run recovery evidence;
-- `grades/runs/<run>/report.md`: concise RCA, remediation, criterion, and
+- `output/grades/runs/<run>/report.md`: concise RCA, remediation, criterion, and
   penalty summaries, followed by independent window comparisons;
-- `grades/runs/<run>/judge-cache.json`: hash-keyed classification checkpoints.
+- `output/grades/runs/<run>/judge-cache.json`: hash-keyed classification checkpoints.
 
 New output directories contain only:
 
@@ -193,7 +200,7 @@ counts. Empty input still writes all five CSV headers.
 Aggregate Markdown, paper metrics, research-summary and incident files are no
 longer generated. Existing historical outputs are preserved; choose a fresh
 output directory to get the clean layout. Per-run JSON retains measurement and
-scoring provenance. Read the CSVs directly or use the exploratory notebook in `eda/`.
+scoring provenance. Read the CSVs directly or run `python -m reporting.report`.
 
 The per-run JSON has this stable top-level shape (nested manifests, results,
 and available diagnostic summaries are retained):
@@ -321,7 +328,7 @@ RCA/remediation scores and scenario session counts include only outputs whose
 `completed_at` falls in `[chaos_start, chaos_end)`. Outputs completing exactly at
 the end are excluded. Excluded jobs retain their original lifecycle status and
 an explicit `time_scope` reason in `grade.json`; the judge is not called for them.
-The notebook applies the same filter to historical grades and exposes excluded
+The Python reporting script applies the same filter to historical grades and exposes excluded
 session counts. Historical grade files and judge caches are not rewritten by
-notebook execution. Whole-run cumulative client mean/P95 summaries are omitted
+report generation. Whole-run cumulative client mean/P95 summaries are omitted
 from chaos-only metrics.

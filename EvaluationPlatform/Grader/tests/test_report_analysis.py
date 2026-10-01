@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from eda.report_analysis import fault_family, numeric_summaries
-from eda.report_metrics import ReportConfig
+from reporting.report_analysis import fault_family, numeric_summaries
+from reporting.report_metrics import ReportConfig
 
 
 def test_fault_family_classifies_archived_scenario_shapes():

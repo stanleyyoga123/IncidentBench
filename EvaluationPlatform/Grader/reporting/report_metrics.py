@@ -1,4 +1,4 @@
-"""Offline notebook measurements; never invokes a judge or modifies archives."""
+"""Offline report measurements; never invokes a judge or modifies archives."""
 from __future__ import annotations
 
 import json
@@ -192,7 +192,7 @@ def build_report(grade_dir: Path, archive_dir: Path, config: ReportConfig, *, in
                                  "included_in_chaos": scope["included"], "exclusion_reason": scope["reason"],
                                  "successful": score > config.score_threshold if score is not None else None,
                                  "completed_at": stamp(job.get('completed_at'))})
-        # Recompute locally so notebook window/baseline/error thresholds actually
+        # Recompute locally so report window/baseline/error thresholds actually
         # change selection; existing grades and caches are never rewritten.
         comparison = compare_windows(archive, config.window_minutes)
         paired = paired_frontend_window(archive, comparison, config.workload, config.namespace,

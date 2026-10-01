@@ -20,40 +20,54 @@ process; the CLI does not automatically load that file. Keep it untracked.
 
 ```bash
 # Semantic judging plus archive measurements:
-python -m grader --input results/sock-shop-1 --output grades/new-assessment
+python -m grader --input results/sock-shop-1 --output output/grades/new-assessment
 
 # Archive measurements only; no model calls:
-python -m grader --input results/sock-shop-1 --output grades/new-offline-assessment --operational-only
+python -m grader --input results/sock-shop-1 --output output/grades/new-offline-assessment --operational-only
 
 # Configure both descriptive comparisons and the paired scenario table:
-python -m grader --input results/sock-shop-1 --output grades/new-window-assessment \
+python -m grader --input results/sock-shop-1 --output output/grades/new-window-assessment \
   --comparison-window-minutes 5 --baseline-ignore-minutes 5 \
   --table-workload front-end --table-namespace sock-shop --table-max-5xx-rate 0.5
 
 # Offline plots:
-python -m visualizer --input results/sock-shop-1 --output visualizations/new-assessment
+python -m visualizer --input results/sock-shop-1 --output output/visualizations/new-assessment
 ```
 
-`grade.sh` is an editable launcher with hard-coded paths/options and does not
-forward arguments. Use `python -m grader` for configurable runs. Legacy
+`./grade.sh` runs the visualizer for all three applications, then the grader,
+then writes `output/report/report.md` through `reporting/report.py`. Select applications
+with `--apps sock-shop teastore` or `--input results/online-boutique`. Grader
+options follow `--`, for example:
+
+```bash
+./grade.sh --apps sock-shop --output-root /tmp/grader-check -- --operational-only
+```
+
+Use `--output-root` to preserve existing outputs during checks. See the
+[pipeline and reporting guide](reporting/README.md) for configuration. Legacy
 `--window-minutes` and `--threshold` are rejected; recovery policy overrides use
 `--evaluation-policy resources/evaluation-policy.json` or another policy file.
 
 ## Current output layout
 
 ```text
-<output>/
-  csvs/
-    summary.csv
-    rca_rubric_score.csv
-    remediation_rubric_score.csv
-    window_comparison.csv
-    scenario_table.csv
-  runs/<run>/
-    grade.json
+output/
+  report/
     report.md
-    judge-cache.json
-  logs/grader.log
+    report-applications.png
+  visualizations/<app>/
+  grades/<app>/
+    csvs/
+      summary.csv
+      rca_rubric_score.csv
+      remediation_rubric_score.csv
+      window_comparison.csv
+      scenario_table.csv
+    runs/<run>/
+      grade.json
+      report.md
+      judge-cache.json
+    logs/grader.log
 ```
 
 Start with `csvs/scenario_table.csv` for one row per archived run: semantic score
@@ -129,26 +143,17 @@ explicit CLI overrides are supported. Ground truth is never generated during gra
 - [Archive input contract](docs/evidence-contract.md)
 - [Validation guide](docs/validation.md)
 - [Visualizer](visualizer/README.md)
-- [Scenario metrics report notebook](eda/report.ipynb)
-- [Markdown report CLI](eda/README.md) — run `python eda/report.py` to generate `eda/report.md`.
-- [Offline synthetic reporting demo](eda/README.md#offline-demonstration) — renders a report and application chart from two small prepared examples without a judge or cluster. The example is not research data.
-- [Original exploratory notebook](eda/eda.ipynb)
+- [Markdown report CLI](reporting/README.md) — run `python -m reporting.report` to generate `output/report/report.md`.
+- [Offline synthetic reporting demo](reporting/README.md#offline-demonstration) — renders a report and application chart from two small prepared examples without a judge or cluster. The example is not research data.
 
-## Scenario metrics notebook
+## Scenario metrics report
 
-Open `eda/report.ipynb` and run all cells. Configure archive/grade paths, score
-threshold (strictly greater than 0.8 by default), P95 relative-change tolerance
-(<20% by default), 5xx ceiling (≤0.5 requests/s), and window/baseline settings
-in the first code cell. It derives max/mean scores, exported session counts,
-time from chaos start to the earliest completed highest-scoring output, signed
-best-window baseline differences, and aggregate session/scenario success counts.
-
-The notebook recomputes paired windows offline using local archives, without
-calling a judge or changing grades. By default it selects the latest completed
-attempt per scenario, falling back to the latest attempt if none completed;
-all attempts remain in an audit table. Holistic aggregates exclude incomplete
-runs and disclose unknown denominators. Optional exports create a new directory.
-
+Run `python -m reporting.report` to read existing `output/grades/<app>` and
+`results/<app>` and generate `output/report/report.md` offline. The Python
+report calculates scenario scores, chaos-only sessions and timing, baseline and
+best-window differences, and application comparisons. Missing evidence stays
+unknown. Completed-run summaries disclose their denominators and keep an audit
+of excluded attempts. See the [reporting guide](reporting/README.md) for options.
 
 ### Chaos-only grading scope
 
@@ -169,7 +174,7 @@ RCA/remediation scores and scenario session counts include only outputs whose
 `completed_at` falls in `[chaos_start, chaos_end)`. Outputs completing exactly at
 the end are excluded. Excluded jobs retain their original lifecycle status and
 an explicit `time_scope` reason in `grade.json`; the judge is not called for them.
-The notebook applies the same filter to historical grades and exposes excluded
+The Python reporting script applies the same filter to historical grades and exposes excluded
 session counts. Historical grade files and judge caches are not rewritten by
-notebook execution. Whole-run cumulative client mean/P95 summaries are omitted
+report generation. Whole-run cumulative client mean/P95 summaries are omitted
 from chaos-only metrics.

@@ -220,7 +220,7 @@ preserves schema 2 and recovery scoring. New outputs omit the retired window
 fields; older schema-2 grades remain readable, with those fields ignored by
 current analysis.
 
-## Notebook output contract and explicit 5xx imputation
+## Python report output contract and explicit 5xx imputation
 
 The current CLI writes only `runs/`, `logs/grader.log` and five CSVs under `csvs/`:
 summary, RCA rubric scores, remediation rubric scores, window comparison and
@@ -260,9 +260,9 @@ RCA/remediation scores and scenario session counts include only outputs whose
 `completed_at` falls in `[chaos_start, chaos_end)`. Outputs completing exactly at
 the end are excluded. Excluded jobs retain their original lifecycle status and
 an explicit `time_scope` reason in `grade.json`; the judge is not called for them.
-The notebook applies the same filter to historical grades and exposes excluded
+The Python reporting script applies the same filter to historical grades and exposes excluded
 session counts. Historical grade files and judge caches are not rewritten by
-notebook execution. Whole-run cumulative client mean/P95 summaries are omitted
+report generation. Whole-run cumulative client mean/P95 summaries are omitted
 from chaos-only metrics.
 
 The effective `policy_hash` hashes both the policy and `time_scope` version, so

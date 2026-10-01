@@ -13,8 +13,8 @@ if str(GRADER_ROOT) not in sys.path:
     sys.path.insert(0, str(GRADER_ROOT))
 
 import pandas as pd
-from eda.report_metrics import ReportConfig, aggregate_report, build_report
-from eda.report_analysis import numeric_summaries
+from reporting.report_metrics import ReportConfig, aggregate_report, build_report
+from reporting.report_analysis import numeric_summaries
 
 APPLICATIONS = {'sock-shop': 'front-end', 'online-boutique': 'frontend', 'teastore': 'teastore-webui'}
 
@@ -123,8 +123,8 @@ def comparison_chart(summaries, path=None):
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--results-dir', type=Path, default=GRADER_ROOT/'results')
-    p.add_argument('--grades-dir', type=Path, default=GRADER_ROOT/'grades')
-    p.add_argument('--output', type=Path, default=Path(__file__).resolve().with_suffix('.md'))
+    p.add_argument('--grades-dir', type=Path, default=GRADER_ROOT/'output'/'grades')
+    p.add_argument('--output', type=Path, default=GRADER_ROOT/'output'/'report'/'report.md')
     p.add_argument('--apps', nargs='+', choices=APPLICATIONS, default=list(APPLICATIONS))
     p.add_argument('--window-minutes', type=float, default=5)
     p.add_argument('--score-threshold', type=float, default=.8)

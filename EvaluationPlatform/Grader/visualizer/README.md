@@ -7,16 +7,16 @@ contact the cluster, model, or other services.
 From `EvaluationPlatform/Grader/` (or a standalone Grader root), run:
 
 ```bash
-python -m visualizer --input results/sock-shop-1 --output visualizations/new-assessment
+python -m visualizer --input results/sock-shop-1 --output output/visualizations/new-assessment
 ```
 
 The default input is `results/result-3` and the default output is
-`visualizations`. Both are configurable:
+`output/visualizations` under the Grader root. Both are configurable:
 
 ```bash
 PYTHONPATH=. python -m visualizer \
   --input results/my-result-set \
-  --output visualizations/my-result-set \
+  --output output/visualizations/my-result-set \
   --format both \
   --view all \
   --dpi 180
@@ -47,7 +47,7 @@ warning.
 Output layout:
 
 ```text
-visualizations/
+output/visualizations/
   report.md
   runs/<run>/
     metrics-only/

@@ -55,7 +55,8 @@ concurrent lock-reset tests; no cluster apply was used.
 ## Existing archive sample
 
 `../Runner/results/sock-shop-1` contains ten run folders. A real operational-only
-report is saved under `grades/sock-shop-1-archive-v3`:
+historical report was saved under `grades/sock-shop-1-archive-v3` (before
+the current `output/` layout):
 
 - Three proxy-recovered runs.
 - Six proxy-unresolved runs.

@@ -14,8 +14,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render elapsed-time timelines for evaluation runs.")
     parser.add_argument("--input", type=Path, default=Path("results/result-3"),
                         help="run directory or directory containing runs (default: results/result-3)")
-    parser.add_argument("--output", type=Path, default=Path("visualizations"),
-                        help="output directory (default: visualizations)")
+    parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "output" / "visualizations",
+                        help="output directory (default: Grader/output/visualizations)")
     parser.add_argument("--format", choices=("png", "svg", "both"), default="both",
                         help="plot format (default: both)")
     parser.add_argument(

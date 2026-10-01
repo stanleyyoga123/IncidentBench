@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from eda.report_metrics import ReportConfig, aggregate_report
+from reporting.report_metrics import ReportConfig, aggregate_report
 
 FAMILIES = ("Node CPU", "Node delay", "Node packet loss", "Node memory",
             "Pod CPU headroom", "Pod bandwidth", "Pod capacity loss", "Pod CPU", "Pod memory")
