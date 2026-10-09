@@ -24,6 +24,8 @@ output/
   visualizations/<app>/
   report/report.md
   report/report-applications.png
+  report/report-activity.png
+  report/report-activity.svg
 ```
 
 Folders are created automatically. `--output-root PATH` places `grades`,
@@ -59,6 +61,24 @@ directory, run `python /path/to/Grader/reporting/report.py`.
 The report covers scenario maximum/mean scores, in-chaos session counts and
 timing, baseline and best-window performance, application comparisons,
 completed-run summaries, fault-family outcomes, and coverage/exclusion audits.
+The workflow activity table groups selected completed runs by application,
+injected fault type, and injected resource type (pod/node). It reports anomalies
+raised, RCA attempts completed, and remediation attempts completed as per-run
+mean ± sample SD, including measured zero-count runs. The accompanying three-panel
+dot chart compares applications on shared fault/resource rows, with separate
+count scales for anomalies, RCA, and remediation. Whiskers show sample SD;
+hollow points mark single evaluable runs with SD unavailable. Unknown counts are
+labelled explicitly; absent application groups have no point. The table provides
+evaluable run counts. PNG and SVG files use the report output stem and directory.
+SD is N/A for a single
+evaluable run. Anomalies use `detected_at`; succeeded and failed job attempts use
+`completed_at`, regardless of grading or final-report availability. All counts
+use recorded chaos intervals with inclusive starts and exclusive ends, capped
+at configured duration or earlier cleanup. Missing session exports, malformed
+anomaly exports, missing boundaries, or eligible records with invalid timestamps
+leave the affected count unknown; per-metric evaluable-run columns disclose
+incomplete coverage. Malformed job exports retain existing report validation
+errors. Counts describe workflow activity, not semantic quality or recovery.
 Unknown evidence stays unknown. Missing applications are labelled and skipped.
 The latest completed attempt is selected per scenario by default, falling back
 to the latest attempt when none completed. `--repeat-policy all_runs` includes

@@ -2,3 +2,4 @@ openai
 pandas
 matplotlib
 PyYAML>=6.0
+pydantic>=2

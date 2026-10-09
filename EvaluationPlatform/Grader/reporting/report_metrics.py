@@ -10,6 +10,7 @@ import pandas as pd
 
 from grader.time_scope import chaos_intervals, job_scope
 from grader.window_comparison import compare_windows, paired_frontend_window
+from reporting.report_activity import activity_counts
 
 
 @dataclass(frozen=True)
@@ -167,6 +168,7 @@ def build_report(grade_dir: Path, archive_dir: Path, config: ReportConfig, *, in
         except (ValueError, TypeError, KeyError):
             spans = []
             row['time_scope_status'] = 'missing_or_invalid_chaos_boundaries'
+        row.update(activity_counts(archive, spans))
         for kind in ("rca", "remediation"):
             jobs = grade.get(kind + "_jobs") or []
             # Counts use original exports, including ungraded / result-less jobs.

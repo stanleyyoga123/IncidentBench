@@ -15,6 +15,8 @@ if str(GRADER_ROOT) not in sys.path:
 import pandas as pd
 from reporting.report_metrics import ReportConfig, aggregate_report, build_report
 from reporting.report_analysis import numeric_summaries
+from reporting.report_activity import activity_display, activity_summary
+from reporting.report_activity_chart import activity_chart
 
 APPLICATIONS = {'sock-shop': 'front-end', 'online-boutique': 'frontend', 'teastore': 'teastore-webui'}
 
@@ -189,6 +191,24 @@ def main(argv=None):
                   'A run completes only when metadata or run-status reports completion, its execution return code is zero or absent, '
                   'and neither source reports failure or interruption.',
                   f'![Application comparison]({chart_path.name})']
+        activity = activity_summary(pd.concat(analysis_selected, ignore_index=True))
+        activity_path = args.output.with_name(args.output.stem + '-activity.png')
+        activity_svg = activity_path.with_suffix('.svg')
+        figure = activity_chart(activity)
+        figure.savefig(activity_path, dpi=180, bbox_inches='tight')
+        figure.savefig(activity_svg, bbox_inches='tight')
+        plt.close(figure)
+        lines += ['### Workflow activity by application, fault type, and resource type',
+                  'Per-run mean ± sample SD for selected completed runs under the configured repeat policy, including measured zeros. '
+                  'SD measures variation, not standard error; one evaluable run gives SD N/A. '
+                  'Anomalies count all exported detection events by detected_at; RCA/remediation count succeeded and failed attempts '
+                  'by completed_at, regardless of grading. Chaos starts are inclusive and ends exclusive, capped at duration or earlier cleanup. '
+                  'Fault/resource types describe the injected scenario. Missing exports/boundaries or invalid eligible timestamps leave '
+                  'counts unknown; additional evaluable-run columns disclose incomplete coverage. '
+                  'Activity counts do not establish semantic quality or recovery.',
+                  f'![Workflow activity comparison]({activity_path.name})',
+                  f'[Download vector chart]({activity_svg.name})',
+                  table(activity_display(activity))]
         for key, title in [('cohort', 'Cohort'), ('semantic', 'Semantic success and window tolerance'),
                            ('scores', 'Score means'), ('sessions', 'Sessions and time to maximum score'),
                            ('performance', 'Window performance'), ('joint', 'Semantic success versus best-window tolerance'),
