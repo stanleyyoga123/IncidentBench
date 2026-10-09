@@ -2,6 +2,15 @@
 
 Orchestrator owns all workflow database access. Migrations and PostgreSQL deployment live in `../Database/`; the HTTP service never creates tables. Evaluation endpoints use the existing control bearer token (`AGENT_CONTROL_TOKEN`), separate from ingestion and job-store tokens.
 
+The Runner interface is implemented in `app/features/evaluation/`, separately
+from `app/features/agent_workflow/`. Its router handles HTTP, its service owns
+control transition rules, and its repository owns transactions and export SQL.
+Both features use the database dependency composed in `app/api.py`; evaluation
+does not call downstream agents or depend on the workflow repository. The shared
+`app/infrastructure/maintenance_gate.py` preserves synchronization with agent
+requests and scheduler dispatch. Both routers remain in the same service with
+the same URLs and authentication.
+
 | Method and path | Operation ID | Behavior |
 | --- | --- | --- |
 | GET `/api/v1/evaluation` | `get_evaluation_state` | Inspect owner, maintenance, reset status |

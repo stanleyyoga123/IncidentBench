@@ -274,11 +274,15 @@ DSN arrive from the component Secret and are expanded into the mounted file.
 
 | File | Responsibility |
 | --- | --- |
-| `app/api.py` | Public/control/internal routes, token separation, response enrichment. |
-| `app/service.py` | Intake and reconciliation loops; downstream snapshots and triggers. |
-| `app/store.py` | Transactions, workflow transitions, leases, lesson ranking/publication. |
-| `app/clients.py` | RCA/remediation/learning HTTP clients and canonical hashes. |
-| `app/schema.py` | API validation and stable data models. |
+| `app/api.py` | Application composition, dependency construction, router registration, and lifecycle. |
+| `app/features/agent_workflow/router.py` | Ingestion/control/internal HTTP routes and authenticated mutation guards. |
+| `app/features/agent_workflow/workflow_coordinator.py` | Intake, reconciliation, workflow control, downstream snapshots, and triggers. |
+| `app/features/agent_workflow/coordinator_loops.py` | Intake and reconciliation thread lifecycle. |
+| `app/features/agent_workflow/workflow_store.py` | Transactions, workflow transitions, leases, lesson ranking/publication. |
+| `app/features/agent_workflow/agent_client.py` | RCA/remediation/learning HTTP clients and canonical hashes. |
+| `app/features/agent_workflow/schema.py` | Agent API validation and stable data models. |
+| `app/features/evaluation/` | Runner HTTP routes, control service, persistence repository, request schema, and export SQL. |
+| `app/infrastructure/` | Shared database connection source, maintenance gate, authentication, and conflict error. |
 | `app/config.py` | Dotted environment configuration. |
 | `kubernetes/configmap.yaml` | In-cluster addresses and scheduler defaults. |
 | `kubernetes/network-policy.yaml` | Agent-platform ingress boundary. |

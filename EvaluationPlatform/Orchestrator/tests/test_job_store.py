@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
-from store import WorkflowStore
+from features.agent_workflow.workflow_store import WorkflowStore
 
 
 class Cursor:
@@ -293,7 +293,7 @@ def test_retrieve_lessons_prioritizes_relevance_then_recency_and_budget():
 
 
 def test_output_checkpoint_requires_current_lease_and_finish_preserves_it():
-    from store import WorkflowConflictError
+    from infrastructure.workflow_conflict_error import WorkflowConflictError
     import pytest
     job_id = uuid4()
     cursor = Cursor(rows=[{'id': job_id}])

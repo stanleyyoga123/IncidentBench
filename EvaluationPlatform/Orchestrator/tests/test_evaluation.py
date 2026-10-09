@@ -6,8 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api import create_app
-from evaluation import EvaluationStore, LOCK
-from store import WorkflowConflictError
+from features.evaluation.evaluation_repository import EvaluationRepository
+from features.evaluation.evaluation_service import EvaluationService
+from infrastructure.maintenance_gate import MaintenanceGate, LOCK
+from infrastructure.workflow_conflict_error import WorkflowConflictError
 from test_api import FakeStore, FakeClient, settings
 
 
@@ -79,12 +81,12 @@ class MemoryDatabase:
 
 
 def test_ownership_reset_idempotency_restart_and_release():
-    db=MemoryDatabase(); evaluation=EvaluationStore(db)
+    db=MemoryDatabase(); evaluation=EvaluationService(EvaluationRepository(db))
     assert evaluation.command('acquire','one')['maintenance']
     with pytest.raises(WorkflowConflictError): evaluation.command('acquire','two')
     with pytest.raises(WorkflowConflictError): evaluation.command('reset','two')
     evaluation.command('reset','one')
-    EvaluationStore(db).command('reset','one')
+    EvaluationService(EvaluationRepository(db)).command('reset','one')
     assert db.reset_count==1
     evaluation.command('resume','one')
     with pytest.raises(WorkflowConflictError): evaluation.command('reset','one')
@@ -98,25 +100,25 @@ def test_ownership_reset_idempotency_restart_and_release():
 
 
 def test_maintenance_waits_for_inflight_dispatch_and_blocks_future_work():
-    db=MemoryDatabase(); evaluation=EvaluationStore(db)
+    db=MemoryDatabase(); evaluation=EvaluationService(EvaluationRepository(db))
     started, finished = Event(), Event()
     def pause():
         started.set()
         evaluation.command('acquire','one')
         finished.set()
-    with evaluation.running():
+    with MaintenanceGate(db).running():
         thread=Thread(target=pause); thread.start()
         assert started.wait(1)
         assert not finished.wait(0.05)
     thread.join(1)
     assert finished.is_set()
     with pytest.raises(WorkflowConflictError):
-        with EvaluationStore(db).running():
+        with MaintenanceGate(db).running():
             pytest.fail('maintenance allowed new work')
 
 
 def test_export_is_consistent_and_requires_ownership_in_maintenance():
-    db=MemoryDatabase(); evaluation=EvaluationStore(db)
+    db=MemoryDatabase(); evaluation=EvaluationService(EvaluationRepository(db))
     evaluation.command('acquire','one')
     with pytest.raises(WorkflowConflictError):evaluation.export('two')
     result=evaluation.export('one')
@@ -132,9 +134,8 @@ def test_control_auth_and_paused_api_gates():
     db=MemoryDatabase()
     class Store(FakeStore):
         def connection(self):return db.connection()
-        def running_guard(self):return EvaluationStore(self).running()
     store=Store()
-    app=create_app(settings(),start_loops=False,store=store,rca=FakeClient(),remediator=FakeClient(),learning=FakeClient())
+    app=create_app(settings(),start_loops=False,store=store,database=db,rca=FakeClient(),remediator=FakeClient(),learning=FakeClient())
     with TestClient(app) as client:
         endpoint='/api/v1/evaluation/acquire'
         assert client.post(endpoint,json={'run_id':'one'}).status_code==401

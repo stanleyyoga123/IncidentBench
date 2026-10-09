@@ -1,11 +1,13 @@
+from contextlib import nullcontext
+from types import SimpleNamespace
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import httpx
 
-from schema import DownstreamJob, Workflow
-from service import AUTO_APPROVAL_ACTOR, AUTO_APPROVAL_REASON, WorkflowCoordinator
-from store import WorkflowConflictError
+from features.agent_workflow.schema import DownstreamJob, Workflow
+from features.agent_workflow.workflow_coordinator import AUTO_APPROVAL_ACTOR, AUTO_APPROVAL_REASON, WorkflowCoordinator
+from infrastructure.workflow_conflict_error import WorkflowConflictError
 
 
 def now():
@@ -176,7 +178,7 @@ class FakeLearning:
 
 def coordinator(store, rca, remediator, learning=None):
     return WorkflowCoordinator(
-        store, rca, remediator, learning or FakeLearning(), batch_size=100
+        store, rca, remediator, learning or FakeLearning(), SimpleNamespace(running=nullcontext), batch_size=100
     )
 
 

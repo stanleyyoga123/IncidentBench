@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+from types import SimpleNamespace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -181,7 +183,7 @@ def operation_ids(app):
 
 def test_token_separation_idempotency_and_operation_ids():
     app = create_app(
-        settings(), start_loops=False, store=FakeStore(),
+        settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=FakeStore(),
         rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
     )
     with TestClient(app) as client:
@@ -242,7 +244,7 @@ def test_token_separation_idempotency_and_operation_ids():
 def test_store_token_owns_internal_job_routes():
     store = FakeStore()
     app = create_app(
-        settings(), start_loops=False, store=store,
+        settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
         rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
     )
     with TestClient(app) as client:
@@ -323,7 +325,7 @@ def test_output_endpoint_uses_store_auth_and_passes_lease():
     store = FakeStore()
     calls = []
     store.record_agent_output = lambda *args: calls.append(args)
-    app = create_app(settings(), start_loops=False, store=store,
+    app = create_app(settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
                      rca=FakeClient(), remediator=FakeClient(), learning=FakeClient())
     job_id = uuid4()
     body = {'lease_owner':'worker', 'raw_output':'answer', 'result':{'summary':'unverified'}}

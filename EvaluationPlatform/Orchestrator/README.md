@@ -31,6 +31,23 @@ for durable serial ownership, maintenance, full reset and consistent session exp
 Orchestrator remains available while configured workers are stopped. Database
 deployment and additive migrations live in `Database/`; runtime code remains DML-only.
 
+## Code ownership
+
+The service has two feature modules under `app/features/`:
+
+- `evaluation/` owns the Runner-facing HTTP interface, evaluation ownership and
+  maintenance transitions, reset, and session export. Its router, service,
+  repository, request schema, and export SQL live together.
+- `agent_workflow/` owns anomaly ingestion, workflow control, downstream agent
+  clients, coordination loops, job persistence, and agent-store HTTP endpoints.
+
+`app/api.py` composes both routers in one FastAPI service. Shared database
+connections, bearer authentication, and the maintenance gate live under
+`app/infrastructure/`. The gate is injected into agent requests and coordination,
+so evaluation maintenance still synchronizes with dispatch and writes without
+either feature constructing the other. HTTP paths, tokens, deployment settings,
+and Runner hooks remain unchanged.
+
 ## Container image
 
 Set `IMAGE_REGISTRY` and `IMAGE_TAG` before using this component's build or

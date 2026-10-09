@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterator, Literal
+from typing import Any, ContextManager, Literal
 from uuid import UUID, uuid4
 
+from infrastructure.database import Database
+from infrastructure.workflow_conflict_error import WorkflowConflictError
+
 from psycopg import Connection
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from schema import (
+from features.agent_workflow.schema import (
     AnomalyEventInput,
     IncidentLesson,
     LearningJob,
@@ -21,22 +22,12 @@ from schema import (
 )
 
 
-class WorkflowConflictError(RuntimeError):
-    pass
-
-
 class WorkflowStore:
-    def __init__(self, dsn: str):
-        self._dsn = dsn
+    def __init__(self, database: Database) -> None:
+        self._database = database
 
-    def running_guard(self):
-        from evaluation import EvaluationStore
-        return EvaluationStore(self).running()
-
-    @contextmanager
-    def connection(self) -> Iterator[Connection]:
-        with Connection.connect(self._dsn, row_factory=dict_row) as conn:
-            yield conn
+    def connection(self) -> ContextManager[Connection]:
+        return self._database.connection()
 
     def ingest(self, anomalies: list[AnomalyEventInput]) -> tuple[int, int, list[dict[str, Any]]]:
         accepted = 0

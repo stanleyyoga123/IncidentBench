@@ -5,7 +5,7 @@ import json
 
 import httpx
 
-from schema import DownstreamJob
+from features.agent_workflow.schema import DownstreamJob
 
 
 class AgentClient:
