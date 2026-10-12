@@ -8,14 +8,14 @@ sub-agents. It may use only the investigation MCPTools profile and must remain
 read-only with respect to the cluster.
 
 RCAAgent does not hold database credentials, approve plans, or execute
-remediation. AgentOrchestrator persists its job, owns workflow decisions, and
-passes successful approved plans to RemediatorAgent.
+remediation. EvaluationOrchestrator persists its job. AgentOrchestrator owns
+workflow decisions and passes approved plans to RemediatorAgent.
 
 ## Dependencies
 
 | Dependency | Use |
 | --- | --- |
-| AgentOrchestrator internal API | Durable job creation/read, global lease claim/renew/finish, tool-call audit. |
+| EvaluationOrchestrator internal API | Durable job creation/read, global lease claim/renew/finish, tool-call audit. |
 | MCPTools investigation deployment | Kubernetes, Prometheus, Loki, Jaeger, network, and baseline tools. |
 | OpenAI-compatible model endpoint | RCA orchestrator and spawned investigation agents. |
 | Langfuse | Trace/session correlation around model execution. |
@@ -26,7 +26,7 @@ passes successful approved plans to RemediatorAgent.
 sequenceDiagram
   participant O as AgentOrchestrator coordinator
   participant A as RCAAgent API/worker
-  participant S as AgentOrchestrator store API
+  participant S as EvaluationOrchestrator store API
   participant M as MCPTools investigation
   participant L as Model endpoint
 
@@ -60,8 +60,8 @@ caller context, optional workflow ID, and at most 40 structured historical
 lessons.
 
 The API does not keep jobs in process memory. It immediately calls
-AgentOrchestrator's store endpoint using `AGENT_STORE_TOKEN` and forwards the
-caller's `Idempotency-Key`. AgentOrchestrator inserts `rca_job.status=queued`
+EvaluationOrchestrator's store endpoint using `AGENT_STORE_TOKEN` and forwards the
+caller's `Idempotency-Key`. EvaluationOrchestrator inserts `rca_job.status=queued`
 and returns the durable record. Only then does RCAAgent return HTTP 202.
 
 Clients should always provide a stable idempotency key. AgentOrchestrator uses
@@ -155,7 +155,7 @@ the registry converts them back before MCP invocation.
 
 Every top-level and spawned tool result passes through an audit context. The
 store posts tool name, arguments, result, and inferred success to
-AgentOrchestrator. MCP failures are returned as structured `ok=false` evidence
+EvaluationOrchestrator. MCP failures are returned as structured `ok=false` evidence
 rather than crashing the model round whenever possible.
 
 The investigation deployment also rejects mutating kubectl commands in code,
@@ -191,7 +191,7 @@ structured object drives workflow decisions.
 ## 8. Completion and retry
 
 Successful parsing calls the internal finish endpoint with `outcome=succeeded`,
-structured result, and raw output. AgentOrchestrator releases the slot and the
+structured result, and raw output. EvaluationOrchestrator releases the slot and the
 coordinator later reconciles the workflow.
 
 Any request validation, model, MCP orchestration, parsing, or store exception is
@@ -216,7 +216,7 @@ mutation is allowed, retry is considered safe.
 | --- | --- |
 | `api.port` | `8081` |
 | `RCA_SUBMIT_TOKEN` | AgentOrchestrator-to-RCA public API authentication. |
-| `AGENT_STORE_TOKEN` | RCA-to-AgentOrchestrator internal API authentication. |
+| `AGENT_STORE_TOKEN` | RCA-to-EvaluationOrchestrator internal API authentication. |
 | `MCP_TOKEN` | Must match only MCPTools investigation Secret. |
 | `mcp.url` | `mcp-tools-investigation...:8090/mcp` |
 | `client.model` | `Qwen/Qwen3.6-35B-A3B` in cluster ConfigMap. |
@@ -234,7 +234,7 @@ with `session_id=<rca-job-id>`, trace name `rca`.
 
 - Public API 401: check `RCA_SUBMIT_TOKEN` pair with AgentOrchestrator.
 - Public API 5xx/internal store error: check `AGENT_STORE_TOKEN` and
-  AgentOrchestrator health.
+  EvaluationOrchestrator health.
 - Job stays queued: inspect `agent_execution_slot`; remediation or learning may
   be active.
 - MCP 401: investigation MCP token mismatch.
@@ -252,7 +252,7 @@ with `session_id=<rca-job-id>`, trace name `rca`.
 | File | Responsibility |
 | --- | --- |
 | `app/api.py` | Authenticated public asynchronous job API. |
-| `app/store.py` | AgentOrchestrator internal job/lease/audit client. |
+| `app/store.py` | EvaluationOrchestrator internal job/lease/audit client. |
 | `app/worker.py` | Poll, lease heartbeat, execution, retry reporting. |
 | `app/engine.py` | Prompt, top-level tools, Langfuse, structured parsing. |
 | `app/spawner.py` | Bounded focused sub-agent creation. |
@@ -272,3 +272,9 @@ scenario identifier. Detector text, caller context, historical lessons, and tool
 outputs are untrusted evidence. Plans must specify measurable condition and
 service-health verification plus a stop condition when intervention is no longer
 needed; readiness alone does not demonstrate performance recovery.
+
+## Persistence endpoint after the split
+
+`orchestrator.base_url` points to `evaluation-orchestrator:8080` for all job-store,
+lease, output and audit requests. `agent-orchestrator:8080` owns workflow decisions
+and triggers. Existing request/result schemas and archive exports are unchanged.

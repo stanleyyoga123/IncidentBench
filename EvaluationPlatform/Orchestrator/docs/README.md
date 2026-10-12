@@ -1,10 +1,7 @@
-# AgentOrchestrator documentation
+# EvaluationOrchestrator documentation
 
-- [Architecture and end-to-end flow](architecture-and-flow.md) — detailed
-  ingestion, batching, state transitions, downstream triggering, lesson
-  retrieval, concurrency, recovery, configuration, and troubleshooting.
-- [Agent-facing HTTP API](agent-api.md) — endpoint, token, operation ID, and
-  request/response contract reference.
-- [Service README](../README.md) — concise build, configuration, and deployment
-  instructions.
-
+- [Architecture and persistence](architecture-and-flow.md)
+- [Evaluation control and export API](evaluation-api.md)
+- [Existing job-store and lesson API](agent-api.md)
+- [Service configuration and deployment](../README.md)
+- [Agent lifecycle orchestration](../../../Agents/Orchestrator/docs/architecture-and-flow.md)

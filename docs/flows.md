@@ -5,12 +5,12 @@
 1. AnomalyDetector fetches the aligned Prometheus window and evaluates the
    active detector profiles.
 2. It builds deterministic event IDs and submits one authenticated batch.
-3. AgentOrchestrator commits all events before returning acknowledgement.
+3. AgentOrchestrator asks EvaluationOrchestrator to commit all events before returning acknowledgement.
 4. Only then does AnomalyDetector start per-series cooldown.
 5. Every 60 seconds AgentOrchestrator claims up to the oldest 100 pending events
    from one namespace scope and creates one RCA job. Cluster-scoped events form
    their own batch.
-6. RCAAgent acquires the global lease through AgentOrchestrator, gathers
+6. RCAAgent acquires the global lease through EvaluationOrchestrator, gathers
    evidence through investigation MCPTools, persists a structured result and
    audits via the job-store APIs, then releases the lease.
 7. A no-action result enters learning. A remediation plan enters
@@ -60,10 +60,10 @@ wait for review or replay the same mutation.
 
 ## Evaluation
 
-The Runner resolves JSON configuration, claims the bundled Orchestrator's evaluation
+The Runner resolves JSON configuration, claims the EvaluationOrchestrator's evaluation
 ownership and maintenance state, and invokes named pre-run shell hooks. The full
-reset and post-run session export use authenticated Orchestrator APIs. Configured
-worker deployments stop before reset and baseline; Orchestrator remains online.
+reset and post-run session export use authenticated EvaluationOrchestrator APIs. Configured
+worker deployments stop before reset and baseline; both orchestrators remain online.
 After baseline, the integration starts workers and resumes dispatch. Finalization
 stops workers, removes chaos and captures evidence before post-run exports.
 Failures remain recorded and unsafe cleanup prevents subsequent runs. See the

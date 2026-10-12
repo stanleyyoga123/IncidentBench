@@ -3,7 +3,7 @@ set -euo pipefail
 
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/deployment/image_config.sh"
-readonly COMPONENTS="mcp-tools learning-agent rca-agent remediator-agent agent-orchestrator anomaly-detector database-job runner"
+readonly COMPONENTS="mcp-tools learning-agent rca-agent remediator-agent evaluation-orchestrator agent-orchestrator anomaly-detector database-job runner"
 
 usage() {
   echo "Usage: $0 [all | COMPONENT ...]"
@@ -30,9 +30,10 @@ for component in "${selected[@]}"; do
     learning-agent) script="Agents/LearningAgent/build.sh" ;;
     rca-agent) script="Agents/RCAAgent/build.sh" ;;
     remediator-agent) script="Agents/RemediatorAgent/build.sh" ;;
-    agent-orchestrator) script="EvaluationPlatform/Orchestrator/build.sh" ;;
+    evaluation-orchestrator) script="EvaluationPlatform/Orchestrator/build.sh" ;;
+    agent-orchestrator) script="Agents/Orchestrator/build.sh" ;;
     anomaly-detector) script="Agents/AnomalyDetector/build.sh" ;;
-    database-job) script="EvaluationPlatform/Orchestrator/Database/build.sh" ;;
+    database-job) script="EvaluationPlatform/Database/build.sh" ;;
     runner) script="EvaluationPlatform/Runner/scripts/build.sh" ;;
     *) echo "Error: unknown component '$component'." >&2; usage >&2; exit 2 ;;
   esac

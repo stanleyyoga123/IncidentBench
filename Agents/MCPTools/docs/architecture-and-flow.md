@@ -13,7 +13,7 @@ One codebase/image runs as two deployments:
   RemediatorAgent.
 
 MCPTools never writes workflow or job rows. Calling agents send tool-call audits
-to AgentOrchestrator. This keeps cluster credentials and database credentials in
+to EvaluationOrchestrator. This keeps cluster credentials and database credentials in
 different services.
 
 ## Transport and request path
@@ -29,7 +29,7 @@ sequenceDiagram
   participant S as MCPTools ASGI middleware
   participant T as Tool implementation
   participant X as Kubernetes/Prometheus/Loki/Jaeger/probe
-  participant O as AgentOrchestrator audit API
+  participant O as EvaluationOrchestrator audit API
 
   A->>S: HTTP /mcp + Bearer profile token
   S->>S: constant-time token check, host protection
@@ -180,7 +180,7 @@ check record. Rewriting any input changes the hash and requires a new check.
 
 The remediation deployment uses one replica and `Recreate` strategy so session
 state and PVC attachment remain unambiguous. RemediatorAgent separately audits
-file content/results to AgentOrchestrator for durable workflow history.
+file content/results to EvaluationOrchestrator for durable workflow history.
 
 ## RBAC model
 

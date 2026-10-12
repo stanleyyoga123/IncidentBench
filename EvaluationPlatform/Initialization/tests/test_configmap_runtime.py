@@ -11,8 +11,14 @@ WORKSPACE = Path(__file__).resolve().parents[3]
 CASES = [
     (
         WORKSPACE / "EvaluationPlatform/Orchestrator/kubernetes/configmap.yaml",
-        "agent-orchestrator-config",
+        "evaluation-orchestrator-config",
         WORKSPACE / "EvaluationPlatform/Orchestrator",
+        "from app.config import get_settings; get_settings()",
+    ),
+    (
+        WORKSPACE / "Agents/Orchestrator/kubernetes/configmap.yaml",
+        "agent-orchestrator-config",
+        WORKSPACE / "Agents/Orchestrator",
         "from app.config import get_settings; get_settings()",
     ),
     (

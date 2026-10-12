@@ -118,13 +118,13 @@ the platform playbook.
 From the workspace root:
 
 ```bash
-docker compose --env-file EvaluationPlatform/Orchestrator/Database/.env \
-  -f EvaluationPlatform/Orchestrator/Database/compose/database.yml up -d postgres
-docker compose --env-file EvaluationPlatform/Orchestrator/Database/.env \
-  -f EvaluationPlatform/Orchestrator/Database/compose/database.yml run --rm migration
+docker compose --env-file EvaluationPlatform/Database/.env \
+  -f EvaluationPlatform/Database/compose/database.yml up -d postgres
+docker compose --env-file EvaluationPlatform/Database/.env \
+  -f EvaluationPlatform/Database/compose/database.yml run --rm migration
 ```
 
-Copy `EvaluationPlatform/Orchestrator/Database/.env.example` to the ignored `.env` and replace every
+Copy `EvaluationPlatform/Database/.env.example` to the ignored `.env` and replace every
 placeholder before running these commands.
 
 ## Validation

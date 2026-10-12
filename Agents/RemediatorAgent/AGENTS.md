@@ -6,7 +6,7 @@ mode, guarded live execution, and direct post-action verification. Any nonempty 
 execution or recovery outcome. Empty output or errors preventing durable completion
 remain `failed`; never retry a mutation blindly. Use only the remediation MCP profile and explicit session IDs.
 Persist jobs, leases, tool-call audits, and artifacts by calling
-AgentOrchestrator's job-store APIs. This service has no database credentials.
+EvaluationOrchestrator's job-store APIs. This service has no database credentials.
 
 Own `kubernetes/configmap.yaml`, placeholder-only `kubernetes/secret.example.yml`,
 the Deployment/ClusterIP Service in `kubernetes/manifest.yaml`, and `deploy.sh`.

@@ -16,9 +16,10 @@ BUILD_SCRIPTS = {
     "learning-agent": "Agents/LearningAgent/build.sh",
     "rca-agent": "Agents/RCAAgent/build.sh",
     "remediator-agent": "Agents/RemediatorAgent/build.sh",
-    "agent-orchestrator": "EvaluationPlatform/Orchestrator/build.sh",
+    "evaluation-orchestrator": "EvaluationPlatform/Orchestrator/build.sh",
+    "agent-orchestrator": "Agents/Orchestrator/build.sh",
     "anomaly-detector": "Agents/AnomalyDetector/build.sh",
-    "database-job": "EvaluationPlatform/Orchestrator/Database/build.sh",
+    "database-job": "EvaluationPlatform/Database/build.sh",
     "evaluation": "EvaluationPlatform/Runner/scripts/build.sh",
 }
 MANIFESTS = {
@@ -29,9 +30,10 @@ MANIFESTS = {
     "learning-agent": ["Agents/LearningAgent/kubernetes/manifest.yaml"],
     "rca-agent": ["Agents/RCAAgent/kubernetes/manifest.yaml"],
     "remediator-agent": ["Agents/RemediatorAgent/kubernetes/manifest.yaml"],
-    "agent-orchestrator": ["EvaluationPlatform/Orchestrator/kubernetes/manifest.yaml"],
+    "evaluation-orchestrator": ["EvaluationPlatform/Orchestrator/kubernetes/manifest.yaml"],
+    "agent-orchestrator": ["Agents/Orchestrator/kubernetes/manifest.yaml"],
     "anomaly-detector": ["Agents/AnomalyDetector/kubernetes/manifest.yaml"],
-    "database-job": ["EvaluationPlatform/Orchestrator/Database/kubernetes/job.yaml"],
+    "database-job": ["EvaluationPlatform/Database/kubernetes/job.yaml"],
     "evaluation": ["EvaluationPlatform/Runner/kubernetes/pod.yaml"],
 }
 REGISTRY = "registry.example.test:5000/research"
@@ -148,9 +150,10 @@ def test_render_finishes_when_configured_image_equals_manifest_marker():
         ("learning-agent", "Agents/LearningAgent", "deploy.sh"),
         ("rca-agent", "Agents/RCAAgent", "deploy.sh"),
         ("remediator-agent", "Agents/RemediatorAgent", "deploy.sh"),
-        ("agent-orchestrator", "EvaluationPlatform/Orchestrator", "deploy.sh"),
+        ("evaluation-orchestrator", "EvaluationPlatform/Orchestrator", "deploy.sh"),
+        ("agent-orchestrator", "Agents/Orchestrator", "deploy.sh"),
         ("anomaly-detector", "Agents/AnomalyDetector", "deploy.sh"),
-        ("database-job", "EvaluationPlatform/Orchestrator/Database", "deploy.sh"),
+        ("database-job", "EvaluationPlatform/Database", "deploy.sh"),
         ("evaluation", "EvaluationPlatform/Runner", "scripts/deploy.sh"),
     ],
 )

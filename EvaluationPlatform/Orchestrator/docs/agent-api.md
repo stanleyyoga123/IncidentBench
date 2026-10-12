@@ -1,22 +1,17 @@
-# AgentOrchestrator agent API
+# EvaluationOrchestrator store API
 
-Base path `/api/v1`. Send `Authorization: Bearer <token>`. The ingestion token
-can call only `POST /anomalies`; the control token can call workflow endpoints;
-the store token can call only `/internal/...` job-store endpoints.
+Base path `/api/v1` on `evaluation-orchestrator:8080`. Existing worker job,
+result, audit and artifact payloads and operation IDs are unchanged. Internal
+routes use `AGENT_STORE_TOKEN`; lesson controls use `AGENT_CONTROL_TOKEN`.
+Detector ingestion and lifecycle controls moved to
+[AgentOrchestrator](../../../Agents/Orchestrator/docs/agent-api.md).
 
 | operationId | Method/path | Purpose |
 | --- | --- | --- |
-| `ingest_anomaly_events` | `POST /anomalies` | Commit 1–1000 event envelopes; returns accepted/duplicate counts. |
-| `list_agent_workflows` | `GET /workflows` | List workflow status and job references. |
-| `get_agent_workflow` | `GET /workflows/{id}` | Read one workflow/version/decision/error. |
-| `approve_agent_workflow` | `POST /workflows/{id}/approve` | Optional manual approve; the reconciler auto-approves as `agent-orchestrator` when RCA requires remediation. |
-| `decline_agent_workflow` | `POST /workflows/{id}/decline` | Close without mutation while status is still `awaiting_approval`. |
-| `retry_agent_workflow` | `POST /workflows/{id}/retry` | Explicitly resubmit a failed/reviewed phase. |
 | `list_incident_lessons` | `GET /lessons` | List active/all reusable lessons. |
 | `get_incident_lesson` | `GET /lessons/{id}` | Read one lesson and version. |
 | `enable_incident_lesson` | `POST /lessons/{id}/enable` | Enable a lesson with actor/reason/version. |
 | `disable_incident_lesson` | `POST /lessons/{id}/disable` | Disable a lesson with actor/reason/version. |
-| `get_agent_orchestrator_health` | `GET /health` | Health and global-slot availability. |
 | `create_internal_rca_job` | `POST /internal/rca/jobs` | Persist an RCA job for RCAAgent. |
 | `get_internal_rca_job` | `GET /internal/rca/jobs/{id}` | Read a persisted RCA job. |
 | `create_internal_remediation_job` | `POST /internal/remediation/jobs` | Persist a remediation job. |
@@ -33,17 +28,17 @@ the store token can call only `/internal/...` job-store endpoints.
 | `upsert_internal_remediation_artifact` | `POST /internal/remediation/jobs/{id}/artifacts` | Upsert a named artifact. |
 | `list_internal_remediation_artifacts` | `GET /internal/remediation/jobs/{id}/artifacts` | List artifact filenames. |
 
-Treat HTTP 409 as a stale version or invalid transition and re-read before
-deciding. Treat duplicate ingestion as success. When RCA succeeds with
-`remediation_required=true`, AgentOrchestrator auto-approves as
-`agent-orchestrator` and submits remediator with the canonical SHA-256 snapshot.
-Successful no-action RCA and verified remediation then block in learning states.
-Learning success publishes atomic lessons; the third failure completes without
-lessons. New RCA jobs receive at most 40 active relevant lessons.
-
 `record_internal_agent_output`: `POST /api/v1/internal/{service}/jobs/{job_id}/output`
 checkpoints `raw_output` and optional `result` while the request's `lease_owner`
-still owns the running job. Uses the store token; returns 204 or 409 for a stale
-lease/maintenance. Services: `rca`, `remediation`, `learning`. Finish calls preserve
-checkpointed fields when omitted. Remediation failures are terminal `failed`
-with retained output; they never wait for manual review.
+owns the running job. It uses the store token, returning 204 or 409 for a stale
+lease/maintenance. Services are `rca`, `remediation`, `learning`. Finish calls
+preserve checkpointed fields when omitted. Remediation failures remain terminal
+with retained output and do not replay ambiguous mutations.
+
+The additional `/api/v1/internal/orchestration/...` persistence routes are used
+by AgentOrchestrator for event ingestion, workflow claims/reads/transitions, job
+attachment, lesson retrieval and audit snapshots. They require the store token;
+mutations use the same maintenance gate. They do not call downstream agents.
+Refer to `/openapi.json` for their typed request/response contracts.
+
+See [evaluation API](evaluation-api.md) for Runner control and exports.

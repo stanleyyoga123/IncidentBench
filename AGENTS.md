@@ -20,10 +20,14 @@ overrides this file for local implementation details.
 - `Agents/AnomalyDetector/`: Prometheus collection, adaptive statistical detection,
   deterministic event envelopes, authenticated HTTP delivery, and its
   ConfigMap, Secret, Deployment/Service manifest, and deploy script.
-- `EvaluationPlatform/Orchestrator/`: anomaly ingestion, idempotency, workflow state,
-  job/slot/audit/artifact DML, batching, reconciliation, automatic remediation
-  submission after RCA, decline/retry, downstream submission, and its ConfigMap,
-  Secret, NetworkPolicy, Deployment/Service, and deploy script.
+- `EvaluationPlatform/Orchestrator/`: sole application DML owner, existing
+  job/slot/audit/artifact and lesson APIs, internal orchestration persistence,
+  evaluation ownership/reset/export, ConfigMap, Secret, Runner NetworkPolicy,
+  Deployment/Service, and deploy script.
+- `Agents/Orchestrator/`: detector ingestion facade, batching, reconciliation,
+  lifecycle decisions, automatic remediation and learning submission, decline/retry,
+  authenticated persistence client, read-only database maintenance gate, and its
+  ConfigMap, Secret, shared NetworkPolicy, Deployment/Service, and deploy script.
 - `Agents/RCAAgent/`: durable asynchronous RCA jobs, LLM sub-agent orchestration, and
   its ConfigMap, Secret, Deployment/Service, and deploy script.
 - `Agents/RemediatorAgent/`: approved asynchronous remediation and verification jobs,
@@ -34,7 +38,7 @@ overrides this file for local implementation details.
   tools and their Kubernetes RBAC, deployments, PVC, Services, and network
   probe DaemonSets, Secrets, and deploy script. Investigation and remediation
   use separate profiles.
-- `EvaluationPlatform/Orchestrator/Database/`: Alembic migrations, sole ownership of database DDL,
+- `EvaluationPlatform/Database/`: Alembic migrations, sole ownership of database DDL,
   PostgreSQL/Secret/migration manifests, local Compose, and deploy script.
 - `EvaluationPlatform/Initialization/`: Ansible inventory, cluster/node setup, platform
   namespaces and tools, and Helm values. It does not deploy applications,
@@ -64,7 +68,7 @@ The workspace is a Git repository. Components may contain unrelated local change
 10. Remediation follows validation, artifact creation, Ansible check mode,
     guarded live execution, then direct post-action verification.
 11. MCPTools never writes workflow state. Job services audit
-    tool calls through AgentOrchestrator; only AgentOrchestrator performs DML.
+    tool calls through EvaluationOrchestrator; only EvaluationOrchestrator performs DML.
 12. The investigation MCP profile rejects mutating kubectl commands in code;
     read-only RBAC is a second enforcement layer.
 13. Remediation artifact calls always carry an explicit `session_id`.
@@ -75,10 +79,10 @@ The workspace is a Git repository. Components may contain unrelated local change
 
 ## APIs and authentication
 
-- AgentOrchestrator ingestion, control, and internal job-store use different
-  bearer tokens.
+- AgentOrchestrator ingestion/control and EvaluationOrchestrator internal
+  job-store use different bearer tokens.
 - RCAAgent, RemediatorAgent, and LearningAgent each use a submission token and share
-  `AGENT_STORE_TOKEN` with AgentOrchestrator.
+  `AGENT_STORE_TOKEN` with both orchestrators.
 - The two MCP deployments use distinct bearer tokens and service accounts.
 - All HTTP services are ClusterIP-only and publish stable OpenAPI operation IDs.
 - MCP uses stateless JSON Streamable HTTP at `/mcp`.
@@ -88,7 +92,7 @@ Secrets as sensitive. Never log, quote, commit, or duplicate their values.
 
 ## Database rules
 
-Only `EvaluationPlatform/Orchestrator/Database/` may create or alter tables. Only `EvaluationPlatform/Orchestrator/`
+Only `EvaluationPlatform/Database/` may create or alter tables. Only `EvaluationPlatform/Orchestrator/`
 performs application DML. The active schema is:
 
 - `anomaly_event`, `agent_workflow`, `rca_job`, `remediation_job`, `learning_job`;
@@ -122,8 +126,9 @@ Run focused tests, then component suites. At minimum:
 
 ```bash
 (cd Agents/AnomalyDetector && PYTHONPATH=src pytest -q)
-(cd EvaluationPlatform/Orchestrator/Database && pytest -q)
+(cd EvaluationPlatform/Database && pytest -q)
 (cd EvaluationPlatform/Orchestrator && pytest -q)
+(cd Agents/Orchestrator && pytest -q)
 (cd EvaluationPlatform/Runner && pytest -q)
 (cd EvaluationPlatform/Grader && pytest -q)
 python -m compileall -q Agents EvaluationPlatform
@@ -135,14 +140,14 @@ services.
 
 ## Coordinated rollout
 
-1. Scale the old agent and detector down.
-2. Replace DatabaseJob Secret placeholders and run `EvaluationPlatform/Orchestrator/Database/deploy.sh`
-   with `ALLOW_AGENT_WORKFLOW_RESET=true` for the destructive reset.
-3. Deploy and verify both MCPTools profiles.
-4. Deploy and verify LearningAgent, RCAAgent, and RemediatorAgent.
-5. Deploy and verify AgentOrchestrator.
-6. Deploy AnomalyDetector and enable ingestion.
-7. Verify API health, MCP discovery, lesson generation, and one end-to-end flow.
+The orchestrator service split has no schema migration or reset. Preserve all
+existing rows and archives; experiments do not need rerunning. With confirmed
+idle jobs and evaluation ownership, stop the old combined orchestrator/detector,
+deploy EvaluationOrchestrator against the existing database, update worker store
+URLs, deploy Agents/Orchestrator, then resume detector ingestion. See
+`docs/operations.md` for the cutover. Never run Database/deploy.sh or the Runner
+reset hook merely to install this split. Fresh installations still need normal
+Database migrations before starting services.
 
 ## Evaluation platform boundary
 
@@ -150,6 +155,6 @@ Runner experiments are resolved from versioned scenario/global/suite JSON. Named
 pre/post shell folders and lifecycle integrations own solution-specific behavior.
 Runner never has workflow SQL or database credentials. Orchestrator's authenticated
 evaluation API owns reset/export and durable serial evaluation ownership.
-Orchestrator stays running during baseline; deployments to scale are in JSON.
+Both orchestrators stay running during baseline; deployments to scale are in JSON.
 Maintenance transitions serialize against dispatch and mutating store requests.
-The migration job under Orchestrator/Database remains the sole DDL owner.
+The migration job under EvaluationPlatform/Database remains the sole DDL owner.

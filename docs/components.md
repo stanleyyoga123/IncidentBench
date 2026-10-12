@@ -3,7 +3,8 @@
 | Component | Owns | Does not own |
 | --- | --- | --- |
 | AnomalyDetector | detection, delivery, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL or workflow state |
-| AgentOrchestrator | workflows, automatic remediator submission, all application DML, ConfigMap, Secret, NetworkPolicy, workload manifest, deploy script | LLM reasoning or cluster tools |
+| AgentOrchestrator | detector ingestion, lifecycle decisions, dispatch, automatic remediation, shared NetworkPolicy, component deployment | database writes, evaluation exports, LLM reasoning or cluster tools |
+| EvaluationOrchestrator | all application DML, existing job/audit/artifact APIs, evaluation controls and exports, Runner ingress policy | agent dispatch or model inference |
 | RCAAgent | asynchronous RCA, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL DML or remediation execution |
 | RemediatorAgent | snapshot-validated execution/verification, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL DML, approval policy, or detector tuning |
 | LearningAgent | asynchronous atomic lesson generation, ConfigMap, Secret, workload manifest, deploy script | PostgreSQL DML, cluster tools, or detector tuning |

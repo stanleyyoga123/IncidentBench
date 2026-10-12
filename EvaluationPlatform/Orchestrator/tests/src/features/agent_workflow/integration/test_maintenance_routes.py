@@ -4,8 +4,10 @@ from fastapi.testclient import TestClient
 
 JOB_ID = "00000000-0000-0000-0000-000000000001"
 MUTATIONS = [
-    ("/api/v1/anomalies", "ingest"),
-    *[(f"/api/v1/workflows/{JOB_ID}/{action}", "control") for action in ("approve", "decline", "retry")],
+    ("/api/v1/internal/orchestration/anomalies", "store"),
+    ("/api/v1/internal/orchestration/workflows/claim", "store"),
+    *[(f"/api/v1/internal/orchestration/workflows/{JOB_ID}/{action}", "store")
+      for action in ("decision", "retry", "submission-failed", "downstream-failed", "rca/attach", "rca/state", "remediation/attach", "remediation/state", "learning/attach", "learning/state")],
     *[(f"/api/v1/lessons/{JOB_ID}/{action}", "control") for action in ("enable", "disable")],
     *[(f"/api/v1/internal/{service}/jobs", "store") for service in ("rca", "remediation", "learning")],
     *[(f"/api/v1/internal/{service}/jobs/{JOB_ID}/{action}", "store")

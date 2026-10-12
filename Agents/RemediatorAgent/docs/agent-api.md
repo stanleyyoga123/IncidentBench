@@ -11,7 +11,7 @@ Use the remediation submission bearer token.
 The snapshot must say `remediation_required=true`, include actor/reason, and
 match its canonical JSON SHA-256. `failed` is terminal and finalizes automatically; no human review is required.
 A fresh incident can trigger a new investigation. The
-public job API persists by calling AgentOrchestrator's internal job-store.
+public job API persists by calling EvaluationOrchestrator's internal job-store.
 
 `succeeded` means a nonempty final agent output was recorded, not verified recovery.
 Execution and recovery outcomes remain in the result, raw output, and tool audits.

@@ -68,7 +68,7 @@ Example scenario:
 }
 ```
 
-Global config supplies shared `load`, `timing`, `integration`, `agents_enabled`, `deployments`, `prerun`, and `postrun`. The bundled configuration preserves the existing six worker/MCP deployments; Orchestrator is deliberately absent because its HTTP interface must remain available. Each deployment has `namespace`, `name`, and positive `replicas` for activation. Shutdown always uses zero and waits for all matching pods, including terminating pods, to disappear.
+Global config supplies shared `load`, `timing`, `integration`, `agents_enabled`, `deployments`, `prerun`, and `postrun`. The bundled configuration preserves the existing six worker/MCP deployments; Both orchestrators are deliberately absent because evaluation HTTP and maintenance coordination must remain available. Each deployment has `namespace`, `name`, and positive `replicas` for activation. Shutdown always uses zero and waits for all matching pods, including terminating pods, to disappear.
 
 Traffic parameters:
 
@@ -104,7 +104,7 @@ Execution order:
 2. Integration `prepare`; bundled acquires durable ownership/maintenance and scales configured workers down.
 3. Ordered pre-run hooks; bundled requests full HTTP reset, installs the application, then grants MCP remediation permissions.
 4. Clear stale chaos, render/archive inputs, normalize and verify placement, warm up the application, start traffic and collect baseline.
-5. Integration `activate` only when agents are enabled; bundled waits for worker readiness, then resumes Orchestrator dispatch.
+5. Integration `activate` only when agents are enabled; bundled waits for worker readiness, then resumes evaluation state so AgentOrchestrator can dispatch.
 6. Execute ordered chaos/recovery steps and collect metrics.
 7. Always finalize load, port forwarding, chaos and evidence; integration `stop` is idempotent and may be invoked again during outer finalization.
 8. Attempt every post-run hook even when an earlier post-run hook fails. Export requires ownership in maintenance. Release ownership only after safe cleanup and successful hooks; maintenance remains enabled until the next run activates.
@@ -227,3 +227,5 @@ script pushes it; the deploy script renders the same reference into the
 first-party Kubernetes manifest before applying it. The checked-in
 `incidentbench.invalid/*:configure-me` reference is a non-pullable marker.
 Third-party images are unaffected.
+
+Runner `orchestrator_url` points to `http://evaluation-orchestrator.agents.svc.cluster.local:8080`. The service split preserves all six `sessions/*.json` exports and full archive contents; existing experiment archives need no conversion or rerun.

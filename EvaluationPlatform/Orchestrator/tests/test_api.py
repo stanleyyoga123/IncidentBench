@@ -11,22 +11,6 @@ from api import create_app
 from config import Settings
 
 
-PUBLIC_OPERATION_IDS = {
-    "get_evaluation_state", "evaluation_acquire", "evaluation_pause", "evaluation_resume",
-    "evaluation_reset", "evaluation_release", "export_evaluation_sessions",
-    "get_agent_orchestrator_health",
-    "ingest_anomaly_events",
-    "list_agent_workflows",
-    "get_agent_workflow",
-    "approve_agent_workflow",
-    "decline_agent_workflow",
-    "retry_agent_workflow",
-    "list_incident_lessons",
-    "get_incident_lesson",
-    "enable_incident_lesson",
-    "disable_incident_lesson",
-}
-
 INTERNAL_OPERATION_IDS = {
     "record_internal_agent_output",
     "create_internal_rca_job",
@@ -138,11 +122,6 @@ class FakeStore:
         self.tool_calls.append((service, job_id, tool_name, arguments, result))
 
 
-class FakeClient:
-    def close(self):
-        pass
-
-
 def settings():
     return Settings.model_validate(
         {
@@ -181,71 +160,27 @@ def operation_ids(app):
     }
 
 
-def test_token_separation_idempotency_and_operation_ids():
-    app = create_app(
-        settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=FakeStore(),
-        rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
-    )
-    with TestClient(app) as client:
-        assert client.post("/api/v1/anomalies", json={"anomalies": [event()]}).status_code == 401
-        assert client.post(
-            "/api/v1/anomalies",
-            headers={"Authorization": "Bearer control"},
-            json={"anomalies": [event()]},
-        ).status_code == 401
-        response = client.post(
-            "/api/v1/anomalies",
-            headers={"Authorization": "Bearer ingest"},
-            json={"anomalies": [event()]},
-        )
-        assert response.status_code == 201
-        unscoped = event()
-        unscoped.pop("namespace")
-        assert client.post(
-            "/api/v1/anomalies",
-            headers={"Authorization": "Bearer ingest"},
-            json={"anomalies": [unscoped]},
-        ).status_code == 422
-        assert response.json()["accepted"] == 1
-        duplicate = client.post(
-            "/api/v1/anomalies",
-            headers={"Authorization": "Bearer ingest"},
-            json={"anomalies": [event()]},
-        )
-        assert duplicate.json()["duplicates"] == 1
-        assert client.get(
-            "/api/v1/workflows", headers={"Authorization": "Bearer ingest"}
-        ).status_code == 401
-        assert client.get(
-            "/api/v1/workflows", headers={"Authorization": "Bearer control"}
-        ).status_code == 200
-        assert client.get(
-            "/api/v1/lessons", headers={"Authorization": "Bearer ingest"}
-        ).status_code == 401
-        assert client.get(
-            "/api/v1/lessons", headers={"Authorization": "Bearer control"}
-        ).json() == {"lessons": []}
-        assert client.post(
-            "/api/v1/internal/rca/jobs",
-            headers={"Authorization": "Bearer ingest"},
-            json={"anomalies": [{"event_id": "a" * 64}]},
-        ).status_code == 401
-        assert client.post(
-            "/api/v1/internal/rca/jobs",
-            headers={"Authorization": "Bearer control"},
-            json={"anomalies": [{"event_id": "a" * 64}]},
-        ).status_code == 401
-
+def test_platform_operation_ids_preserve_store_and_evaluation_interfaces():
+    app = create_app(settings(), maintenance_gate=SimpleNamespace(running=nullcontext), store=FakeStore())
     ids = operation_ids(app)
-    assert ids == PUBLIC_OPERATION_IDS | INTERNAL_OPERATION_IDS
-    assert len(ids) == len(set(ids)) == 34
+    expected_public = {
+        "get_evaluation_state", "evaluation_acquire", "evaluation_pause", "evaluation_resume",
+        "evaluation_reset", "evaluation_release", "export_evaluation_sessions",
+        "get_evaluation_orchestrator_health", "list_incident_lessons", "get_incident_lesson",
+        "enable_incident_lesson", "disable_incident_lesson",
+    }
+    assert INTERNAL_OPERATION_IDS | expected_public <= ids
+    assert "ingest_anomaly_events" not in ids
+    assert "approve_agent_workflow" not in ids
+    all_ids = [value["operationId"] for path in app.openapi()["paths"].values()
+               for value in path.values() if "operationId" in value]
+    assert len(all_ids) == len(set(all_ids))
 
 
 def test_store_token_owns_internal_job_routes():
     store = FakeStore()
     app = create_app(
-        settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
-        rca=FakeClient(), remediator=FakeClient(), learning=FakeClient(),
+        settings(), maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
     )
     with TestClient(app) as client:
         created = client.post(
@@ -325,8 +260,8 @@ def test_output_endpoint_uses_store_auth_and_passes_lease():
     store = FakeStore()
     calls = []
     store.record_agent_output = lambda *args: calls.append(args)
-    app = create_app(settings(), start_loops=False, maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
-                     rca=FakeClient(), remediator=FakeClient(), learning=FakeClient())
+    app = create_app(settings(), maintenance_gate=SimpleNamespace(running=nullcontext), store=store,
+                     )
     job_id = uuid4()
     body = {'lease_owner':'worker', 'raw_output':'answer', 'result':{'summary':'unverified'}}
     with TestClient(app) as client:

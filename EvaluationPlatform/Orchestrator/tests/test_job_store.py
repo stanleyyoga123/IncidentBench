@@ -326,3 +326,40 @@ def test_remediation_failure_finishes_workflow_without_manual_review():
     for status in ('failed', 'needs_review'):
         store.set_remediation_state(uuid4(), status, error={'type':'VerificationError'})
     assert all(c['status'] == c['anomaly_status'] == 'failed' and c['completed'] for c in changes)
+
+
+def test_get_workflow_uses_injected_database_connection():
+    now = datetime.now(timezone.utc)
+    identifier = uuid4()
+    cursor = Cursor(rows=[{
+        "id": identifier, "status": "rca_submitting", "version": 1,
+        "created_at": now, "updated_at": now,
+    }])
+    connection = Connection(cursor)
+
+    class InjectedDatabase:
+        @contextmanager
+        def connection(self):
+            yield connection
+
+    result = WorkflowStore(InjectedDatabase()).get_workflow(identifier)
+    assert result.id == identifier
+    assert cursor.queries == [("SELECT * FROM agent_workflow WHERE id = %s", (identifier,))]
+
+
+def test_get_workflow_reuses_supplied_transaction_without_opening_connection():
+    now = datetime.now(timezone.utc)
+    identifier = uuid4()
+    cursor = Cursor(rows=[{
+        "id": identifier, "status": "rca_submitting", "version": 1,
+        "created_at": now, "updated_at": now,
+    }])
+    connection = Connection(cursor)
+
+    class UnusedDatabase:
+        def connection(self):
+            raise AssertionError("opened second transaction")
+
+    result = WorkflowStore(UnusedDatabase()).get_workflow(identifier, for_update=True, conn=connection)
+    assert result.id == identifier
+    assert cursor.queries == [("SELECT * FROM agent_workflow WHERE id = %s FOR UPDATE", (identifier,))]

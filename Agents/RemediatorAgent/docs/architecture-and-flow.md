@@ -8,14 +8,15 @@ to use mutating MCP capabilities.
 
 It does not diagnose from scratch, approve its own plan, persist directly to
 PostgreSQL, or retry an ambiguous mutation automatically. AgentOrchestrator
-supplies the approved RCA snapshot and owns the durable job/audit records.
+supplies the approved RCA snapshot; EvaluationOrchestrator owns the durable
+job/audit records.
 MCPTools enforces filesystem, Ansible, command, and Kubernetes boundaries.
 
 ## Dependencies
 
 | Dependency | Use |
 | --- | --- |
-| AgentOrchestrator internal API | Persist/read job, claim/renew/release global slot, tool audits, artifact listing. |
+| EvaluationOrchestrator internal API | Persist/read job, claim/renew/release global slot, tool audits, artifact listing. |
 | MCPTools remediation deployment | Read validation, session artifact files, check/live Ansible, post-action verification. |
 | OpenAI-compatible model endpoint | Executes the constrained remediation workflow. |
 | Langfuse | Correlates the model session with remediation job ID. |
@@ -62,7 +63,7 @@ boolean `true`, the hash matches, actor/reason are non-empty, and version is
 positive. This prevents a stale or modified plan from being executed under a
 different approval.
 
-The API forwards the request and `Idempotency-Key` to AgentOrchestrator's
+The API forwards the request and `Idempotency-Key` to EvaluationOrchestrator's
 internal store. HTTP 202 is returned only after `remediation_job` is durable.
 
 ## 2. Global lease and no-blind-retry rule
@@ -118,7 +119,7 @@ hard technical gate begins at check-before-live execution below.
 job-specific directory on the remediation MCP PVC. The explicit session ID
 prevents process-local context leakage between jobs.
 
-Every tool call is audited through AgentOrchestrator. A successful
+Every tool call is audited through EvaluationOrchestrator. A successful
 `remediator.write_file` audit additionally upserts `remediation_artifact` with
 filename, content, and SHA-256. Consequently, durable audit/export does not
 depend only on the MCP pod's filesystem.
@@ -180,10 +181,10 @@ assess whether execution and recovery actually succeeded.
 - `summary` from Status (or bounded raw fallback);
 - one normalized string per change;
 - one normalized string per verification;
-- artifact filenames fetched from AgentOrchestrator after execution.
+- artifact filenames fetched from EvaluationOrchestrator after execution.
 
 It finishes the internal job with structured result and raw model output.
-AgentOrchestrator releases the slot and later moves the workflow into learning.
+EvaluationOrchestrator releases the slot; AgentOrchestrator later moves the workflow into learning.
 The subsequent LearningAgent snapshot includes this completed output and the
 bounded RCA/remediation tool audit.
 
@@ -254,3 +255,9 @@ The Langfuse session ID is the remediation job UUID and trace name is
 
 See [agent-api.md](agent-api.md) and
 [MCPTools MCP contract](../../MCPTools/docs/mcp-api.md).
+
+## Persistence endpoint after the split
+
+`orchestrator.base_url` points to `evaluation-orchestrator:8080` for all job-store,
+lease, output and audit requests. `agent-orchestrator:8080` owns workflow decisions
+and triggers. Existing request/result schemas and archive exports are unchanged.

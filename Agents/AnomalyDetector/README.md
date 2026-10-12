@@ -5,7 +5,7 @@ time series and commits anomaly records to AgentOrchestrator over HTTP. Detectio
 observed Prometheus data; no external forecasting service is required.
 
 The service does not create its database table. Apply the shared Alembic
-migrations in `../../EvaluationPlatform/Orchestrator/Database` before starting the detector.
+migrations in `../../EvaluationPlatform/Database` before starting the detector.
 
 ## Data flow
 
@@ -110,7 +110,7 @@ API contract.
 For a fresh database, run this first from the workspace root:
 
 ```bash
-cd EvaluationPlatform/Orchestrator/Database
+cd EvaluationPlatform/Database
 ./run.sh
 ```
 

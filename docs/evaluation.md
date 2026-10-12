@@ -1,7 +1,8 @@
 # Evaluation
 
-The platform consists of Initialization, Orchestrator (including Database), Runner
-and Grader. The bundled incident-response components live under Agents/.
+The platform consists of Initialization, Database, Orchestrator, Runner
+and Grader. Agent lifecycle orchestration lives in `Agents/Orchestrator`;
+persistence and evaluation APIs stay in `EvaluationPlatform/Orchestrator`. The bundled incident-response components live under Agents/.
 
 Start with the [workspace quickstart](../README.md), then the
 [Runner interface](../EvaluationPlatform/Runner/README.md),

@@ -18,10 +18,11 @@ validate_image_settings
 # Component scripts own their Secrets, ConfigMaps, RBAC, Services and workloads.
 components=(
   'Agents/MCPTools|mcp-tools-investigation mcp-tools-remediation'
+  'EvaluationPlatform/Orchestrator|evaluation-orchestrator'
   'Agents/LearningAgent|learning-agent'
   'Agents/RCAAgent|rca-agent'
   'Agents/RemediatorAgent|remediator-agent'
-  'EvaluationPlatform/Orchestrator|agent-orchestrator'
+  'Agents/Orchestrator|agent-orchestrator'
   'Agents/AnomalyDetector|anomaly-detector'
 )
 

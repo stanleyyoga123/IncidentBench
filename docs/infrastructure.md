@@ -15,10 +15,10 @@ RBAC, remediation artifact PVC, and overlay/underlay probe DaemonSets.
 Operators preserve this deployment order:
 
 1. run Infrastructure `site.yml` for platform prerequisites;
-2. replace DatabaseJob placeholders and run `EvaluationPlatform/Orchestrator/Database/deploy.sh`, using
+2. replace DatabaseJob placeholders and run `EvaluationPlatform/Database/deploy.sh`, using
    `ALLOW_AGENT_WORKFLOW_RESET=true` only for the coordinated destructive reset;
-3. replace placeholders and deploy MCPTools;
-4. deploy RCAAgent and RemediatorAgent;
+3. replace placeholders and deploy EvaluationOrchestrator and MCPTools;
+4. deploy LearningAgent, RCAAgent and RemediatorAgent;
 5. deploy AgentOrchestrator;
 6. deploy AnomalyDetector;
 7. optionally deploy Evaluation independently.
@@ -35,7 +35,7 @@ are pinned to the tested release in `ansible/group_vars/all.yml`; an empty or
 floating Istio version is rejected. Use `playbooks/istio.yml` for an Istio-only
 reconciliation so unrelated platform charts are not upgraded.
 
-After rotating the DatabaseJob password, rerun `EvaluationPlatform/Orchestrator/Database/deploy.sh`.
+After rotating the DatabaseJob password, rerun `EvaluationPlatform/Database/deploy.sh`.
 PostgreSQL stores its role password in the persistent data volume, so the
 script rolls the StatefulSet and synchronizes that role over its local socket
 before migration.
@@ -73,3 +73,5 @@ Checked-in workload YAML uses `incidentbench.invalid/<component>:configure-me`
 markers; deploy scripts replace them only in the streamed manifest. Upstream
 images such as PostgreSQL keep their own references. No public first-party image
 registry is assumed. Build/push the chosen version before deploying it.
+
+For the orchestrator split on an existing database, skip database deployment and migrations; follow [the non-destructive cutover](operations.md#orchestrator-split-cutover).

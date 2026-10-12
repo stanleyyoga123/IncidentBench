@@ -10,7 +10,7 @@ from features.evaluation.evaluation_repository import EvaluationRepository
 from features.evaluation.evaluation_service import EvaluationService
 from infrastructure.maintenance_gate import MaintenanceGate, LOCK
 from infrastructure.workflow_conflict_error import WorkflowConflictError
-from test_api import FakeStore, FakeClient, settings
+from test_api import FakeStore, settings
 
 
 class MemoryDatabase:
@@ -135,13 +135,13 @@ def test_control_auth_and_paused_api_gates():
     class Store(FakeStore):
         def connection(self):return db.connection()
     store=Store()
-    app=create_app(settings(),start_loops=False,store=store,database=db,rca=FakeClient(),remediator=FakeClient(),learning=FakeClient())
+    app=create_app(settings(),store=store,database=db)
     with TestClient(app) as client:
         endpoint='/api/v1/evaluation/acquire'
         assert client.post(endpoint,json={'run_id':'one'}).status_code==401
         assert client.post(endpoint,headers={'Authorization':'Bearer store'},json={'run_id':'one'}).status_code==401
         assert client.post(endpoint,headers={'Authorization':'Bearer control'},json={'run_id':'one'}).status_code==200
-        for endpoint,token,payload in [('/api/v1/anomalies','ingest',{'anomalies':[]}),('/api/v1/internal/rca/jobs','store',{'anomalies':[]})]:
+        for endpoint,token,payload in [('/api/v1/internal/orchestration/anomalies','store',{'anomalies':[]}),('/api/v1/internal/rca/jobs','store',{'anomalies':[]})]:
             assert client.post(endpoint,headers={'Authorization':'Bearer '+token},json=payload).status_code==409
-        assert client.post('/api/v1/anomalies',json={'anomalies':[]}).status_code==401
+        assert client.post('/api/v1/internal/orchestration/anomalies',json={'anomalies':[]}).status_code==401
         assert client.get('/health').status_code==200

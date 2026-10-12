@@ -77,7 +77,7 @@ def resolve_scenario(path, overrides=None, *, documents=None):
         if key in seen:
             raise ValueError('duplicate deployment')
         seen.add(key)
-        if result['integration'] == 'bundled' and deployment['name'] == 'agent-orchestrator':
+        if result['integration'] == 'bundled' and deployment['name'] in ('agent-orchestrator', 'evaluation-orchestrator'):
             raise ValueError('Orchestrator must remain running')
     for phase in ('prerun', 'postrun'):
         for name in result[phase]:

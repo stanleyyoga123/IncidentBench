@@ -1,4 +1,5 @@
 from functools import wraps
+from threading import RLock
 import logging
 import json
 from typing import Any
@@ -8,8 +9,9 @@ import httpx
 
 from features.agent_workflow.agent_client import AgentClient
 from features.agent_workflow.schema import DecisionRequest, RetryRequest, Workflow
-from features.agent_workflow.workflow_store import WorkflowStore
+from features.agent_workflow.workflow_store_client import WorkflowStoreClient
 from infrastructure.workflow_conflict_error import WorkflowConflictError
+from infrastructure.persistence_unavailable_error import PersistenceUnavailableError
 from infrastructure.maintenance_gate import MaintenanceGate
 
 
@@ -21,7 +23,7 @@ AUTO_APPROVAL_REASON = "automatic approval after RCA required remediation"
 def running_only(method):
     @wraps(method)
     def guarded(self, *args, **kwargs):
-        with self._maintenance_gate.running():
+        with self._lifecycle_lock, self._maintenance_gate.running():
             return method(self, *args, **kwargs)
 
     return guarded
@@ -30,7 +32,7 @@ def running_only(method):
 class WorkflowCoordinator:
     def __init__(
         self,
-        store: WorkflowStore,
+        store: WorkflowStoreClient,
         rca: AgentClient,
         remediator: AgentClient,
         learning: AgentClient,
@@ -38,6 +40,7 @@ class WorkflowCoordinator:
         *,
         batch_size: int,
     ) -> None:
+        self._lifecycle_lock = RLock()
         self._maintenance_gate = maintenance_gate
         self._store = store
         self._rca = rca
@@ -54,16 +57,63 @@ class WorkflowCoordinator:
             return 0
         workflow, anomalies = claimed
         try:
-            lessons = self._store.retrieve_lessons(anomalies)
-            job = self._rca.create_rca(
-                workflow.id, anomalies, historical_lessons=lessons
-            )
-            self._store.attach_rca_job(workflow.id, job.id)
+            self._submit_rca(workflow, anomalies)
             return len(anomalies)
+        except (PersistenceUnavailableError, WorkflowConflictError):
+            raise
         except Exception as exc:
+            if self._ambiguous_downstream_failure(exc):
+                raise
             self._store.fail_submission(workflow.id, self._error(exc))
             LOGGER.exception("Failed to submit RCA workflow %s", workflow.id)
             return 0
+
+    def _submit_rca(self, workflow: Workflow, anomalies: list[dict[str, Any]]) -> None:
+        attempt = workflow.version if workflow.rca_job_id is not None else 1
+        if workflow.rca_job_id is None:
+            lessons = self._store.retrieve_lessons(anomalies)
+            job = self._rca.create_rca(workflow.id, anomalies, attempt, historical_lessons=lessons)
+        else:
+            job = self._rca.create_rca(workflow.id, anomalies, attempt)
+        self._store.attach_rca_job(workflow.id, job.id)
+
+    def _submit_remediation(self, workflow: Workflow) -> Workflow:
+        if workflow.decision_actor is None or workflow.decision_reason is None:
+            raise ValueError("remediation submission requires persisted approval")
+        rca_job = self._rca.get_rca(workflow.rca_job_id)
+        attempt = workflow.version if workflow.remediation_job_id is not None else 1
+        job = self._remediator.create_remediation(
+            workflow.id,
+            rca_job,
+            {"actor": workflow.decision_actor, "reason": workflow.decision_reason,
+             "workflow_version": workflow.version},
+            attempt,
+        )
+        self._store.attach_remediation_job(workflow.id, job.id)
+        return self._store.get_workflow(workflow.id)
+
+    def _recover_submission(self, workflow: Workflow) -> None:
+        try:
+            if workflow.status == "rca_submitting":
+                self._submit_rca(workflow, self._store.anomaly_payloads(workflow.id))
+            else:
+                self._submit_remediation(workflow)
+        except (PersistenceUnavailableError, WorkflowConflictError):
+            raise
+        except Exception as exc:
+            if self._ambiguous_downstream_failure(exc):
+                raise
+            if workflow.status == "rca_submitting" and workflow.rca_job_id is None:
+                self._store.fail_submission(workflow.id, self._error(exc))
+            else:
+                self._store.mark_submission_failed(workflow.id, self._error(exc))
+            raise
+
+    @staticmethod
+    def _ambiguous_downstream_failure(exc: Exception) -> bool:
+        return isinstance(exc, httpx.TransportError) or (
+            isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code >= 500
+        )
 
     @running_only
     def submit_approved_remediation(
@@ -77,19 +127,12 @@ class WorkflowCoordinator:
             workflow_id, "approved", actor, reason, expected_version
         )
         try:
-            rca_job = self._rca.get_rca(workflow.rca_job_id)
-            job = self._remediator.create_remediation(
-                workflow.id,
-                rca_job,
-                {
-                    "actor": actor,
-                    "reason": reason,
-                    "workflow_version": workflow.version,
-                },
-            )
-            self._store.attach_remediation_job(workflow.id, job.id)
-            return self._store.get_workflow(workflow.id)
+            return self._submit_remediation(workflow)
+        except (PersistenceUnavailableError, WorkflowConflictError):
+            raise
         except Exception as exc:
+            if self._ambiguous_downstream_failure(exc):
+                raise
             self._store.mark_submission_failed(workflow.id, self._error(exc))
             raise
 
@@ -134,7 +177,10 @@ class WorkflowCoordinator:
         updated = 0
         for workflow in self._store.list_reconcilable():
             try:
-                if workflow.status == "awaiting_approval":
+                if workflow.status in {"rca_submitting", "remediation_submitting"}:
+                    self._recover_submission(workflow)
+                    updated += 1
+                elif workflow.status == "awaiting_approval":
                     self.submit_approved_remediation(
                         workflow.id,
                         AUTO_APPROVAL_ACTOR,
@@ -226,7 +272,7 @@ class WorkflowCoordinator:
                         workflow.id, job.status, error=job.error
                     )
                     updated += 1
-            except (httpx.HTTPError, ValueError, WorkflowConflictError):
+            except (httpx.HTTPError, ValueError, WorkflowConflictError, PersistenceUnavailableError):
                 LOGGER.exception("Failed to reconcile workflow %s", workflow.id)
         return updated
 
@@ -285,6 +331,7 @@ class WorkflowCoordinator:
             pass
         return workflow.model_copy(update=updates)
 
+    @running_only
     def decide(
         self, workflow_id: UUID, request: DecisionRequest, value: str
     ) -> Workflow:
@@ -300,42 +347,26 @@ class WorkflowCoordinator:
                 request.reason,
                 request.expected_version,
             )
-        except (KeyError, WorkflowConflictError):
+        except (KeyError, WorkflowConflictError, PersistenceUnavailableError):
             raise
         except Exception as exc:
             self._store.mark_submission_failed(workflow_id, self._error(exc))
             raise
 
+    @running_only
     def retry(self, workflow_id: UUID, request: RetryRequest) -> Workflow:
         try:
             workflow = self._store.reset_for_retry(
-                workflow_id,
-                request.expected_version,
-                request.actor,
-                request.reason,
+                workflow_id, request.expected_version, request.actor, request.reason,
             )
-            attempt = workflow.version
             if workflow.status == "rca_submitting":
-                job = self._rca.create_rca(
-                    workflow.id, self._store.anomaly_payloads(workflow.id), attempt
-                )
-                self._store.attach_rca_job(workflow.id, job.id)
-            else:
-                rca_job = self._rca.get_rca(workflow.rca_job_id)
-                job = self._remediator.create_remediation(
-                    workflow.id,
-                    rca_job,
-                    {
-                        "actor": request.actor,
-                        "reason": request.reason,
-                        "workflow_version": workflow.version,
-                    },
-                    attempt,
-                )
-                self._store.attach_remediation_job(workflow.id, job.id)
-            return self._store.get_workflow(workflow.id)
-        except (KeyError, WorkflowConflictError):
+                self._submit_rca(workflow, self._store.anomaly_payloads(workflow.id))
+                return self._store.get_workflow(workflow.id)
+            return self._submit_remediation(workflow)
+        except (KeyError, WorkflowConflictError, PersistenceUnavailableError):
             raise
         except Exception as exc:
+            if self._ambiguous_downstream_failure(exc):
+                raise
             self._store.mark_submission_failed(workflow_id, self._error(exc))
             raise

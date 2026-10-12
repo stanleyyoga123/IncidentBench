@@ -17,6 +17,9 @@ MANIFEST_PATHS = [
     WORKSPACE / "Agents/RemediatorAgent/kubernetes/manifest.yaml",
     WORKSPACE / "Agents/LearningAgent/kubernetes/configmap.yaml",
     WORKSPACE / "Agents/LearningAgent/kubernetes/manifest.yaml",
+    WORKSPACE / "Agents/Orchestrator/kubernetes/configmap.yaml",
+    WORKSPACE / "Agents/Orchestrator/kubernetes/network-policy.yaml",
+    WORKSPACE / "Agents/Orchestrator/kubernetes/manifest.yaml",
     WORKSPACE / "EvaluationPlatform/Orchestrator/kubernetes/configmap.yaml",
     WORKSPACE / "EvaluationPlatform/Orchestrator/kubernetes/network-policy.yaml",
     WORKSPACE / "EvaluationPlatform/Orchestrator/kubernetes/manifest.yaml",
@@ -29,6 +32,9 @@ SECRET_CONTRACTS = {
             "AGENT_INGESTION_TOKEN",
             "DETECTOR_PROFILE_API_TOKEN",
         }
+    },
+    "EvaluationOrchestrator": {
+        "evaluation-orchestrator-secrets": {"DATABASE_DSN", "AGENT_CONTROL_TOKEN", "AGENT_STORE_TOKEN"}
     },
     "AgentOrchestrator": {
         "agent-orchestrator-secrets": {
@@ -122,6 +128,7 @@ def test_resource_identities_are_unique_across_component_manifests():
 def test_split_deployments_services_pvc_and_probe_ownership():
     expected = {
         "agent-orchestrator",
+        "evaluation-orchestrator",
         "rca-agent",
         "remediator-agent",
         "learning-agent",
@@ -178,6 +185,7 @@ def test_remediation_pvc_configmap_and_secret_contracts():
     expected_configmaps = {
         "anomaly-detector": "anomaly-detector-config",
         "agent-orchestrator": "agent-orchestrator-config",
+        "evaluation-orchestrator": "evaluation-orchestrator-config",
         "rca-agent": "rca-agent-config",
         "remediator-agent": "remediator-agent-config",
         "learning-agent": "learning-agent-config",
@@ -202,7 +210,7 @@ def test_remediation_pvc_configmap_and_secret_contracts():
 
 def test_component_owned_secrets_have_exact_names_keys_and_placeholders():
     for component, expected_contract in SECRET_CONTRACTS.items():
-        path = WORKSPACE / ("EvaluationPlatform/Orchestrator" if component == "AgentOrchestrator" else "Agents/" + component) / "kubernetes/secret.example.yml"
+        path = WORKSPACE / ("EvaluationPlatform/Orchestrator" if component == "EvaluationOrchestrator" else "Agents/Orchestrator" if component == "AgentOrchestrator" else "Agents/" + component) / "kubernetes/secret.example.yml"
         actual_contract = {
             document["metadata"]["name"]: set(document["stringData"])
             for document in load_documents(path)
@@ -219,6 +227,8 @@ def test_pairwise_tokens_are_declared_by_matching_consumers():
     assert "AGENT_INGESTION_TOKEN" in keys_by_component["AnomalyDetector"]
     assert "AGENT_INGESTION_TOKEN" in keys_by_component["AgentOrchestrator"]
     assert "AGENT_STORE_TOKEN" in keys_by_component["AgentOrchestrator"]
+    assert "AGENT_STORE_TOKEN" in keys_by_component["EvaluationOrchestrator"]
+    assert "DATABASE_DSN" in keys_by_component["EvaluationOrchestrator"]
     assert "AGENT_STORE_TOKEN" in keys_by_component["RCAAgent"]
     assert "AGENT_STORE_TOKEN" in keys_by_component["RemediatorAgent"]
     assert "RCA_SUBMIT_TOKEN" in keys_by_component["AgentOrchestrator"]
@@ -241,6 +251,7 @@ def test_pairwise_tokens_are_declared_by_matching_consumers():
 
 def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
     expected_references = {
+        "EvaluationOrchestrator": {"secret.example.yml", "secret.yml", "configmap.yaml", "network-policy.yaml", "manifest.yaml"},
         "AnomalyDetector": {
             "secret.example.yml",
             "secret.yml",
@@ -283,7 +294,7 @@ def test_component_deploy_scripts_own_manifests_and_refuse_placeholders():
         },
     }
     for component, references in expected_references.items():
-        script = WORKSPACE / ("EvaluationPlatform/Orchestrator" if component == "AgentOrchestrator" else "Agents/" + component) / "deploy.sh"
+        script = WORKSPACE / ("EvaluationPlatform/Orchestrator" if component == "EvaluationOrchestrator" else "Agents/Orchestrator" if component == "AgentOrchestrator" else "Agents/" + component) / "deploy.sh"
         content = script.read_text()
         assert script.stat().st_mode & 0o111
         assert "kubectl config current-context" in content
@@ -296,6 +307,7 @@ def test_first_party_images_require_configuration_and_always_pull():
     expected_images = {
         "anomaly-detector": "incidentbench.invalid/anomaly-detector:configure-me",
         "agent-orchestrator": "incidentbench.invalid/agent-orchestrator:configure-me",
+        "evaluation-orchestrator": "incidentbench.invalid/evaluation-orchestrator:configure-me",
         "learning-agent": "incidentbench.invalid/learning-agent:configure-me",
         "rca-agent": "incidentbench.invalid/rca-agent:configure-me",
         "remediator-agent": "incidentbench.invalid/remediator-agent:configure-me",
@@ -426,3 +438,30 @@ def test_platform_storage_and_terminal_pod_growth_are_bounded():
         "ToolsNodeDiskPressure",
         "TerminalPodBacklog",
     }
+
+
+def test_workers_persist_to_evaluation_service_and_detector_triggers_agent_service():
+    configmaps = resources("ConfigMap")
+    for name in ("rca-agent", "remediator-agent", "learning-agent"):
+        assert (
+            "orchestrator.base_url=http://evaluation-orchestrator.agents.svc.cluster.local:8080"
+            in configmaps[f"{name}-config"]["data"][".env"]
+        )
+    assert (
+        "http://agent-orchestrator.agents.svc.cluster.local:8080"
+        in configmaps["anomaly-detector-config"]["data"][".env"]
+    )
+    assert (
+        "store.base_url=http://evaluation-orchestrator.agents.svc.cluster.local:8080"
+        in configmaps["agent-orchestrator-config"]["data"][".env"]
+    )
+
+
+def test_agent_platform_policy_allows_both_orchestrators():
+    ingress = resources("NetworkPolicy")["agent-platform-ingress"]["spec"]["ingress"]
+    callers = {
+        source["podSelector"]["matchLabels"].get("app")
+        for rule in ingress
+        for source in rule["from"]
+    }
+    assert {"agent-orchestrator", "evaluation-orchestrator"} <= callers

@@ -1,24 +1,36 @@
 # Operations and rollout
 
-## Incompatible rollout
+## Orchestrator split cutover
 
-1. Back up anything that must survive. Legacy agent workflow rows are deleted.
-2. Scale the old CloudAgent and AnomalyDetector down.
-3. Install platform prerequisites with Infrastructure `site.yml`.
-4. Copy `EvaluationPlatform/Orchestrator/Database/kubernetes/secret.example.yml` to ignored
-   `kubernetes/secret.yml`, replace every `++++++++` placeholder, and run
-   `ALLOW_AGENT_WORKFLOW_RESET=true ./EvaluationPlatform/Orchestrator/Database/deploy.sh`. Migration
-   Alembic head `20260831_0004` must finish before any service starts.
-5. Copy each component `secret.example.yml` to ignored `secret.yml`, replace
-   placeholders while keeping the pairwise token matrix matching, then deploy
-   MCPTools, LearningAgent, Agents/RCAAgent/RemediatorAgent, AgentOrchestrator, and
-   AnomalyDetector in that order. `AGENT_STORE_TOKEN` must match across
-   Orchestrator and all three job services.
-6. Verify `/health` for both MCP profiles, all three job services, and the
-   orchestrator; verify MCP discovery with the appropriate tokens.
-7. Confirm committed detector ingestion.
-8. Exercise no-action, decline, and approved-remediation mocked flows before a
-   controlled live experiment.
+This split preserves the existing schema, data, submission/result contracts and
+archives. It needs no experiment rerun, database migration or reset. In particular,
+do not run `Database/deploy.sh`, set `ALLOW_AGENT_WORKFLOW_RESET=true`, or start a
+Runner experiment merely to install this change.
+
+1. Arrange a coordinated cutover when no evaluation or agent job is active.
+   Stop the old combined orchestrator and detector before replacing services.
+2. Populate the two component Secrets locally from their examples. Keep the
+   existing database and matching store/ingestion/submission token values.
+3. Deploy `EvaluationPlatform/Orchestrator` as `evaluation-orchestrator` against
+   the existing database. It serves persistence, lessons and evaluation APIs.
+4. Update/restart RCAAgent, RemediatorAgent and LearningAgent with their store
+   URL pointing to `http://evaluation-orchestrator.agents.svc.cluster.local:8080`.
+5. Deploy `Agents/Orchestrator` as `agent-orchestrator`. Its persistence HTTP
+   client points to EvaluationOrchestrator, and its read-only maintenance DSN
+   points to the same database. Restore detector ingestion only after health
+   checks pass. There must be only one lifecycle coordinator running.
+6. Update Runner's ignored environment file `orchestrator_url` to
+   `http://evaluation-orchestrator.agents.svc.cluster.local:8080`. Preserve the
+   existing control-token reference and all experiment settings.
+7. Inspect service health and existing persisted records using authenticated
+   reads. Existing archives remain available to the unchanged offline Grader.
+   A new live experiment is not an installation check.
+
+Both orchestrators remain online during baseline; the existing advisory lock
+serializes evaluation maintenance with dispatch and persistence mutations.
+Fresh installations still require DatabaseJob's normal migrations before services
+start. Older destructive migrations retain their existing safeguards; they are
+not part of this service split.
 
 For every supported application, keep `collector.metadata.namespaces` in
 AnomalyDetector and `workloads.namespaces` in RCAAgent aligned. MCPTools
@@ -37,13 +49,10 @@ During upgrade, MCPTools deletes only the obsolete namespaced RoleBinding named
 change avoids Kubernetes' immutable-`roleRef` rejection when migrating from the
 old namespaced Role to the workload ClusterRole.
 
-Downgrade recreates legacy table structure only. Deleted records are not
-recoverable. Return `ALLOW_AGENT_WORKFLOW_RESET` to false after migration.
-
 ## Agent manifest rollout
 
-The root `deploy.sh` invokes the six component deployment scripts in dependency
-order, including Orchestrator and both MCP profiles. It checks all component
+The root `deploy.sh` invokes the seven component deployment scripts in dependency
+order, including both orchestrators and both MCP profiles. It checks all component
 Secrets before applying resources, uses the current kubectl context, and stops
 on the first error. Each agent Deployment is restarted and awaited so mounted
 ConfigMaps and Secret environment changes are loaded, including namespace

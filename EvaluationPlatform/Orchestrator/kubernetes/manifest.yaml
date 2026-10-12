@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: agent-orchestrator, namespace: agents}
+metadata: {name: evaluation-orchestrator, namespace: agents}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: agent-orchestrator}}
+  selector: {matchLabels: {app: evaluation-orchestrator}}
   template:
-    metadata: {labels: {app: agent-orchestrator, agent-platform: coordinator}}
+    metadata: {labels: {app: evaluation-orchestrator, agent-platform: coordinator}}
     spec:
       automountServiceAccountToken: false
       nodeSelector: {role: tools}
       containers:
-        - name: agent-orchestrator
-          image: incidentbench.invalid/agent-orchestrator:configure-me
+        - name: evaluation-orchestrator
+          image: incidentbench.invalid/evaluation-orchestrator:configure-me
           imagePullPolicy: Always
           ports: [{name: http, containerPort: 8080}]
-          envFrom: [{secretRef: {name: agent-orchestrator-secrets}}]
+          envFrom: [{secretRef: {name: evaluation-orchestrator-secrets}}]
           volumeMounts: [{name: config, mountPath: /app/.env, subPath: .env, readOnly: true}]
           readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
           livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 20, periodSeconds: 20}
           resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
-      volumes: [{name: config, configMap: {name: agent-orchestrator-config}}]
+      volumes: [{name: config, configMap: {name: evaluation-orchestrator-config}}]
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: agent-orchestrator, namespace: agents}
-spec: {type: ClusterIP, selector: {app: agent-orchestrator}, ports: [{name: http, port: 8080, targetPort: http}]}
+metadata: {name: evaluation-orchestrator, namespace: agents}
+spec: {type: ClusterIP, selector: {app: evaluation-orchestrator}, ports: [{name: http, port: 8080, targetPort: http}]}

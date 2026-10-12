@@ -6,7 +6,7 @@ readonly ROOT_DIR="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 source "$ROOT_DIR/deployment/image_config.sh"
 validate_image_settings
 
-readonly IMAGE="$(image_ref "agent-orchestrator")"
+readonly IMAGE="$(image_ref "evaluation-orchestrator")"
 readonly PLATFORM="${PLATFORM:-linux/amd64}"
 
 docker buildx build \

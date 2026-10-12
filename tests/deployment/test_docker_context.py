@@ -14,7 +14,8 @@ COMPONENTS = [
     "Agents/RCAAgent",
     "Agents/RemediatorAgent",
     "EvaluationPlatform/Orchestrator",
-    "EvaluationPlatform/Orchestrator/Database",
+    "Agents/Orchestrator",
+    "EvaluationPlatform/Database",
 ]
 
 

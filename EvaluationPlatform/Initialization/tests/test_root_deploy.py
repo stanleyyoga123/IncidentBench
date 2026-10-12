@@ -6,8 +6,8 @@ import subprocess
 import pytest
 
 WORKSPACE = Path(__file__).resolve().parents[3]
-COMPONENTS = ['Agents/MCPTools', 'Agents/LearningAgent', 'Agents/RCAAgent',
-              'Agents/RemediatorAgent', 'EvaluationPlatform/Orchestrator', 'Agents/AnomalyDetector']
+COMPONENTS = ['Agents/MCPTools', 'EvaluationPlatform/Orchestrator', 'Agents/LearningAgent',
+              'Agents/RCAAgent', 'Agents/RemediatorAgent', 'Agents/Orchestrator', 'Agents/AnomalyDetector']
 
 
 def fixture_workspace(tmp_path):
@@ -50,7 +50,7 @@ def test_deploy_uses_component_owners_and_refreshes_all_agent_pods(tmp_path):
     lines = log.read_text().splitlines()
     assert [line for line in lines if line.startswith('deploy ')] == ['deploy ' + component for component in COMPONENTS]
     workloads = ['mcp-tools-investigation', 'mcp-tools-remediation', 'learning-agent', 'rca-agent',
-                 'remediator-agent', 'agent-orchestrator', 'anomaly-detector']
+                 'remediator-agent', 'evaluation-orchestrator', 'agent-orchestrator', 'anomaly-detector']
     for name in workloads:
         restart = f'kubectl rollout restart deployment/{name} --namespace agents'
         ready = f'kubectl rollout status deployment/{name} --namespace agents --timeout=5m'

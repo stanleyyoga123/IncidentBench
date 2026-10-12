@@ -43,6 +43,7 @@ def test_shape_defaults_are_explicit_in_resolved_archive():
     {'load':{'type':'burst','parameters':{'peak_users':1}}},
     {'load':{'type':'daily','parameters':{'stages':[{'duration':10,'spawn_rate':1,'percentage_users':100},{'duration':5,'spawn_rate':1,'percentage_users':100}]}}},
     {'deployments':[{'name':'agent-orchestrator','namespace':'agents','replicas':1}]},
+    {'deployments':[{'name':'evaluation-orchestrator','namespace':'agents','replicas':1}]},
     {'prerun':['../escape']}, {'prerun':['missing-hook']}, {'typo':True},
 ])
 def test_invalid_config_fails_before_execution(override):

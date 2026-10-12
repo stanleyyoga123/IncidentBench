@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "prometheus_url": "http://prometheus-server.monitoring.svc.cluster.local",
-  "orchestrator_url": "http://agent-orchestrator.agents.svc.cluster.local:8080",
+  "orchestrator_url": "http://evaluation-orchestrator.agents.svc.cluster.local:8080",
   "control_token_env": "ORCHESTRATOR_CONTROL_TOKEN",
   "inventory": "../../Initialization/ansible/inventory.ini",
   "host": null,

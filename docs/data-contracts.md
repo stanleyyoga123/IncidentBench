@@ -40,7 +40,7 @@ hypotheses.
 `agent_execution_slot` has exactly one row (`id=1`).
 `agent_tool_call` records service/job/tool/arguments/result/outcome.
 `remediation_artifact` stores job-scoped filename, content, and SHA-256.
-AgentOrchestrator is the only application that performs DML against these
+EvaluationOrchestrator is the only application that performs DML against these
 tables.
 
 Jobs and workflows use UUID identities, status/version, timestamps, attempts,
@@ -54,7 +54,7 @@ Pairwise bearer values must match exactly between detector/orchestrator,
 orchestrator/RCA, orchestrator/remediator, orchestrator/learning, all job-service store
 token, RCA/investigation MCP, and remediator/remediation MCP. The two MCP
 tokens and AgentOrchestrator's control token remain distinct. DatabaseJob
-separately owns the PostgreSQL identity used to construct AgentOrchestrator's
+separately owns the PostgreSQL identity used to construct EvaluationOrchestrator's
 `DATABASE_DSN`. RCAAgent, RemediatorAgent, and LearningAgent have no database credentials.
 
 ## Evaluation interface
@@ -99,3 +99,15 @@ an ambiguous mutation. New incidents proceed normally. Legacy `needs_review`
 finish requests are accepted during rolling upgrades and normalized to `failed`;
 legacy review workflows are finalized by reconciliation. Existing archived files
 are immutable and cannot recover text that was never persisted.
+
+## Orchestrator service split
+
+`agent-orchestrator` hosts detector ingestion and workflow lifecycle controls.
+`evaluation-orchestrator` hosts existing internal RCA/remediation/learning store
+APIs, lessons, evaluation ownership/reset/export, and internal orchestration
+persistence. Worker `orchestrator.base_url` and Runner `orchestrator_url` point
+to `evaluation-orchestrator`; the detector continues to use `agent-orchestrator`.
+Paths, payloads, job/output schemas and export SQL are preserved. No migration,
+data conversion, new string-only submission contract, or experiment rerun is
+needed. AgentOrchestrator also uses read-only PostgreSQL transactions for the
+existing maintenance advisory lock; it performs no DML.

@@ -19,13 +19,14 @@ Read in this order:
 
 Detailed component internals:
 
-- [AgentOrchestrator flow](../EvaluationPlatform/Orchestrator/docs/architecture-and-flow.md)
+- [EvaluationOrchestrator persistence](../EvaluationPlatform/Orchestrator/docs/architecture-and-flow.md)
+- [AgentOrchestrator flow](../Agents/Orchestrator/docs/architecture-and-flow.md)
 - [AnomalyDetector flow](../Agents/AnomalyDetector/docs/architecture-and-flow.md)
 - [RCAAgent flow](../Agents/RCAAgent/docs/architecture-and-flow.md)
 - [RemediatorAgent flow](../Agents/RemediatorAgent/docs/architecture-and-flow.md)
 - [LearningAgent flow](../Agents/LearningAgent/docs/architecture-and-flow.md)
 - [MCPTools flow](../Agents/MCPTools/docs/architecture-and-flow.md)
-- [DatabaseJob schema and migration flow](../EvaluationPlatform/Orchestrator/Database/docs/architecture-and-flow.md)
+- [DatabaseJob schema and migration flow](../EvaluationPlatform/Database/docs/architecture-and-flow.md)
 
 The legacy KubernetesCloudAgent monolith has been removed. Each component owns
 its Kubernetes resources, placeholder Secret, and deployment. DatabaseJob owns

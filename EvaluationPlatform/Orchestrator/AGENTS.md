@@ -1,34 +1,23 @@
-# AgentOrchestrator instructions
+# EvaluationOrchestrator instructions
 
-Own anomaly ingestion, durable workflow coordination, and all application DML.
-RCAAgent, RemediatorAgent, and LearningAgent persist jobs, leases, tool-call audits, and
-artifacts only through the authenticated `/api/v1/internal/...` job-store APIs.
-Preserve separate ingestion/control/store tokens, deterministic event
-idempotency, optimistic workflow versions, the 60-second/100-event claim
-defaults, and automatic remediator submission after RCA sets
-`remediation_required=true`. Record the system actor as `agent-orchestrator`.
-Applications may perform DML only; schema changes belong to `Database/`.
-Downstream failures must remain visible and retry must create an explicitly
-versioned submission.
+Own all application DML, existing internal RCA/remediation/learning job APIs,
+leases, audits, output checkpoints, artifacts, lessons, and evaluation control
+and export. Agent lifecycle orchestration lives in `Agents/Orchestrator` and
+calls authenticated internal persistence endpoints. Do not add agent clients,
+dispatch threads or downstream submission credentials to this service.
 
-The singleton `agent_execution_slot` serializes RCA, remediation, and learning, including
-direct job API submissions. Brief `awaiting_approval` does not occupy the slot.
-Expired RCA holders requeue while `attempts < max_attempts` and otherwise fail.
-Expired or failed remediation becomes `failed` and is never requeued.
-Successful no-action or remediated workflows enter learning before completion.
-Publish only schema-valid lessons; after three failed learning attempts finalize
-without lessons and preserve `learning_error`. Retrieve no more than 40 active
-lessons within 24,000 characters and pass them to RCA as untrusted context.
+Preserve existing tables, data contracts, operation IDs and six export arrays.
+This service split introduces no migration, reset or string-only output schema.
+Keep `AGENT_STORE_TOKEN` separate from `AGENT_CONTROL_TOKEN`. Database DDL remains
+owned only by `../Database/`; runtime code performs DML only.
 
-Own `kubernetes/configmap.yaml`, placeholder-only `kubernetes/secret.example.yml`,
-`kubernetes/network-policy.yaml`, the Deployment/ClusterIP Service in
-`kubernetes/manifest.yaml`, and `deploy.sh`. Copy the example Secret to ignored
-`kubernetes/secret.yml` and replace every `++++++++` locally before deploying;
-the script uses kubectl's current context and refuses unreplaced placeholders.
-Infrastructure installs platform prerequisites only.
+Preserve deterministic event idempotency, optimistic versions, singleton global
+execution, retry limits, output checkpoints and terminal ambiguous remediation
+failure. All store mutations use the database maintenance gate. Evaluation
+transitions retain the existing exclusive advisory lock; AgentOrchestrator holds
+the matching shared lock in a read-only transaction across dispatch. Preserve
+ownership/reset idempotency and consistent export snapshots.
 
-Run `PYTHONPATH=app pytest -q` and `python -m compileall -q app tests`.
-
-Evaluation maintenance uses a durable singleton and advisory transaction locks.
-Keep ownership/reset idempotency and export snapshot consistency. Evaluation
-control transitions must remain synchronized with all dispatch and write APIs.
+Own component ConfigMap, placeholder Secret, Runner ingress NetworkPolicy, Deployment,
+ClusterIP Service and build/deploy scripts. Do not read or copy real Secrets.
+Run `pytest -q` and `python -m compileall -q app tests` without live services.

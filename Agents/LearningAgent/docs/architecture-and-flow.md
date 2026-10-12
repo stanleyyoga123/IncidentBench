@@ -8,8 +8,8 @@ faster and avoid previously observed mistakes.
 
 It has no MCP client, Kubernetes service account access, remediation tools, or
 database credentials. It performs model inference only. AgentOrchestrator owns
-the source snapshot, durable job, retries, validation boundary, publication,
-activation status, retrieval, and eventual RCA delivery.
+the source snapshot and eventual RCA delivery; EvaluationOrchestrator owns
+durable jobs, retries, validation, lesson publication, activation and retrieval.
 
 ## When learning runs
 
@@ -28,7 +28,7 @@ unsafe outcomes into reusable guidance.
 sequenceDiagram
   participant O as AgentOrchestrator coordinator
   participant L as LearningAgent
-  participant S as AgentOrchestrator store API
+  participant S as EvaluationOrchestrator store API
   participant M as Model endpoint
   participant DB as PostgreSQL
 
@@ -84,7 +84,7 @@ request is rejected unless:
 - canonical source is at most 500,000 characters.
 
 The API forwards the validated request and `Idempotency-Key` to
-AgentOrchestrator's internal job store. It returns HTTP 202 only after the
+EvaluationOrchestrator's internal job store. It returns HTTP 202 only after the
 `learning_job` row exists.
 
 ## 3. Worker and global lease
@@ -145,16 +145,16 @@ string for `applies_when`, `avoid`, `evidence_refs`, or `tags` becomes a
 one-item list; qualitative confidence labels such as `high` or `medium` become
 0–1 numbers; blank `resource`/`name`/`metric` become null. Remaining JSON or
 Pydantic errors still fail the attempt. Blank namespace/resource/name/metric
-values become null. AgentOrchestrator continues to require
+values become null. EvaluationOrchestrator continues to require
 the canonical lists-and-float shape on publication.
 
 ## 6. Durable publication
 
 On success, LearningAgent posts the structured result and raw model output to
-AgentOrchestrator. The internal request is validated a second time using the
+EvaluationOrchestrator. The internal request is validated a second time using the
 same lesson bounds.
 
-AgentOrchestrator commits three effects in one database transaction:
+EvaluationOrchestrator commits three effects in one database transaction:
 
 1. mark `learning_job` succeeded with result/raw output;
 2. insert ordered `incident_lesson` rows, idempotent by job and ordinal;
@@ -196,7 +196,7 @@ use. Lessons never directly mutate detector profiles or cluster state.
 | --- | --- |
 | `api.port` | `8083` |
 | `LEARNING_SUBMIT_TOKEN` | AgentOrchestrator-to-Learning public API. |
-| `AGENT_STORE_TOKEN` | Learning-to-AgentOrchestrator internal API. |
+| `AGENT_STORE_TOKEN` | Learning-to-EvaluationOrchestrator internal API. |
 | `client.model` | `Qwen/Qwen3.6-35B-A3B` in cluster ConfigMap. |
 | `client.url/token` | OpenAI-compatible model endpoint. |
 | `worker.poll_interval_seconds` | `2` |
@@ -219,7 +219,7 @@ AgentOrchestrator begins submitting learning work.
 - Submission 401: check the Learning submission token pair.
 - Submission 422: canonicalize with sorted keys/compact separators; compare
   workflow IDs, completion type, remediation presence, count, and source size.
-- Internal store 401/5xx: verify `AGENT_STORE_TOKEN` and AgentOrchestrator.
+- Internal store 401/5xx: verify `AGENT_STORE_TOKEN` and EvaluationOrchestrator.
 - Job remains queued: inspect the shared slot; RCA/remediation take precedence
   naturally by whichever job currently owns it.
 - Repeated invalid output: inspect raw model output and Langfuse; confirm the
@@ -245,4 +245,10 @@ AgentOrchestrator begins submitting learning work.
 | `kubernetes/manifest.yaml` | One-replica tool-node deployment and service. |
 
 See [agent-api.md](agent-api.md) and
-[AgentOrchestrator flow](../../../EvaluationPlatform/Orchestrator/docs/architecture-and-flow.md).
+[AgentOrchestrator flow](../../Orchestrator/docs/architecture-and-flow.md).
+
+## Persistence endpoint after the split
+
+`orchestrator.base_url` points to `evaluation-orchestrator:8080` for all job-store,
+lease, output and audit requests. `agent-orchestrator:8080` owns workflow decisions
+and triggers. Existing request/result schemas and archive exports are unchanged.

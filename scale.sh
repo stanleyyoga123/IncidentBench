@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0"
-  echo "Scale all seven agent-platform Deployments to zero in namespace agents."
+  echo "Scale all eight platform Deployments to zero in namespace agents."
   echo "Uses kubectl's current context. Run when evaluations and agent jobs are idle."
 }
 
@@ -29,6 +29,7 @@ fi
 deployments=(
   anomaly-detector
   agent-orchestrator
+  evaluation-orchestrator
   rca-agent
   remediator-agent
   learning-agent

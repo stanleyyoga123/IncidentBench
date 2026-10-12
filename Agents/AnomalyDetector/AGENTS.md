@@ -9,7 +9,7 @@ HTTP. It never connects to PostgreSQL.
 
 This repository does not own database DDL or cluster installation:
 
-- Schema and Alembic migrations belong to `../../EvaluationPlatform/Orchestrator/Database/`.
+- Schema and Alembic migrations belong to `../../EvaluationPlatform/Database/`.
 - The service Deployment and ClusterIP Service belong to `kubernetes/manifest.yaml`.
 - Non-secret runtime configuration belongs to `kubernetes/configmap.yaml`.
 - Runtime credentials belong to `kubernetes/secret.example.yml`; copy it to

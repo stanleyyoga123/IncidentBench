@@ -40,6 +40,8 @@ class MemoryStore:
             item
             for item in self.workflows.values()
             if item.status in {
+                "rca_submitting",
+                "remediation_submitting",
                 "rca_queued",
                 "rca_running",
                 "awaiting_approval",
@@ -319,7 +321,7 @@ def test_existing_awaiting_approval_is_auto_submitted():
     assert len(remediator.created) == 1
 
 
-def test_remediator_submit_error_marks_workflow_failed():
+def test_explicit_remediator_rejection_marks_workflow_failed():
     rca_job_id = uuid4()
     item = workflow(rca_job_id=rca_job_id, status="awaiting_approval", version=3)
     store = MemoryStore([item])
@@ -336,7 +338,7 @@ def test_remediator_submit_error_marks_workflow_failed():
         fail=httpx.HTTPStatusError(
             "failed",
             request=httpx.Request("POST", "http://remediator/api/v1/remediation/jobs"),
-            response=httpx.Response(500),
+            response=httpx.Response(400),
         )
     )
 
@@ -345,3 +347,59 @@ def test_remediator_submit_error_marks_workflow_failed():
     assert updated.status == "failed"
     assert item.id in store.failed
     assert remediator.created == []
+
+
+def test_recovered_rca_retry_rejection_preserves_prior_job_and_workflow():
+    from unittest.mock import MagicMock
+    from features.agent_workflow.workflow_store_client import WorkflowStoreClient
+
+    item = workflow(status="rca_submitting", version=5)
+    store = MagicMock(spec=WorkflowStoreClient)
+    store.list_reconcilable.return_value = [item]
+    store.anomaly_payloads.return_value = [{"event_id": "a" * 64}]
+    rca = MagicMock()
+    rca.create_rca.side_effect = httpx.HTTPStatusError(
+        "invalid request", request=httpx.Request("POST", "http://rca/jobs"), response=httpx.Response(400),
+    )
+    assert coordinator(store, rca, FakeRemediator()).reconcile_once() == 0
+    store.mark_submission_failed.assert_called_once()
+    store.fail_submission.assert_not_called()
+    assert rca.create_rca.call_args.args == (item.id, store.anomaly_payloads.return_value, 5)
+
+
+def test_store_conflict_after_rca_creation_preserves_pending_submission():
+    from unittest.mock import MagicMock
+    import pytest
+    from features.agent_workflow.workflow_store_client import WorkflowStoreClient
+
+    item = workflow(status="rca_submitting", rca_job_id=None, version=1)
+    store = MagicMock(spec=WorkflowStoreClient)
+    store.execution_available.return_value = True
+    store.claim_pending.return_value = (item, [{"event_id": "a" * 64}])
+    store.retrieve_lessons.return_value = []
+    store.attach_rca_job.side_effect = WorkflowConflictError("evaluation transition in progress")
+    rca = MagicMock()
+    rca.create_rca.return_value = DownstreamJob(id=uuid4(), status="queued")
+    with pytest.raises(WorkflowConflictError):
+        coordinator(store, rca, FakeRemediator()).intake_once()
+    store.fail_submission.assert_not_called()
+    store.mark_submission_failed.assert_not_called()
+
+
+def test_store_conflict_after_remediation_creation_preserves_approved_submission():
+    from unittest.mock import MagicMock
+    import pytest
+    from features.agent_workflow.workflow_store_client import WorkflowStoreClient
+
+    item = workflow(status="remediation_submitting", version=2,
+                    decision_actor=AUTO_APPROVAL_ACTOR, decision_reason=AUTO_APPROVAL_REASON)
+    store = MagicMock(spec=WorkflowStoreClient)
+    store.decide.return_value = item
+    store.attach_remediation_job.side_effect = WorkflowConflictError("evaluation transition in progress")
+    rca = FakeRca({item.rca_job_id: DownstreamJob(id=item.rca_job_id, status="succeeded", result={"remediation_required": True})})
+    with pytest.raises(WorkflowConflictError):
+        coordinator(store, rca, FakeRemediator()).submit_approved_remediation(
+            item.id, AUTO_APPROVAL_ACTOR, AUTO_APPROVAL_REASON, 1,
+        )
+    store.fail_submission.assert_not_called()
+    store.mark_submission_failed.assert_not_called()

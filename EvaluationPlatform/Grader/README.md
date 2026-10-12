@@ -178,3 +178,57 @@ The Python reporting script applies the same filter to historical grades and exp
 session counts. Historical grade files and judge caches are not rewritten by
 report generation. Whole-run cumulative client mean/P95 summaries are omitted
 from chaos-only metrics.
+
+## Manual human–judge labeling
+
+Run the local review desk with the existing Grader Python environment:
+
+```bash
+cd EvaluationPlatform/Grader
+python -m labeler
+```
+
+Open <http://127.0.0.1:8765>, enter your reviewer name, and select a session.
+Read the final agent output and archived ground truth, choose all rubric classes
+and available penalty decisions, add notes, and save your verdict. Judge labels
+and penalty decisions start hidden; reveal them after your independent review.
+Use **Save & next unreviewed** to continue, or mark insufficient evidence as
+**Unable to assess**. Saved reviews can be reopened and edited under the same
+reviewer name. A changed name is a separate reviewer.
+
+Defaults are source-tree `judge_score/` and `output/manual-review/`, independent
+of the current directory. When the output directory contains `sample.json`, the
+desk loads only its selected cases, in manifest order. The current selection is
+the same 100 cases reviewed by the AI (50 RCA and 50 remediation). The header
+identifies the selection; filters, navigation, and progress stay within it.
+Use `--sample PATH` to choose an explicit manifest, or `--all-sessions` to ignore
+the saved selection. A custom `--output PATH` without `sample.json` reviews the
+complete input. Each manifest record requires `index`, `source`, `source_hash`
+(SHA-256), and `kind`; duplicate sources/indexes, missing files, and mismatched
+hashes/kinds stop startup rather than silently changing the selection.
+Other overrides are `--input PATH`, `--output PATH`, and `--port PORT`.
+The app binds only to loopback and requires no model calls,
+frontend build, or additional dependencies beyond Grader's Pydantic. Run one
+app process per output directory.
+
+Canonical latest reviews are atomic JSON files in `output/manual-review/reviews/`,
+keyed by source path, source SHA-256, and reviewer. `reviews.csv` updates on save;
+**Download CSV** exports all reviewers within the selected sample (or the complete
+dataset with `--all-sessions`) with criterion classes, penalty decisions,
+notes, timestamps, alignment agreement, and human-minus-judge score differences.
+CSV cells beginning with spreadsheet formula characters are escaped. Source
+files are read only. Old reviews are retained when source hashes change and
+marked `source_current=False` in exports. Sample exports retain old hash versions
+for selected source paths but omit reviews for sources outside the sample.
+Restart after changing source data; update a sample manifest deliberately if its
+source hashes change.
+
+Human scores use the current `resources/rubric.json`. Rubric agreement and
+alignment use only rated sessions with recorded judge scores and a matching
+rubric hash. Unreviewed, unable-to-assess, missing-judge, and rubric-mismatched
+sessions are excluded from comparison denominators. The displayed aggregate
+counts apply to the current reviewer across the selected catalog; queue filters
+only select sessions. Score differences compare rubric and final adjusted
+scores separately. Remediation without recorded penalty criteria has an unknown
+human final adjusted score, rather than an assumed zero penalty. Alignment is
+derived from the first correctness criterion at ≥0.75 and ignores penalties.

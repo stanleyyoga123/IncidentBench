@@ -177,8 +177,9 @@ execution, live tracking, and extension interfaces.
 | [Initialization](EvaluationPlatform/Initialization/README.md) | Cluster and node preparation, namespaces, and platform tools. |
 | [Runner](EvaluationPlatform/Runner/README.md) | Applications, traffic, scenarios, chaos, lifecycle integrations, and evidence capture. |
 | [Grader](EvaluationPlatform/Grader/README.md) | Archived-run assessment, plots, reports, and exploratory analysis. |
-| [Orchestrator](EvaluationPlatform/Orchestrator/README.md) | Durable coordination for the reference agents and its evaluation API. |
-| [Database](EvaluationPlatform/Orchestrator/Database/README.md) | PostgreSQL deployment and schema migrations. |
+| [EvaluationOrchestrator](EvaluationPlatform/Orchestrator/README.md) | Job/result persistence, evaluation control and artifact exports. |
+| [AgentOrchestrator](Agents/Orchestrator/README.md) | Reference-agent lifecycle, dispatch and workflow coordination. |
+| [Database](EvaluationPlatform/Database/README.md) | PostgreSQL deployment and schema migrations. |
 | [Agents](docs/components.md) | Detection, RCA, remediation, learning, and MCP tool services. |
 | [Documentation](docs/README.md) | Architecture, runtime flows, contracts, and component guides. |
 
@@ -203,10 +204,14 @@ images. Expand the checklist for configuration and execution commands.
 
 1. Copy `EvaluationPlatform/Initialization/ansible/inventory.example.ini` to ignored `inventory.ini`. Fill SSH addresses, users, and Chaosd endpoints for your nodes. Review `group_vars/all.yml` and `vault.example.yml`; see the initialization guide for cluster prerequisites, Ansible dependencies and playbook order.
 2. Copy each deployed component's `kubernetes/secret.example.yml` to ignored `kubernetes/secret.yml`. Replace required `++++++++` values. Keep ingestion, control, job-store, service-submission, and the two MCP tokens distinct; matching peers must receive the same value for their shared token.
-3. Copy `EvaluationPlatform/Runner/config/environment.example.json` to ignored `environment.json`. Set service endpoints, inventory path, and `node_ips` to the actual node InternalIPs. The documentation addresses in the example are not cluster addresses. Export the variable named by `control_token_env`, normally `ORCHESTRATOR_CONTROL_TOKEN`, with the Orchestrator's `AGENT_CONTROL_TOKEN` value. Do not put credentials in JSON.
-4. Deploy in dependency order: Initialization prerequisites → Orchestrator/Database → both MCP profiles → LearningAgent, RCAAgent, RemediatorAgent → Orchestrator → AnomalyDetector → optional Runner pod. Each component retains its own `deploy.sh` (Runner uses `scripts/deploy.sh`); commands use the current Kubernetes context. Database migrations are a separate job, never application startup work.
+3. Copy `EvaluationPlatform/Runner/config/environment.example.json` to ignored `environment.json`. Set service endpoints, inventory path, and `node_ips` to the actual node InternalIPs. The documentation addresses in the example are not cluster addresses. Export the variable named by `control_token_env`, normally `ORCHESTRATOR_CONTROL_TOKEN`, with EvaluationOrchestrator's `AGENT_CONTROL_TOKEN` value. Do not put credentials in JSON.
+4. Deploy in dependency order: Initialization prerequisites → Database → EvaluationOrchestrator → both MCP profiles → LearningAgent, RCAAgent, RemediatorAgent → AgentOrchestrator → AnomalyDetector → optional Runner pod. Each component retains its own `deploy.sh` (Runner uses `scripts/deploy.sh`); commands use the current Kubernetes context. Database migrations are a separate job, never application startup work.
 
-For an existing deployment, stop the detector and job workers before deploying the new database migration and Orchestrator API. Migration `20260913_0005` adds evaluation ownership without clearing existing workflow data. The older legacy-table migration still requires its explicit reset flag when applicable. Do not set that flag merely to install this additive migration.
+For the orchestrator split on an existing deployment, follow the
+[non-destructive cutover](docs/operations.md#orchestrator-split-cutover).
+There is no schema or archive change: do not run a migration/reset or rerun an
+experiment for this split. Update Runner and worker store URLs to
+`evaluation-orchestrator`; detector ingestion stays on `agent-orchestrator`.
 
 ## Build component images
 
@@ -242,8 +247,8 @@ them or run database migrations.
 
 After platform prerequisites and database migrations are installed, run
 `./deploy.sh` from the workspace root. It applies each component's current local
-Kubernetes files in dependency order: MCPTools, LearningAgent, RCAAgent,
-RemediatorAgent, Orchestrator, then AnomalyDetector. It restarts all seven
+Kubernetes files in dependency order: EvaluationOrchestrator, MCPTools, LearningAgent, RCAAgent,
+RemediatorAgent, AgentOrchestrator, then AnomalyDetector. It restarts all eight
 Deployments and waits for readiness so ConfigMap and Secret changes take effect.
 
 Populate each component's ignored `kubernetes/secret.yml` first. The script uses
@@ -259,9 +264,9 @@ also accepts `APPLICATION_NAMESPACES="online-boutique teastore sock-shop"`.
 ## Scale down the agent platform
 
 Run `./scale.sh` from the project root when evaluations and agent jobs are idle.
-It sets replicas to zero for AnomalyDetector, Orchestrator, RCAAgent,
+It sets replicas to zero for AnomalyDetector, both orchestrators, RCAAgent,
 RemediatorAgent, LearningAgent, and both MCPTools deployments in namespace
-`agents`, using kubectl's current context. It checks that all seven deployments
+`agents`, using kubectl's current context. It checks that all eight deployments
 exist before scaling. Kubernetes terminates their pods asynchronously.
 
 ## Validate and run

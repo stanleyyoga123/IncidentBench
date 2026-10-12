@@ -10,7 +10,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd -- "$script_dir/../.." && pwd)"
 source "$root_dir/deployment/image_config.sh"
 validate_image_settings
-render_image_manifest "$script_dir/kubernetes/manifest.yaml" "agent-orchestrator" >/dev/null
+render_image_manifest "$script_dir/kubernetes/manifest.yaml" "evaluation-orchestrator" >/dev/null
 
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "Error: kubectl is required." >&2
@@ -44,5 +44,5 @@ fi
 kubectl apply -f "$secret_file"
 kubectl apply -f "$script_dir/kubernetes/configmap.yaml"
 kubectl apply -f "$script_dir/kubernetes/network-policy.yaml"
-render_image_manifest "$script_dir/kubernetes/manifest.yaml" "agent-orchestrator" | kubectl apply -f -
-kubectl rollout status deployment/agent-orchestrator --namespace agents --timeout=5m
+render_image_manifest "$script_dir/kubernetes/manifest.yaml" "evaluation-orchestrator" | kubectl apply -f -
+kubectl rollout status deployment/evaluation-orchestrator --namespace agents --timeout=5m

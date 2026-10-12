@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
@@ -148,7 +150,8 @@ class WorkflowStore:
             cur.execute(
                 """
                 SELECT * FROM agent_workflow
-                WHERE status IN ('rca_queued', 'rca_running', 'awaiting_approval',
+                WHERE status IN ('rca_submitting', 'remediation_submitting',
+                                 'rca_queued', 'rca_running', 'awaiting_approval',
                                  'remediation_queued', 'remediation_running',
                                  'learning_submitting', 'learning_queued',
                                  'learning_running', 'needs_review')
@@ -171,18 +174,12 @@ class WorkflowStore:
             return [Workflow.model_validate(row) for row in cur.fetchall()]
 
     def get_workflow(self, workflow_id: UUID, *, for_update=False, conn=None) -> Workflow | None:
-        owns_connection = conn is None
-        if owns_connection:
-            conn = Connection.connect(self._dsn, row_factory=dict_row)
-        try:
-            with conn.cursor() as cur:
-                suffix = " FOR UPDATE" if for_update else ""
-                cur.execute(f"SELECT * FROM agent_workflow WHERE id = %s{suffix}", (workflow_id,))
-                row = cur.fetchone()
-                return Workflow.model_validate(row) if row else None
-        finally:
-            if owns_connection:
-                conn.close()
+        context = self.connection() if conn is None else nullcontext(conn)
+        with context as connection, connection.cursor() as cur:
+            suffix = " FOR UPDATE" if for_update else ""
+            cur.execute(f"SELECT * FROM agent_workflow WHERE id = %s{suffix}", (workflow_id,))
+            row = cur.fetchone()
+            return Workflow.model_validate(row) if row else None
 
     def set_rca_state(self, workflow_id: UUID, status: str, *, result=None, error=None) -> None:
         if status == "succeeded":

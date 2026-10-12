@@ -7,3 +7,9 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 /reporting/*.ipynb
+
+# Local labeler tools
+/labeler/
+/tests/src/labeler/
+/tests/resources/labeler/
+/judge_score/
