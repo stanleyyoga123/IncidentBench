@@ -56,9 +56,12 @@ at zero.
 | TeaStore registry capacity loss | During continuing endpoint instability, avoid unsafe mutation; after current evidence demonstrates stability, restore exactly one replica and verify registrations. | Validated single-pod recovery after stability returns. | Adding replicas/HPA and splitting in-memory registry state; restart loop during instability. |
 | Long multi-fault | Act only on the currently evidenced phase; no disruptive action during an idle period. | Phase-appropriate bounded mitigation. | Acting on a future/stale phase or the wrong node/service. |
 
-TeaStore registry CPU remediation is vertical-only. `redis-cart` and
-`teastore-db` and Sock Shop `carts-db` memory remediation is also vertical-only because their current
-deployments do not provide safe shared-state horizontal scaling.
+TeaStore registry CPU remediation is vertical-only. `redis-cart` memory
+remediation targets per-pod memory headroom because recurring pressure affects
+every running replica; horizontal scaling alone does not remove that pressure.
+Do not infer a singleton deployment from this remediation rule. TeaStore
+`teastore-db` and Sock Shop `carts-db` memory remediation is also vertical-only
+because their current deployments do not provide safe shared-state horizontal scaling.
 
 ## Recovery evidence
 

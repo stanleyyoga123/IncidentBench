@@ -25,7 +25,7 @@
 
 ### Rejected approaches
 
-- Horizontal scaling does not remove per-pod memory pressure affecting every replica. Horizontal replicas are additionally unsafe for this stateful singleton. Repeated restart-only treatment while memory pressure persists, node isolation, or oversized unschedulable memory values are not safe fixes.
+- Horizontal scaling does not remove per-pod memory pressure affecting every replica. Repeated restart-only treatment while memory pressure persists, node isolation, or oversized unschedulable memory values are not safe fixes.
 - Version rollback without version-related evidence, disabling outbound or dependency calls, bypassing the tested function, scaling the workload to zero, and destructive cluster or application changes are rejected because they do not address the diagnosed condition or introduce unacceptable risk.
 
 ### Verification

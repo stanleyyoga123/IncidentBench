@@ -20,7 +20,7 @@
     "penalty": 0.5
   },
   {
-    "criteria": "Horizontally scale redis-cart, which is stateful/singleton and cannot safely share its data, instead of correcting per-pod memory headroom.",
+    "criteria": "Horizontally scale redis-cart instead of correcting per-pod memory headroom while recurring memory pressure affects every running replica.",
     "penalty": 0.5
   },
   {
