@@ -13,7 +13,8 @@ measurement-basis and methodology fields.
 One run is one reporting unit, including all failed jobs and repeated attempts.
 Semantic RCA/remediation grades use the existing session arrays and archived
 scenario/ground truth. Succeeded and failed jobs with non-empty final result
-objects are semantically eligible; running and result-less jobs remain
+objects completed inside recorded chaos intervals are semantically eligible;
+running and result-less jobs remain
 non-evaluable. Failed-job scores describe output quality, not execution success.
 The job CSVs retain `status` and add `is_failed` (`True` for `failed`, otherwise
 `False`). Run configuration records
@@ -53,8 +54,9 @@ Counter resets or inconsistent counts make the window unknown. No interpolation
 or invented requests are used. CSV gaps longer than five seconds contribute no
 coverage. Counts across gaps can still be reported over their measured endpoints,
 with the coverage fraction; they cannot establish a recovery streak. Incident
-counts use the whole incident counter window, independently of the narrower
-recovery bins, and disclose their exact endpoints and CSV line references.
+counts sum separate counter windows within recorded chaos intervals,
+independently of the narrower recovery bins, and disclose their measured
+endpoints and CSV line references.
 
 The original Locust invocation lacks `--csv-full-history`. Its history percentile
 columns are cumulative, according to the [Locust CSV writer source](https://docs.locust.io/en/2.41.1/_modules/locust/stats.html).
@@ -102,10 +104,14 @@ The strict `recovery_seconds`, `recovered` and `active_fault_recovery` fields st
 unknown for this input format. This prevents proxy results from being mistaken
 for the former histogram method.
 
-`recovery_schedule_phase` says `during_scheduled_chaos` only if the entire streak
-fits between a recorded step's schedule start and cleanup start. Otherwise it
-says `after_schedule_cleanup` (or `unknown` for a boundary-crossing streak).
-Neither label proves injection remained active: recurring faults can have idle
+`recovery_schedule_phase` records `during_scheduled_chaos` when the entire
+streak fits between a recorded step's schedule start and cleanup start.
+Current chaos-only calculations exclude bins after cleanup and idle gaps;
+`unknown` can occur when a qualifying streak spans touching chaos intervals
+and no single recorded step contains the entire streak. The compatibility
+label `after_schedule_cleanup` can appear in historical or separately supplied
+outcomes.
+The phase label does not prove injection remained active: recurring faults can have idle
 periods, and fault removal or HPA can explain improvement. Job completion does
 not move the recovery timestamp. The thresholds are configurable research
 choices; evaluate sensitivity without changing the original runs.
@@ -172,7 +178,8 @@ and `logs/grader.log`. See [metrics.md](metrics.md) for their contents. There is
 no automatically generated aggregate research summary or paper-metrics file.
 
 Scenario-table maxima/means use evaluable succeeded and failed job scores within
-each run; remediation scores include penalties. Session counts include all jobs,
+each run; remediation scores include penalties. Session counts include outputs
+completed inside recorded chaos intervals,
 not only scored jobs. Means exclude unavailable/judge-failed scores. Keep runs
 as experimental units when performing additional campaign-level aggregation;
 do not let runs with more retries receive more weight accidentally.
@@ -187,7 +194,7 @@ completion, not verified recovery. Legacy per-job metric/final-grade fields stay
 
 `csvs/scenario_table.csv` contains 14 columns: the twelve scenario/score/baseline/best-window/session fields
 and two 5xx imputation counts. Each row is one
-archived run, with maximum and mean scored-job outputs and exported session
+archived run, with maximum and mean scored-job outputs and in-chaos session
 counts. Failed jobs with scores are included; remediation totals include
 penalties. Missing/judge-failed scores are excluded from means, not replaced with
 zero. Job CSVs expose scored counts; per-run JSON retains run identities and provenance.

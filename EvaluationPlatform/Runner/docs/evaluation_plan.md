@@ -1,11 +1,18 @@
-# Paper evaluation plan
+# Historical evaluation proposal (superseded)
 
-This plan defines the two headline numbers used to summarize the 70 application-specific evaluation scenarios: 23 Online Boutique scenarios,
+This retained plan proposes two headline numbers for summarizing the 70 application-specific evaluation scenarios: 23 Online Boutique scenarios,
 23 TeaStore scenarios, 23 full-length Sock Shop scenarios and its retained short case. The scenario catalogue is documented in
 [`scenario.md`](scenario.md).
 
-The analysis is implemented in [`analyzer.py`](../../Grader/analyzer.py).
-Run `python analyzer.py grades/combined` from the Grader directory.
+The current reporting implementation is documented in
+[`reporting/README.md`](../../Grader/reporting/README.md). From the Grader directory,
+run `python -m reporting.report`. Current grading policy is documented in
+[`methodology.md`](../../Grader/docs/methodology.md). This proposal is superseded
+and describes neither current policy nor current results. It predates the current reporting
+pipeline and is retained as a methods proposal, not a description of implemented
+metrics. Its SSR threshold, eligibility rules, and proposed headline rates must
+not be attributed to the current report; use the reporting documentation for
+current behavior.
 
 The evaluation should measure whether the autonomous incident loop eventually
 diagnoses and safely remediates each incident within the fixed scenario window.
@@ -13,8 +20,8 @@ It should not average every intermediate hypothesis as if each were an
 independent incident, and it should not report the single highest score across
 the entire dataset.
 
-The analyzer also reports a configurable **Scenario Success Rate
-(SSR)**. Set its `--threshold` argument. A
+The former analyzer defined a configurable **Scenario Success Rate
+(SSR)** as follows. A
 graded scenario is successful when at least one succeeded, non-empty RCA
 session and at least one succeeded, non-empty remediation session each have
 `rubric.overall_score` greater than or equal to that threshold. Otherwise it is

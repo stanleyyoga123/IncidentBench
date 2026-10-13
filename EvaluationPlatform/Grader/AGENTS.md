@@ -29,6 +29,7 @@ still describe the full upstream repository; resolve local paths from this root.
   optional richer evidence, calibration, aggregation, and output formats.
 - `visualizer/`: archive metric loading, lifecycle timelines, and rendering.
 - `reporting/`: Python analysis helpers and Markdown report generation.
+- `labeler/`: local human-review desk, sample validation, and review exports.
 - `resources/`: authoritative rubric, evaluation policy, scenario policy,
   manually maintained ground truth, and scenario penalties.
 - `tests/`: offline regression tests; `docs/`: contracts and methodology.
@@ -110,17 +111,17 @@ Use `python` below from that environment.
 
 ```bash
 # Focused suites: select those affected by the change.
-python -m pytest -q tests/test_grader.py
-python -m pytest -q tests/test_archive_metrics.py tests/test_research.py tests/test_window_comparison.py
-python -m pytest -q tests/test_visualizer.py
+python -m pytest -q tests/grader/test_best_window_outputs.py tests/test_time_scope.py
+python -m pytest -q tests/test_report_metrics.py tests/test_report_analysis.py
+python -m pytest -q tests/src/reporting tests/src/pipeline
 
 # Full local suite after implementation changes.
 python -m pytest -q
-python -m compileall -q grader visualizer
+python -m compileall -q grader visualizer reporting labeler
 
 # Example offline assessment: choose a fresh output path for each experiment.
-python -m grader --input results/sock-shop-1 --output output/grades/my-offline-check --operational-only
-python -m visualizer --input results/sock-shop-1 --output output/visualizations/my-check
+python -m grader --input results/sock-shop --output output/grades/my-offline-check --operational-only
+python -m visualizer --input results/sock-shop --output output/visualizations/my-check
 ```
 
 `grade.sh` runs visualization, grading, and Markdown reporting for the three

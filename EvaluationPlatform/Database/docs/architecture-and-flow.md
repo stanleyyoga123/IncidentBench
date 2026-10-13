@@ -6,10 +6,11 @@ DatabaseJob is the sole DDL owner for the platform PostgreSQL database. It
 packages Alembic migrations and runs them locally, through Compose, or as a
 Kubernetes Job. It is not a long-running API or workflow coordinator.
 
-AgentOrchestrator is the only runtime application that performs DML. The three
-agent services persist through AgentOrchestrator's internal HTTP API. No agent
-service should import Alembic, create tables at startup, or carry a database
-DSN.
+EvaluationOrchestrator is the only runtime application that performs DML. The
+three job services and AgentOrchestrator persist through its authenticated
+internal HTTP API. RCAAgent, RemediatorAgent, and LearningAgent carry no
+database DSN. AgentOrchestrator uses a read-only connection solely for the
+shared maintenance lock. Runtime services never import Alembic or create tables.
 
 ## Migration chain
 
@@ -18,10 +19,11 @@ DSN.
   -> 20260817_0001  adopt/create legacy anomaly workflow schema
   -> 20260817_0002  destructive split-agent schema replacement
   -> 20260819_0003  additive learning jobs and incident lessons
-  -> 20260831_0004  anomaly and lesson namespace scope (head)
+  -> 20260831_0004  anomaly and lesson namespace scope
+  -> 20260913_0005  durable evaluation ownership and maintenance (head)
 ```
 
-Alembic must report one head: `20260831_0004`.
+Alembic must report one head: `20260913_0005`.
 
 ## Coordinated migration sequence
 
@@ -89,8 +91,8 @@ timestamps.
 ### `remediation_job`
 
 Durable approved remediation with the same job fields plus a restrictive FK to
-its RCA job. Remediation failures can be represented as `needs_review` because
-mutation state may be ambiguous.
+its RCA job. Ambiguous remediation failures are terminal `failed`; legacy
+`needs_review` completion requests are normalized to `failed` by the store.
 
 ### `agent_execution_slot`
 
@@ -139,6 +141,14 @@ namespace; namespaced deployment evidence must carry its exact namespace.
 Confidence is constrained to 0–1; ordinal is non-negative; versions are
 positive. Indexes support active scope/recency retrieval and confidence review.
 
+## Revision 0005: evaluation ownership
+
+Revision `20260913_0005` adds the singleton `evaluation_control` table with
+`run_id`, `maintenance`, and `reset_done`, and creates its initial row.
+EvaluationOrchestrator owns control transitions; AgentOrchestrator reads the
+maintenance state while holding the matching advisory lock. Ownership survives
+process restarts and serializes evaluation runs. Downgrade removes this table.
+
 ## Relationship overview
 
 ```mermaid
@@ -159,13 +169,13 @@ a polymorphic FK.
 
 ## Runtime transaction invariants
 
-The schema supports, while AgentOrchestrator enforces:
+The schema supports, while EvaluationOrchestrator enforces through its store APIs:
 
 - event acknowledgement only after commit;
 - idempotency through unique event/job keys;
 - optimistic workflow/lesson versions;
 - one active execution lease globally;
-- safe RCA/learning retry and remediation `needs_review`;
+- bounded RCA/learning retry and terminal ambiguous remediation failure;
 - atomic learning success, lesson publication, and slot release;
 - cascade cleanup of workflow learning data and remediation artifacts.
 
@@ -220,9 +230,10 @@ survive an incompatible rollout.
 
 ## Evaluation cleanup/export interaction
 
-Evaluation pre-run truncates all current runtime tables, including
-`incident_lesson` and `learning_job`, in one statement, then clears—but does not
-truncate—the singleton slot. Including the learning tables is required by FK
+EvaluationOrchestrator's authenticated pre-run reset truncates all workflow
+runtime tables, including `incident_lesson` and `learning_job`, in one statement,
+then deletes and recreates the empty execution-slot row. It preserves
+`evaluation_control` ownership and maintenance. Including the learning tables is required by FK
 relationships even when they appear empty.
 
 Evaluation post-run exports learning jobs with ordered nested lessons before the
@@ -232,7 +243,7 @@ experiments.
 ## Troubleshooting
 
 - `password authentication failed`: compare DatabaseJob Secret values,
-  persisted role password, and AgentOrchestrator `DATABASE_DSN`; rerun the
+  persisted role password, and both orchestrators' `DATABASE_DSN`; rerun the
   password synchronization path rather than regenerating unrelated Secrets.
 - Migration refuses reset: legacy tables contain data; stop writers, back up as
   required, and explicitly set the reset flag only for the coordinated reset.
@@ -257,6 +268,7 @@ experiments.
 | `migrations/versions/20260817_0002_agent_services.py` | Destructive split-agent replacement. |
 | `migrations/versions/20260819_0003_learning_lessons.py` | Additive learning schema and slot repair. |
 | `migrations/versions/20260831_0004_namespace_scope.py` | Namespace scope for anomaly events and lessons. |
+| `migrations/versions/20260913_0005_evaluation_control.py` | Durable evaluation ownership and maintenance singleton. |
 | `kubernetes/job.yaml` | In-cluster migration execution. |
 | `deploy.sh` | Context/Secret validation, PostgreSQL readiness/password sync, Job run. |
 | `tests/test_migrations.py` | Migration and destructive-guard contracts. |

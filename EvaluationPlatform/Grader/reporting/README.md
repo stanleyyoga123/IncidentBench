@@ -41,8 +41,10 @@ paths resolve from the Grader root.
 `PYTHON` overrides the interpreter executable; otherwise `.venv/bin/python`,
 `python`, then `python3` are tried. Judge configuration supports `JUDGE_URL`,
 `JUDGE_MODEL`, `JUDGE_TOKEN`, `JUDGE_TIMEOUT_SECONDS`, `JUDGE_MAX_TOKENS`, and
-`GRADER_CONCURRENCY`, or forwarded grader options. Existing launcher defaults
-retain its configured local endpoint, `Qwen/Qwen3.6-35B-A3B`, 600-second timeout,
+`GRADER_CONCURRENCY`, or forwarded grader options. Set `JUDGE_URL` for your own
+server. Existing launcher defaults
+use a configured private-network endpoint (unlike the module CLI's localhost
+default), `Qwen/Qwen3.6-35B-A3B`, a 600-second timeout,
 8192-token allowance, and five workers.
 
 To generate only the report from existing archives and grades:

@@ -6,8 +6,8 @@ an answer even when parsing, tool execution, or recovery verification fails.
 ## Save sequence
 
 1. RCA, Remediator, and LearningAgent send generated text to
-   `POST /api/v1/internal/{service}/jobs/{job_id}/output` before parsing or verification.
-2. Remediator also checkpoints its parsed result before checking verified recovery.
+   `POST /api/v1/internal/{service}/jobs/{job_id}/output` before parsing.
+2. Remediator also checkpoints its parsed result before durable completion.
 3. The worker finishes the job. Omitted output fields preserve their checkpointed
    values. A temporary checkpoint request failure includes the generated answer
    in the failure-completion request as a fallback.
@@ -21,8 +21,12 @@ lease. They do not release the execution slot or assert that remediation worked.
 
 ## Autonomous outcomes
 
-Unsuccessful or unverified remediation and expired remediation leases finish as
-`failed`. Workflow reconciliation records failure, its error and completion time,
+A remediation job with nonempty final output finishes as `succeeded`, including
+output describing failed execution, skipped actions, or unverified recovery.
+This status indicates output completion; assess actual recovery from output and
+tool audits. Empty output, errors preventing durable completion, and expired
+remediation leases finish as `failed`. Workflow reconciliation records terminal
+failure, its error and completion time,
 and releases the workflow from further reconciliation. No manual review decision
 is required. The same ambiguous mutation is not blindly replayed; later detector
 incidents can initiate a fresh investigation.
@@ -33,7 +37,7 @@ terminal failure. Historical archive files retain their original contents.
 
 ## Validation
 
-Unit tests cover output before parse/verification rejection, checkpoint-failure
+Unit tests cover output before parse rejection, checkpoint-failure
 fallback, stale-lease rejection, terminal workflow finalization, and preservation
 of failed outputs through Runner's session exporter. Live validation uses synthetic
 inputs and real deployed job services/model calls. Its exported files are kept

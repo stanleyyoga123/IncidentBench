@@ -40,7 +40,7 @@ sequenceDiagram
   P-->>T: matrix results
   T->>T: normalize finite values and order timestamps
   loop every metric series
-    T->>R: resolve method/resource/name/metric
+    T->>R: resolve method/namespace/resource/name/metric
     R-->>Z: effective profile + provenance
     Z->>Z: evaluate tail and persistence guards
   end
@@ -104,9 +104,10 @@ requirements need a correspondingly larger collection window.
 
 Each monitor resolves its own method using this precedence:
 
-1. exact `(method, resource, name, metric)`;
-2. resource wildcard `(method, resource, "*", metric)`;
-3. global `(method, "*", "*", metric)`.
+1. exact `(method, namespace, resource, name, metric)`;
+2. namespace/resource wildcard `(method, namespace, resource, "*", metric)`;
+3. namespace-wildcard exact/resource-wide overrides;
+4. global `(method, "*", "*", "*", metric)`.
 
 If no profile supports a series, that method skips it. The selected profile ID,
 version, source, and effective parameters are attached to the emitted detection
@@ -152,7 +153,7 @@ bounded tuning cannot turn an outage detector into its opposite.
 ## 7. Deduplication identity and delivery
 
 For every anomalous detection, the sink constructs an envelope and calculates
-SHA-256 over compact key-sorted JSON containing timestamp, resource, name,
+SHA-256 over compact key-sorted JSON containing timestamp, namespace, resource, name,
 metric, method, detail, profile ID/version, and profile parameters. That digest
 is `event_id`.
 
@@ -167,7 +168,8 @@ committed the event. There is no detector-side database or outbox.
 
 ## 8. Cooldown semantics
 
-Cooldown is keyed by `resource/name/metric` inside each monitor. Crucially, it
+Cooldown is keyed by `namespace:resource:name:metric` inside each monitor,
+using `_cluster` when namespace is null. Crucially, it
 starts only after AgentOrchestrator acknowledges the complete batch. A timeout,
 401, 5xx, malformed response, or partial acknowledgement leaves every detected
 series eligible on the next cycle.

@@ -7,11 +7,13 @@ contact the cluster, model, or other services.
 From `EvaluationPlatform/Grader/` (or a standalone Grader root), run:
 
 ```bash
-python -m visualizer --input results/sock-shop-1 --output output/visualizations/new-assessment
+python -m visualizer --input results/sock-shop --output output/visualizations/new-assessment
 ```
 
-The default input is `results/result-3` and the default output is
-`output/visualizations` under the Grader root. Both are configurable:
+The default input is `results/result-3`, resolved from the caller's working
+directory; select the archive directory explicitly for current results. The
+default output is `output/visualizations` under the Grader root. Explicit
+relative input/output paths resolve from the caller's working directory:
 
 ```bash
 PYTHONPATH=. python -m visualizer \
@@ -69,6 +71,7 @@ best remaining Prometheus identity label. Missing optional session files
 result in empty lanes rather than a failure. Invalid metadata or a run with no
 timeline events is reported as a failure, while other runs continue rendering.
 
-New archives additionally plot client P95 histogram estimates, failure ratio and successful throughput. These are distinct from per-service mesh metrics. Incident outcomes and methodology hashes are documented in the [research guide](../docs/methodology.md).
+Archives with optional `evidence/client-intervals.jsonl` additionally plot client
+P95 histogram estimates, failure ratio and successful throughput. These are distinct from per-service mesh metrics. Incident outcomes and methodology hashes are documented in the [research guide](../docs/methodology.md).
 
 Original Runner CSV histories also produce client failure-ratio and successful-throughput charts from counter differences. Cumulative client P95 is not plotted as interval latency. No Runner instrumentation update is required.

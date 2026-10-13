@@ -7,8 +7,9 @@ evaluator-only inputs for exact execution timing and reproducibility; the
 catalogue below describes only the production-observable incident condition.
 The remediation descriptions match the grader ground-truth policy in
 [`resources/scenario-policy.md`](../../Grader/resources/scenario-policy.md).
-The paper-level aggregation and reporting method is defined in
-[`evaluation_plan.md`](evaluation_plan.md).
+The historical paper-level methods proposal is retained in
+[`evaluation_plan.md`](evaluation_plan.md); current reporting behavior is documented
+in [`reporting/README.md`](../../Grader/reporting/README.md).
 
 ## Remediation types
 

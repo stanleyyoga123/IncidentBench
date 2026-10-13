@@ -1,7 +1,7 @@
 # LearningAgent
 
-LearningAgent creates durable, reusable incident lessons from successful RCA and
-remediation outcomes. It exposes asynchronous authenticated jobs, uses no MCP
+LearningAgent creates durable, reusable incident lessons from completed RCA and
+remediation output, assessing the actual outcome from evidence. It exposes asynchronous authenticated jobs, uses no MCP
 tools, and persists only through EvaluationOrchestrator's internal store API.
 
 See [`docs/README.md`](docs/README.md) for the detailed learning lifecycle and

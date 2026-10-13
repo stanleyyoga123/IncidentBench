@@ -406,7 +406,9 @@ The last-five-minute baseline must have completed, pass any recorded health
 assessment, have client failure ratio ≤1%, and satisfy coverage/request rules.
 Client bins need at least 100 requests and 90% coverage. Service checks need at
 least two samples per bin; archive scrape step must be ≤15 seconds. Missing
-bins break recovery streaks. The observation deadline is recorded metrics end.
+bins break recovery streaks. The observation deadline is the earlier of recorded
+metrics end and the final chaos interval end, capped by duration or cleanup.
+Bins outside recorded chaos intervals are excluded.
 Full algorithm and exclusions are in [methodology.md](methodology.md).
 
 | Operational status | Meaning |
@@ -430,8 +432,10 @@ Weighted rubric totals range from 0 to 1. Remediation's final total is
 `max(0, rubric_score − penalty_total)`; RCA has no penalties. Alignment uses
 root-cause/remediation correctness ≥0.75, independently of penalties.
 Scenario-table score maxima and means include scored succeeded **and failed**
-jobs. Missing scores are excluded, not zero. Session counts include all exported
-jobs, including running and result-less jobs; they are not scored denominators.
+jobs completed inside recorded chaos intervals. Missing scores are excluded,
+not zero. Session counts include every output with an in-chaos completion
+timestamp, including result-less jobs; they are not scored denominators.
+Running jobs without completion timestamps are excluded.
 
 Current RemediatorAgent `succeeded` means it produced nonempty final output;
 that output may report a failed, skipped or unverified action. Historical
@@ -456,8 +460,8 @@ archive grading; see [evidence-contract.md](evidence-contract.md).
 
 The normal CLI no longer emits `incidents.csv`, `incidents.json`,
 `paper_metrics.csv`, `research_summary.*`, or `scenario_table.md/json`.
-Historical files and helper functions can still exist; they are not current
-CLI outputs. Do not treat their old counts as the current campaign's results.
+Historical files can still exist; they are not current CLI outputs. Do not treat
+their old counts as the current campaign's results.
 
 
 ### Chaos-only grading scope

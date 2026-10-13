@@ -1,11 +1,17 @@
-# Agent platform documentation
+# IncidentBench documentation
 
-The implemented platform detects Kubernetes anomalies, commits them to a
-durable coordinator, performs evidence-backed RCA, automatically submits
-required remediation with a snapshot hash, remediates through guarded tools,
-evaluates the outcome, and turns successful workflows into reusable lessons.
+IncidentBench runs controlled Kubernetes incident experiments, captures their
+evidence, and grades incident-response outputs and application behavior. The
+bundled reference agents provide detection, RCA, guarded remediation, and
+evidence-linked learning; another response system can use the Runner's lifecycle
+integrations.
 
-Read in this order:
+Start with the [project quickstart](../README.md),
+[Runner guide](../EvaluationPlatform/Runner/README.md),
+[Grader guide](../EvaluationPlatform/Grader/README.md), and
+[reporting guide](../EvaluationPlatform/Grader/reporting/README.md).
+
+For the reference agent platform, read:
 
 1. [Architecture](architecture.md)
 2. [Runtime flows](flows.md)

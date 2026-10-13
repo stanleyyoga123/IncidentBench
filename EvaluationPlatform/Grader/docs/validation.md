@@ -11,7 +11,7 @@ For implementation changes, run from the Grader root:
 
 ```bash
 python -m pytest -q
-python -m compileall -q grader visualizer
+python -m compileall -q grader visualizer reporting labeler
 ```
 
 Focused fixtures include semantic failed-job eligibility, independent and paired
@@ -52,7 +52,10 @@ localhost settings. Python compileall, diff whitespace, 204 YAML parses, 43 shel
 syntax checks and offline Ansible syntax passed. Counts include unrelated
 concurrent lock-reset tests; no cluster apply was used.
 
-## Existing archive sample
+## Historical archive sample: 2026-09-15
+
+The paths, report files, and analyzer below describe that validation pass;
+they are not current checkout requirements or current output contracts.
 
 `../Runner/results/sock-shop-1` contains ten run folders. A real operational-only
 historical report was saved under `grades/sock-shop-1-archive-v3` (before

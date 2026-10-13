@@ -11,7 +11,7 @@ penalty definitions for the maintained scenario references.
 From `EvaluationPlatform/Grader/`:
 
 ```bash
-PYTHONPATH=. python -m grader --input results/sock-shop-1 --output output/grades/new-assessment
+PYTHONPATH=. python -m grader --input results/sock-shop --output output/grades/new-assessment
 ```
 
 The semantic judge defaults to the local OpenAI-compatible vLLM endpoint at
@@ -30,7 +30,7 @@ each application's entry workload and namespace. See the
 available for individual grading runs:
 
 ```bash
-python -m grader --input results/sock-shop-1 --output output/grades/new-assessment --concurrency 10
+python -m grader --input results/sock-shop --output output/grades/new-assessment --concurrency 10
 ```
 
 ```bash
@@ -80,14 +80,19 @@ Each run is discovered through `metadata.json` and must contain:
 
 Ground truth is never generated or overwritten. A missing ground-truth file,
 archived scenario, or archived chaos manifest marks only that run `ungraded`;
-other runs continue. Archived manifests remain required for reproducibility,
+other runs continue. Maintained references include the current application
+scenarios and smoke/multi-fault scenarios; legacy `real-*` ground-truth aliases
+have been removed. To grade
+older archives using those names, supply a separate matching reference directory
+with `--ground-truth`. Archived manifests remain required for reproducibility,
 input validation, and remediation-penalty judging, but are not supplied to the
 normal RCA or remediation rubric judge.
 
 ## Rubric classification
 
 Every exported job is reported independently. Succeeded and failed jobs with a
-non-empty final `result` are sent to the judge. The archived lifecycle status is
+non-empty final `result` completed inside recorded chaos intervals are sent
+to the judge. The archived lifecycle status is
 preserved independently of semantic quality. Running jobs remain non-evaluable.
 
 `resources/rubric.json` is the source of truth for criterion ids, class labels,
@@ -149,9 +154,11 @@ files. Penalty checkpoints are cached separately with the penalty-file hash, so
 editing a penalty JSON does not redo rubric classifications.
 
 Each successful classification is cached immediately and atomically by SHA-256
-over the prompt version, rubric hash, model, job kind, selected ground truth,
-and final result JSON. Penalty cache keys additionally include normalized
-manifests and the penalty-file hash. Editing `rubric.json` therefore invalidates
+over the prompt version, rubric hash, model and revision, job kind, scenario,
+selected ground truth, final result JSON, and bounded observations/evidence
+assessment. Use `--model-revision` or `JUDGE_MODEL_REVISION` to record an immutable
+judge revision; an omitted revision is recorded as unknown. Penalty cache keys
+additionally include normalized manifests and the penalty-file hash. Editing `rubric.json` therefore invalidates
 old rubric checkpoints. `JUDGE_MAX_TOKENS` or `--judge-max-tokens` controls the
 response allowance; the 8,192-token default accommodates local reasoning
 models.
@@ -178,7 +185,7 @@ For each run, the grader writes:
   penalty summaries, followed by independent window comparisons;
 - `output/grades/runs/<run>/judge-cache.json`: hash-keyed classification checkpoints.
 
-New output directories contain only:
+The standard output layout is:
 
 ```text
 runs/<run>/grade.json
@@ -287,7 +294,8 @@ in both window CSVs and per-run JSON. Missing query files, traffic gaps and
 explicit nonfinite samples remain unavailable. P95 is never zero-filled.
 
 Score maxima and means include scored succeeded and failed jobs; remediation
-uses final scores after penalties. Session counts include every exported job;
+uses final scores after penalties. Session counts include only outputs completed
+inside recorded chaos intervals;
 scored denominators can be obtained from the job CSVs. One row represents one archived
 run, even when scenario names repeat. Per-run JSON records selection settings, trimmed
 baseline boundaries, coverage, counts, and unknown reasons in `paired_window`.

@@ -20,18 +20,18 @@ process; the CLI does not automatically load that file. Keep it untracked.
 
 ```bash
 # Semantic judging plus archive measurements:
-python -m grader --input results/sock-shop-1 --output output/grades/new-assessment
+python -m grader --input results/sock-shop --output output/grades/new-assessment
 
 # Archive measurements only; no model calls:
-python -m grader --input results/sock-shop-1 --output output/grades/new-offline-assessment --operational-only
+python -m grader --input results/sock-shop --output output/grades/new-offline-assessment --operational-only
 
 # Configure both descriptive comparisons and the paired scenario table:
-python -m grader --input results/sock-shop-1 --output output/grades/new-window-assessment \
+python -m grader --input results/sock-shop --output output/grades/new-window-assessment \
   --comparison-window-minutes 5 --baseline-ignore-minutes 5 \
   --table-workload front-end --table-namespace sock-shop --table-max-5xx-rate 0.5
 
 # Offline plots:
-python -m visualizer --input results/sock-shop-1 --output output/visualizations/new-assessment
+python -m visualizer --input results/sock-shop --output output/visualizations/new-assessment
 ```
 
 `./grade.sh` runs the visualizer for all three applications, then the grader,
@@ -55,6 +55,8 @@ output/
   report/
     report.md
     report-applications.png
+    report-activity.png
+    report-activity.svg
   visualizations/<app>/
   grades/<app>/
     csvs/
@@ -116,7 +118,8 @@ never follows old pod paths or endpoint addresses stored in metadata.
 
 Semantic job inputs are `sessions/rca_session.json` and
 `sessions/remediation_run.json`. **Succeeded and failed jobs with nonempty final
-`result` objects** are eligible. Running/result-less jobs and judge failures remain
+`result` objects
+completed inside recorded chaos intervals** are eligible. Running/result-less jobs and judge failures remain
 explicitly non-evaluable. Status and `is_failed` are preserved in the job CSVs.
 Raw output, private reasoning and tool traces do not replace final results.
 
@@ -198,8 +201,7 @@ reviewer name. A changed name is a separate reviewer.
 
 Defaults are source-tree `judge_score/` and `output/manual-review/`, independent
 of the current directory. When the output directory contains `sample.json`, the
-desk loads only its selected cases, in manifest order. The current selection is
-the same 100 cases reviewed by the AI (50 RCA and 50 remediation). The header
+desk loads only its selected cases, in manifest order. The header
 identifies the selection; filters, navigation, and progress stay within it.
 Use `--sample PATH` to choose an explicit manifest, or `--all-sessions` to ignore
 the saved selection. A custom `--output PATH` without `sample.json` reviews the

@@ -27,16 +27,11 @@ TCP port 22 must be reachable from the runner on the tool node to all service
 nodes. Re-run the cleaner playbook whenever a node is rebuilt or the helper
 changes.
 
-Read-only verification from the workspace root:
+The cleanup script remains in Runner and requires `--yes` against a confirmed
+target. It records host checks as part of cleanup; there is no separate
+`check_chaos_state.sh` entrypoint:
 
 ```bash
-EvaluationPlatform/Runner/check_chaos_state.sh
-```
-
-The destructive cleanup script remains in Evaluation and requires an explicit
-confirmation or `--yes`:
-
-```bash
-EvaluationPlatform/Runner/scripts/cleanup_chaos_state.sh
+EvaluationPlatform/Runner/scripts/cleanup_chaos_state.sh --yes
 ```
 

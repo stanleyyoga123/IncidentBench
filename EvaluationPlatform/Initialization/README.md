@@ -64,7 +64,7 @@ Then install the platform:
 cd EvaluationPlatform/Initialization/ansible
 ansible-playbook site.yml \
   --ask-vault-pass \
-  -e @/absolute/path/to/secrets.vault.yml
+  -e @vault.yml
 ```
 
 `site.yml` performs only these phases:
@@ -134,7 +134,7 @@ cd EvaluationPlatform/Initialization/ansible
 ansible-inventory --graph
 ansible-playbook site.yml --syntax-check
 cd ../../Runner
-kubectl kustomize applications/online-boutique/kustomize >/dev/null
+kubectl kustomize resources/applications/online-boutique/kustomize >/dev/null
 ```
 
 Syntax checks are safe and local. Do not run provisioning, chart upgrades,

@@ -10,9 +10,10 @@
 | LearningAgent | EvaluationOrchestrator job-store API; OpenAI-compatible model; optional Langfuse |
 | MCPTools | Kubernetes API; Prometheus; Loki; Jaeger; utility network probes |
 | DatabaseJob | Kubernetes API or Docker Compose; PostgreSQL |
-| Evaluation | Kubernetes API; Infrastructure inventory/manifests; workload generator |
+| Runner | Kubernetes API; Initialization inventory/manifests; workload generator; configured lifecycle integration (EvaluationOrchestrator for the bundled agents) |
+| Grader | local Runner archives and grading resources; OpenAI-compatible judge for semantic grading; saved grades for reporting |
 
-Python services require FastAPI/Pydantic; both orchestrators and DatabaseJob
+The agent HTTP services require FastAPI/Pydantic; both orchestrators and DatabaseJob
 use psycopg. MCPTools and MCP clients use the official MCP Python SDK 2.x with
 stateless JSON Streamable HTTP. Remediation additionally requires Ansible,
 `ansible-runner`, the `kubernetes` Python client, `jsonpatch`, and the

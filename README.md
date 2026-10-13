@@ -232,7 +232,7 @@ them or run database migrations.
 
 After platform prerequisites and database migrations are installed, run
 `./deploy.sh` from the workspace root. It applies each component's current local
-Kubernetes files in dependency order: EvaluationOrchestrator, MCPTools, LearningAgent, RCAAgent,
+Kubernetes files in dependency order: MCPTools, EvaluationOrchestrator, LearningAgent, RCAAgent,
 RemediatorAgent, AgentOrchestrator, then AnomalyDetector. It restarts all eight
 Deployments and waits for readiness so ConfigMap and Secret changes take effect.
 

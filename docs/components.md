@@ -11,7 +11,8 @@
 | MCPTools | cluster tools, profile Secrets/manifests, RBAC, PVC, probes, deploy script | workflow DML |
 | DatabaseJob | PostgreSQL, Secret, Compose, Alembic schema/migration Job, deploy script | long-running coordination |
 | Infrastructure | cluster/node Ansible, platform namespaces/tools, Helm values | application/database/evaluation deployment or Secrets |
-| Evaluation | experiments, restarts, cleanup, artifacts, runner Secret/Ansible/deploy script | platform installation |
+| Runner | experiments, restarts, cleanup, artifacts, runner Secret/Ansible/deploy script | platform installation or database access |
+| Grader | offline archive measurements, semantic grading, visualization, reports | live cluster operations or changes to source archives |
 
 API entry points are `/api/v1/anomalies`, `/api/v1/workflows`,
 `/api/v1/rca/jobs`, `/api/v1/remediation/jobs`, `/api/v1/learning/jobs`, and `/mcp`. Each HTTP service

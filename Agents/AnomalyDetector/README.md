@@ -70,7 +70,8 @@ in AgentOrchestrator's Secret. Deploy only after AgentOrchestrator is healthy.
 
 The first adaptability control surface is available under
 `/api/v1/detector/profiles`. Profiles are versioned and resolved in this order:
-exact resource/name, resource wildcard, then the built-in global default.
+exact namespace/resource/name, namespace/resource wildcard, namespace-wildcard
+overrides, then the built-in global default.
 
 Other agents and MCP-style HTTP adapters should use the complete
 [agent API contract](docs/agent-api.md). It documents stable tool names,
@@ -79,7 +80,7 @@ workflows.
 
 - `GET /api/v1/detector/profiles` lists active profiles.
 - `GET /api/v1/detector/profiles/resolve` shows the effective profile for a
-  method/resource/name/metric tuple.
+  method/namespace/resource/name/metric tuple.
 - `GET /api/v1/detector/profiles/{id}` and `.../{id}/history` expose the active
   revision and audit history.
 - `POST /api/v1/detector/profiles` creates a scoped override.

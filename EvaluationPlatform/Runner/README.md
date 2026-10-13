@@ -9,7 +9,7 @@ The runner owns load, application placement verification, Chaos Mesh execution, 
 - `config/`: shared global settings, environment examples and ignored local `environment.json`, plus the editable `load-shapes.json` registry.
 - `hooks/`: importable lifecycle/helpers and customizable `integrations/`, `prerun/`, and `postrun/` scripts.
 - `scripts/`: build, deployment and chaos cleanup operations.
-- `results/`: raw run archives. Grading outputs, visualization outputs, and `analyzer.py` live in `../Grader/`.
+- `results/`: raw run archives. Grading, visualization, and reporting live in `../Grader/`.
 
 From this directory, copy `config/environment.example.json` to `config/environment.json` and fill your endpoints, inventory path and node IPs. Supply the referenced token through the environment. Validate before running:
 
@@ -23,8 +23,8 @@ Build with `scripts/build.sh`; deploy with `scripts/deploy.sh` only against an a
 
 ```bash
 cd ../Grader
-./grade.sh --input ../Runner/results --output grades
-python analyzer.py
+./grade.sh --input ../Runner/results/online-boutique
+python -m reporting.report --results-dir ../Runner/results --grades-dir output/grades
 ```
 
 ## Configuration

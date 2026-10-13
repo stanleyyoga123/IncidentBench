@@ -2,7 +2,7 @@
 
 ## Purpose and boundaries
 
-LearningAgent converts a completed successful incident workflow into zero or
+LearningAgent converts a completed incident workflow into zero or
 more reusable, atomic lessons. Its output helps future RCA jobs investigate
 faster and avoid previously observed mistakes.
 
@@ -16,11 +16,12 @@ durable jobs, retries, validation, lesson publication, activation and retrieval.
 AgentOrchestrator submits learning only after:
 
 - successful RCA that requires no remediation; or
-- successful remediation with verification result.
+- remediation with nonempty final output recorded as `succeeded`.
 
-It does not learn from failed RCA, declined plans, failed remediation,
-`needs_review`, or another ambiguous workflow. This avoids turning uncertain or
-unsafe outcomes into reusable guidance.
+It does not learn from failed RCA, declined plans, or remediation jobs that
+failed before durable output completion. Remediation `succeeded` denotes output
+completion, so learning must assess failed, skipped, or unverified actions from
+the result and tool audits rather than assume recovery.
 
 ## Sequence
 
@@ -49,7 +50,8 @@ sequenceDiagram
   L->>S: finish succeeded
   S->>DB: commit job result, lessons, and slot release
   O->>L: GET job status
-  O->>DB: finalize workflow
+  O->>S: finalize workflow
+  S->>DB: commit workflow completion
 ```
 
 ## 1. Source snapshot construction

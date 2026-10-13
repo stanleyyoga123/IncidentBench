@@ -25,9 +25,8 @@ Secret. Deploy after MCPTools, DatabaseJob and EvaluationOrchestrator.
 ### Output persistence
 
 Generated final text is saved through EvaluationOrchestrator's authenticated job-output
-endpoint before parsing or verification. Failed jobs retain `raw_output` in
-session exports; Remediator also retains its parsed `result` when recovery
-verification fails. Failure status remains separate from generated claims.
+endpoint before parsing. Failed jobs retain `raw_output` in session exports.
+Failure status remains separate from generated claims.
 
 ## Container image
 

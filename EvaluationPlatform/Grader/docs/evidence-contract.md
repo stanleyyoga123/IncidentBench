@@ -1,14 +1,14 @@
 # Grader input contract: existing Runner archives
 
 The supported default input is the previous Runner output, copied locally, for example
-`results/sock-shop-1` under the Grader workspace. No new evidence directory or
+`results/sock-shop` under the Grader workspace. No new evidence directory or
 Runner change is required.
 
 | File | Fields used | Purpose |
 | --- | --- | --- |
 | `metadata.json` | `metrics.start/end/step_seconds`, `baseline_seconds`, `baseline_health`, `phases`, `chaos_steps`, `status`, `application` | Baseline, scheduled fault and observation boundaries; validity |
 | `loadgenerator/*_stats_history.csv` | `Name=Aggregated`, `Timestamp`, `Total Request Count`, `Total Failure Count`, `Total Average Response Time` | Client interval counters, coverage and descriptive mean response-time estimates |
-| `loadgenerator/*_stats.csv` | Aggregate counts, `95%`, `Average Response Time` | Whole-run client diagnostics |
+| `loadgenerator/*_stats.csv` | Aggregate counts, `95%`, `Average Response Time` | Whole-run diagnostics; omitted from chaos-only metrics |
 | `metrics/*.json` | `data.result[].metric` and `values` | All original telemetry families; individual-service proxy checks |
 | `inputs/scenario.json`, archived chaos YAML | Existing scenario names and faults | Semantic ground truth matching and penalties |
 | `sessions/rca_session.json`, `remediation_run.json` | IDs, status, result and actual lifecycle timestamps | Semantic outputs, attempts and available timings |
@@ -53,7 +53,8 @@ evidence bundles. Existing session results remain the semantic input contract.
 
 ## Semantic job eligibility
 
-Succeeded and failed jobs with non-empty final `result` objects are scored.
+Succeeded and failed jobs with non-empty final `result` objects completed
+inside recorded chaos intervals are scored.
 Running and result-less jobs retain non-evaluable dispositions. The original
 `status` is preserved; job CSVs add `is_failed` (`True` for `failed`, otherwise
 `False`). A semantic score does not change execution or recovery outcomes.

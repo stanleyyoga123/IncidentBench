@@ -9,6 +9,9 @@ flowchart LR
   O -->|persistence HTTP| S[EvaluationOrchestrator]
   S <--> DB[(PostgreSQL)]
   E -->|evaluation control and export| S
+  E --> A[Local run archive]
+  A --> G[Offline Grader]
+  G --> V[Reports and comparisons]
   O -->|read-only maintenance lock| DB
   O --> R[RCAAgent]
   R -->|store token + job APIs| S
@@ -29,7 +32,7 @@ DML, job-store APIs, evaluation control, and session exports.
 RCAAgent owns analysis and sub-agent orchestration. RemediatorAgent owns
 approved execution and verification. All three job services persist through
 EvaluationOrchestrator HTTP APIs and do not hold PostgreSQL credentials. LearningAgent
-turns successful workflow evidence into atomic lessons and also persists only
+turns completed workflow evidence into atomic lessons and also persists only
 through EvaluationOrchestrator. MCPTools owns
 all cluster-facing capabilities and is deployed twice: a read profile with
 read-oriented RBAC, and a remediation profile with a separate token, bounded
@@ -38,7 +41,7 @@ RBAC, one replica, and a PVC.
 The singleton `agent_execution_slot` serializes RCA, remediation, and learning jobs,
 including direct API submissions. Automated `awaiting_approval` does not hold
 the lease; remediator claims it after RCA releases.
-Every HTTP Service is ClusterIP-only. NetworkPolicy, bearer authentication,
+The bundled agent-platform HTTP Services are ClusterIP-only. NetworkPolicy, bearer authentication,
 server-side tool profiles, and Kubernetes RBAC are independent security layers.
 
 Application namespace is a first-class incident field. The detector preserves
@@ -53,6 +56,11 @@ ConfigMap, placeholder Secret, manifests, and a deploy script that uses
 kubectl's current context. AgentOrchestrator owns the shared ingress
 NetworkPolicy. DatabaseJob owns PostgreSQL and migration resources.
 Infrastructure installs platform tools and namespaces only.
+
+The Grader reads local Runner archives and uses the configured model judge for
+semantic grading. Archive measurements and report generation run locally;
+`--operational-only` disables model calls. Grading does not contact the live
+cluster or change archived evidence. See the [Grader guide](../EvaluationPlatform/Grader/README.md).
 
 Evaluation reset/export also travels through EvaluationOrchestrator HTTP APIs. The durable
 `evaluation_control` singleton gates dispatch during maintenance and owns one
