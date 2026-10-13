@@ -88,18 +88,6 @@ def write_run_report(path: Path, grade: dict[str, Any], rubric: Rubric) -> None:
     path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
-def write_global_report(path: Path, grades: list[dict[str, Any]], rubric: Rubric) -> None:
-    lines = ['# Semantic diagnostics', '',
-             'Evaluable-output means exclude missing and unfinished results; they are not incident success rates.', '']
-    for kind in ('rca', 'remediation'):
-        jobs = [j for g in grades for j in g.get(kind + '_jobs', [])]
-        missing = sum(j.get('rubric') is None for j in jobs)
-        lines.extend([f"{kind.upper()}: {len(jobs)} exported jobs; {missing} without evaluable semantic scores.", ''])
-        lines.extend(_score_table_section(grades, rubric.kind(kind), kind.upper() + ' rubric scores', heading='###'))
-    lines.extend(_global_penalty_section(grades))
-    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-
-
 def _job_table(jobs: list[dict[str, Any]], *, remediation: bool) -> list[str]:
     if not jobs:
         return ["No outputs were present."]
@@ -153,19 +141,6 @@ def _score_matrix_section(
     if not rows:
         return []
     return ["", f"### {title}", ""] + _score_markdown_table(rows, kind_rubric)
-
-
-def _score_table_section(
-    grades: list[dict[str, Any]],
-    kind_rubric: KindRubric,
-    title: str,
-    *,
-    heading: str = "##",
-) -> list[str]:
-    rows = rubric_score_rows(grades, kind_rubric)
-    if not rows:
-        return []
-    return ["", f"{heading} {title}", ""] + _score_markdown_table(rows, kind_rubric)
 
 
 def _combined_remediation_section(
@@ -348,43 +323,6 @@ def _penalty_sections(jobs: list[dict[str, Any]]) -> list[str]:
                 + " |"
             )
     return sections
-
-
-def _global_penalty_section(grades: list[dict[str, Any]]) -> list[str]:
-    rows: list[str] = []
-    for grade in grades:
-        for job in grade.get("remediation_jobs") or []:
-            items = [
-                item
-                for item in ((job.get("rubric") or {}).get("penalties") or [])
-                if item.get("applied")
-            ]
-            if not items:
-                continue
-            for item in items:
-                rows.append(
-                    "| "
-                    + " | ".join(
-                        (
-                            _cell(grade.get("run")),
-                            _cell(job.get("id")),
-                            _cell(item.get("criteria")),
-                            _score(item.get("penalty")),
-                            _cell(item.get("reason")),
-                        )
-                    )
-                    + " |"
-                )
-    if not rows:
-        return []
-    return [
-        "",
-        "## Remediation penalties applied",
-        "",
-        "| Run | Job | Criteria | Penalty | Reason |",
-        "| --- | --- | --- | ---: | --- |",
-        *rows,
-    ]
 
 
 def _rubric_score_row(

@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from statistics import mean
-
-from .paper_summary import finite
 
 
 COLUMNS = (
@@ -24,6 +23,10 @@ COLUMNS = (
     ('baseline_5xx_imputed_samples', 'Baseline 5xx imputed samples'),
     ('best_5xx_imputed_samples', 'Best window 5xx imputed samples'),
 )
+
+
+def finite(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def score_summary(jobs):

@@ -25,7 +25,7 @@ still describe the full upstream repository; resolve local paths from this root.
   structured classifications, deterministic scoring, and reference loading.
 - `grader/archive_metrics.py`, `metrics.py`, `window_comparison.py`: archive-derived
   measurements, telemetry summaries, and baseline/chaos comparisons.
-- `grader/research.py`, `calibration.py`, `research_reports.py`, `reports.py`:
+- `grader/research.py`, `calibration.py`, `reports.py`:
   optional richer evidence, calibration, aggregation, and output formats.
 - `visualizer/`: archive metric loading, lifecycle timelines, and rendering.
 - `reporting/`: Python analysis helpers and Markdown report generation.

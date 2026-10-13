@@ -13,8 +13,7 @@ root-cause analysis (RCA), guarded remediation, verification, and learning.
 Researchers can plug in another response system through lifecycle adapters while
 reusing the workloads, fault scenarios, evidence capture, and grading pipeline.
 
-[Explore the results](EvaluationPlatform/Grader/eda/report.md) ·
-[Open the analysis notebook](EvaluationPlatform/Grader/eda/report.ipynb) ·
+[Explore reporting](EvaluationPlatform/Grader/reporting/README.md) ·
 [Browse the scenarios](EvaluationPlatform/Runner/docs/scenario.md) ·
 [Read the architecture](docs/architecture.md)
 
@@ -115,40 +114,26 @@ missing evidence, and measurement denominators. The
 [grading methodology](EvaluationPlatform/Grader/docs/methodology.md) explains
 what each assessment supports.
 
-### See an example
-
-The [generated report](EvaluationPlatform/Grader/eda/report.md) and
-[notebook](EvaluationPlatform/Grader/eda/report.ipynb) show the current experiment
-snapshot, including application comparisons, session and score summaries,
-response timing, and fault-family outcomes. The notebook presents each table
-in its own cell and recomputes measurements from local archives and existing grades.
-
-![Application comparison from the archived experiment snapshot](EvaluationPlatform/Grader/eda/report-applications.png)
-
-The chart compares semantic scenario attainment and frontend window tolerance.
-Labels show successful/evaluable counts; it illustrates the bundled reference
-system's recorded behavior under these experiments.
-
 ## Try the project
 
 **Explore without a cluster.** Install the Grader requirements and run the
-small [synthetic reporting demo](EvaluationPlatform/Grader/eda/README.md#offline-demonstration)
+small [synthetic reporting demo](EvaluationPlatform/Grader/reporting/README.md#offline-demonstration)
 from a fresh clone:
 
 ```bash
 python -m pip install -r EvaluationPlatform/Grader/requirements.txt
-python EvaluationPlatform/Grader/eda/report.py \
+python EvaluationPlatform/Grader/reporting/report.py \
   --results-dir EvaluationPlatform/Grader/examples/report-demo/results \
   --grades-dir EvaluationPlatform/Grader/examples/report-demo/grades \
   --apps sock-shop online-boutique \
-  --output EvaluationPlatform/Grader/eda/exports/demo/report.md
+  --output EvaluationPlatform/Grader/output/report-demo/report.md
 ```
 
 The bundled fixture contains illustrative scores, not research results. It
 makes no model or cluster calls; absent telemetry remains unknown. Full research
 archives and grades are intentionally excluded from Git. With your own archives
-under the Grader's `results/` and `grades/`, run
-`python EvaluationPlatform/Grader/eda/report.py` to regenerate the real-data
+under the Grader's `results/` and `output/grades/`, run
+`python EvaluationPlatform/Grader/reporting/report.py` to regenerate the real-data
 report. See the [Grader guide](EvaluationPlatform/Grader/README.md) for new runs,
 `--operational-only` assessment, and visualization commands.
 
