@@ -4,12 +4,12 @@
 
 ### Expected incident condition
 
-- The `orders` Deployment configures CPU request and limit both `100m`. Recurring CPU demand reaches this hard limit, leaving no burst headroom and driving CPU saturation across the workload.
+- The `orders` Deployment configures CPU request and limit both `200m`. Recurring CPU demand reaches this hard limit, leaving no burst headroom and driving CPU saturation across the workload.
 - `orders` coordinates checkout across customer records, cart, payment and shipping, with order state stored in `orders-db`; verify order creation and downstream completion.
 
 ### Expected diagnosis and evidence
 
-- **Root cause:** Insufficient per-pod CPU headroom on `orders` in namespace `sock-shop`: request and limit are both `100m`, so demand cannot burst above the requested CPU.
+- **Root cause:** Insufficient per-pod CPU headroom on `orders` in namespace `sock-shop`: request and limit are both `200m`, so demand cannot burst above the requested CPU.
 - **Corroboration:** CPU usage must rise to saturation across all `orders` replicas without a single-node concentration; node memory and unrelated workloads should remain comparatively healthy.
 - A full RCA must name the correct workload, resource or failure dimension, affected scope, and operational effect. Naming only an upstream symptom or dependent service is partial localization.
 
@@ -17,7 +17,7 @@
 
 ### Fully correct
 
-- Vertically right-size only `orders` in namespace `sock-shop`. Increase both CPU request and limit from `100m` using observed sustained demand and eligible-node capacity, keep `request < limit`, preserve memory and unrelated settings, and complete a controlled rollout.
+- Vertically right-size only `orders` in namespace `sock-shop`. Increase both CPU request and limit from `200m` using observed sustained demand and eligible-node capacity, keep `request < limit`, preserve memory and unrelated settings, and complete a controlled rollout.
 
 ### Helpful but incomplete
 
